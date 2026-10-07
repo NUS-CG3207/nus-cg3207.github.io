@@ -1,0 +1,2038 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://nus-cg3207.github.io/asst_manuals/Asst_01/Asst_01/">
+      
+      
+        <link rel="prev" href="../../../getting_started/vivado_install_guide/">
+      
+      
+        <link rel="next" href="../../Asst_02/Asst_02/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Assignment 1 [Weeks 4-5] - NUS CG3207 Labs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12.3%207.29c.2-.18.44-.29.7-.29.27%200%20.5.11.71.29.19.21.29.45.29.71%200%20.27-.1.5-.29.71-.21.19-.44.29-.71.29-.26%200-.5-.1-.7-.29-.19-.21-.3-.44-.3-.71%200-.26.11-.5.3-.71m-2.5%204.68s2.17-1.72%202.96-1.79c.74-.06.59.79.52%201.23l-.01.06c-.14.53-.31%201.17-.48%201.78-.38%201.39-.75%202.75-.66%203%20.1.34.72-.09%201.17-.39.06-.04.11-.08.16-.11%200%200%20.08-.08.16.03.02.03.04.06.06.08.09.14.14.19.02.27l-.04.02c-.22.15-1.16.81-1.54%201.05-.41.27-1.98%201.17-1.74-.58.21-1.23.49-2.29.71-3.12.41-1.5.59-2.18-.33-1.59-.37.22-.59.36-.72.45-.11.08-.12.08-.19-.05l-.03-.06-.05-.08c-.07-.1-.07-.11.03-.2M22%2012c0%205.5-4.5%2010-10%2010S2%2017.5%202%2012%206.5%202%2012%202s10%204.5%2010%2010m-2%200c0-4.42-3.58-8-8-8s-8%203.58-8%208%203.58%208%208%208%208-3.58%208-8%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Merriweather:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Merriweather";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/isa-tutorial.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="nus" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#assignment-1-familiarisation-with-assembly-language-and-hdlfpga" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-header__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NUS CG3207 Labs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Assignment 1 [Weeks 4-5]
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-nav__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NUS CG3207 Labs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/howto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to use this website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/prereq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lab Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/nexys4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting to know your Nexys 4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/vivado_install_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation Guide for Vivado
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment manuals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assignment manuals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 1 [Weeks 4-5]
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 1 [Weeks 4-5]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-0-getting-familiar-with-fpgas-0-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 0: Getting familiar with FPGAs [0 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-assembly-simulation-5-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Assembly simulation [5 points]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 1: Assembly simulation [5 points]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task instructions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-basic-hdl-simulation-and-implementation-5-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Basic HDL simulation and implementation [5 points]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 2: Basic HDL simulation and implementation [5 points]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#design-specification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design specification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-design-a-clock-enable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to design a clock enable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submission-and-demonstration-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission and demonstration instructions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Submission and demonstration instructions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#submission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#demonstration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demonstration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#penalties-for-late-submission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Penalties for late submission
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_02/Asst_02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 2 [Weeks 5-7]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_03/Asst_03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 3 [Weeks 7-9]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_04/Asst_04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 4 [Weeks 9-12]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources for RISC-V
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources for RISC-V
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/rv_memmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/peripherals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Peripheral Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/rv_programming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programming Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/web_sim/riscv_simulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V ISA Tutorial
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RISC-V ISA Tutorial
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/registers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruction Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/dp-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Processing Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/memory-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/control-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/assembly/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Assembly Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/isa-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ISA Designer's Dilemma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Miscellaneous
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Miscellaneous
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../misc/Prefetching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prefetching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-0-getting-familiar-with-fpgas-0-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 0: Getting familiar with FPGAs [0 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-assembly-simulation-5-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Assembly simulation [5 points]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 1: Assembly simulation [5 points]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task instructions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-basic-hdl-simulation-and-implementation-5-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Basic HDL simulation and implementation [5 points]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 2: Basic HDL simulation and implementation [5 points]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#design-specification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design specification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-design-a-clock-enable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to design a clock enable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submission-and-demonstration-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission and demonstration instructions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Submission and demonstration instructions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#submission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#demonstration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demonstration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#penalties-for-late-submission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Penalties for late submission
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="assignment-1-familiarisation-with-assembly-language-and-hdlfpga">Assignment 1: Familiarisation with Assembly Language and HDL/FPGA</h1>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Assignment 1 consists of <strong>2</strong> tasks, worth <strong>5</strong> points each, for a total of <strong>10 points</strong>.</p>
+<p>Assignment 1 is an <strong>individual</strong> exercise. You will work in groups for later labs, but this one must be completed, submitted and demonstrated <strong>individually</strong>.</p>
+</div>
+<h2 id="introduction">Introduction</h2>
+<p>This assignment is designed to test your prerequisite knowledge for smooth completion of this course. It will walk through some basics of desigining for FPGA hardware,  writing RISC-V code, and how to use your RISC-V code in an FPGA design.</p>
+<p>It is <strong>imperative</strong> to put in effort and try your best for this assignment. It may take an amount of effort that is quite disproportionately large, compared to the impact on your grade. This is normal. This assignment is designed to prepare you for the later ones, so that you can spend time debugging your design, instead of debugging your knowledge. </p>
+<h2 id="task-0-getting-familiar-with-fpgas-0-points">Task 0: Getting familiar with FPGAs [0 points]</h2>
+<p>To comfortably complete Assignment 1 (and 2 and 3 and 4, for that matter), solid familiarity with the FPGA design toolchain is required. Having taken, and understood (at least most of) EE2026 or CS2100DE is sufficient for this level of familiarity.</p>
+<p>If you are not confident of your Vivado-wrangling and FPGA-whispering capabilities, you should go to <a href="https://nus-cs2100de.github.io/labs">the CS2100DE website</a> and attempt Lab 1 through Lab 4.</p>
+<p>If you have already read through, and followed the instructions in <a href="../../../getting_started/prereq/">Lab Prerequisites</a>, as you should have done, then congratulations - you are ready for the tasks ahead! If not, now is the time to do so.</p>
+<p>This task is not graded, but necessary to be able to complete the assignments meaningfully. Please do not take it lightly.</p>
+<h2 id="task-1-assembly-simulation-5-points">Task 1: Assembly simulation [5 points]</h2>
+<h3 id="task-overview">Task overview</h3>
+<p>The goal of this task is to get familiar with the <a href="../../../rv_resources/rv_programming/">RISC-V assembler/simulator</a> or <a href="../../../ARM/arm_programming/">ARM assembler/simulator</a> by simulating a sample program. We will simulate a system with memory-mapped input/output (MMIO).</p>
+<p>We assume that the LEDs on this system are mapped to address <a href="" title="0xC00 for ARM"><code>0xFFFF0060</code></a>. This means that when we write to this memory address using <a href="" title="STR for ARM"><code>sw</code></a>, the least significant 16 bits of whatever data we write to this address is shown on the LEDs. For example, if we write <code>0xF0F0</code>, the first four LEDs from the left will be lit, then the next four will be unlit, the next four lit, and the last four unlit.</p>
+<p>Similarly, we assume that the DIP switches are mapped to address <a href="" title="0xC04 for ARM"><code>0xFFFF0064</code></a>. This means that when we read data from this memory address using <a href="" title="LDR for ARM"><code>lw</code></a>, the least significant 16 bits of data read will correspond to the state of the switches. For example, if the switches are alternating between on (up) and off (down), with the first switch from the left being on, the data read will be <code>0xAAAA</code>.</p>
+<h3 id="task-instructions">Task instructions</h3>
+<p>In this task, we will simulate the user providing some input to the switches, and observe the provided assembly program display said input on the LEDs. The first step, of course, is to download the <a href="../../../code_templates/Asst_01/DIP_to_LED.asm">RISC-V assembly sample</a> program or the <a href="../../../code_templates/Asst_01/arm_assembly_sample.s">ARM assembly sample</a> program. Then, we can open our sample file in RARS or Keil MDK and start simulating.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">RISC-V (RARS)</label><label for="__tabbed_1_2">ARM (Keil MDK)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Refer to <a href="https://nus-cs2100de.github.io/labs/manuals/04/lab_04#getting-started-with-rars">Lab 4 from CS2100DE</a> for some help on how to open a RISC-V assembly file in RARS. The guide is written for a different sample program, but the steps to open, assemble and run the code are identical.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Remember to set the memory configuration correctly - from "Settings" -&gt; "Memory Configuration", choose "Default". Setting this correctly is <strong>very important</strong> - our simulation for this assignment depends on this memory configuration being selected, and our CPU design later will also assume this memory configuration.</p>
+</div>
+<p>Once you have assembled and begun to run the RISC-V code line-by-line, before executing line 48, simulate changing the input on the switches by modifying the memory at the address mapped to the DIP switches (<code>0xFFFF0064</code>). Then, continue running the code, including lines 48 and 49, one line at a time, until the memory at the address for the LEDs (<code>0xFFFF0060</code>) changes to reflect the new data. </p>
+<figure>
+<p><img alt="Screenshot of addresses in RARS" src="../rars_address_ss.png" /></p>
+<figcaption>
+<p>Screenshot of addresses in RARS</p>
+</figcaption>
+</figure>
+</div>
+<div class="tabbed-block">
+<p>Refer to <a href="../../../ARM/arm_programming/">the ARM Programming Guide</a> for instructions on how to set up and use Keil MDK. </p>
+<p>Once you have assembled and begun to run the ARM code line by line, before executing line 23, simulate changing the input on the switches by modifying the memory at the address mapped to the DIP switches (<code>0xC04</code>). Then continue running the code, including lines 23 and 24, one line at a time, until the memory at the address for the LEDs (<code>0xC00</code>) changes to reflect the new data.</p>
+<figure>
+<p><img alt="Screenshot of addresses in Keil MDK" src="../keil_address_ss.png" /></p>
+<figcaption>
+<p>Screenshot of addresses in Keil MDK</p>
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>For the assessment, you must be able to demonstrate everything you just did in front of your assessor. You must also understand every line of the sample assembly program, as you may be quizzed on what a particular line (or set of lines) does.</p>
+<p>Finally, dump the instruction and data memories. Click the "Dump Memory" button in RARS to do this. We need to dump the "text" (instruction) and "data" sections, using the "Hexadecimal Text" option, and finally choosing to "Dump to File...". Name these with .mem extension and keep them in a safe place to use in the next task.</p>
+<h4 id="optional-but-recommended">Optional but Recommended</h4>
+<p>Simulate a 'Hello World' Program. 
+There are 2 versions provided - </p>
+<ul>
+<li><a href="../../../code_templates/Asst_01/HelloWorld.asm">HelloWorld</a> that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
+and</li>
+<li><a href="../../../code_templates/Asst_01/HelloWorld_jal_jalr.asm">HelloWorld_jal_jalr</a> that uses subroutines and requires full <code>jal</code> and <code>jalr</code> support.</li>
+</ul>
+<p>Since we are using a simulator now and isn't worried about processor capabilities, you can simulate either or both.
+Read the UART peripheral details to understand the 4 registers involved.
+To simulate it, you need to go to Tools&gt;Keyboard and Display MMIO simulator, and the 'Connect to Program'. The following screenshot will be handy.</p>
+<p><img alt="Hello World" src="../HelloWorld.png" />
+Note that if you are single-stepping, you need to give the keyboard inputs at the appropriate time - after the previous keypress has been ready by the program - there is no buffer to store characters if you send them at a rate faster than the program can consume it.</p>
+<h2 id="task-2-basic-hdl-simulation-and-implementation-5-points">Task 2: Basic HDL simulation and implementation [5 points]</h2>
+<p>In this task, we will implement a simple hardware demo, that reads data from two Read-Only Memories (ROMs) and displays them on the seven-segment display on the FPGA. Note that we are <strong>not</strong> (yet) building a CPU, or anything that actually executes the instructions, so what instructions we use is somewhat irrelevant.</p>
+<h3 id="design-specification">Design specification</h3>
+<p>The system we will implement looks like this:</p>
+<figure>
+<p><img alt="" src="../block_diagram.png" /></p>
+<figcaption>
+<p>A block diagram of the system we want to implement</p>
+</figcaption>
+</figure>
+<p><code>IROM</code> (<code>INSTR_MEM</code> in the figure above) and <code>DMEM</code> (<code>DATA_CONST_MEM</code> in the figure above) are ROMs with 128 words each. We will use RARS to dump our assembly program into these ROMs, so <code>IROM</code> will hold the instructions of the assembly program (in machine code, of course), while <code>DMEM</code> will hold the constants and initialised variables we declare in the program. In later assignments, the <code>DMEM</code> hardware we implement will be writeable, but for now, we assume that it is not, and hence a 'ROM'. The ROMs are both combinational logic and do not need clocking. Both ROMs are only word-addressable, not byte-addressable.</p>
+<p>The <code>Clock_Enable</code> block generates an <code>enable</code> signal, to be used in tandem with the system clock <code>clk</code>. A module using this clock enable should, at every edge of <code>clk</code>, check if <code>enable</code> is high, and only be enabled if it is. </p>
+<p><code>Clock_Enable</code> takes in the upper and center push buttons as inputs, and uses them as follows:</p>
+<ol>
+<li>
+<p>If <code>btnU</code> is pressed, <code>enable</code> is pulled high every once every 250 milliseconds, and stays high for one clock cycle. Thus, the counter is incremented at 4 Hz.</p>
+<p>Example: At t=0 ms, <code>enable</code> is high. Then, at the next clock edge, <code>enable</code> should be low, and it should remain low until t=250 ms. At t=250 ms, enable should be pulled high. Repeat.  </p>
+</li>
+<li>
+<p>If <code>btnC</code> is pressed, <code>enable</code> is never pulled high. </p>
+</li>
+<li>
+<p>If neither <code>btnU</code> nor <code>btnC</code> are pressed, <code>enable</code> is pulled high once every 1000 ms (1 second), and stays high for one clock cycle. Thus, the counter is incremented at 1 Hz.</p>
+<p>Example: At t=0 ms, <code>enable</code> is high. Then, at the next clock edge, <code>enable</code> should be low, and it should remain low until t=1000 ms. At t=1000 ms, enable should be pulled high. Repeat.</p>
+</li>
+<li>
+<p>Both buttons being pressed simultaneously is undefined behaviour. You may choose the outcome in this case.</p>
+</li>
+<li>
+<p>The system behaviour when both <code>btnU</code> and <code>btnC</code> are pressed together is unspecified. It is left to your choice.</p>
+</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The counter does <strong>not</strong> need to be exactly 1 Hz or 4 Hz. We will allow some (generous) margin of error. Using clock enable thresholds that are powers of two could make the hardware simpler, if done properly (How?). However, when <code>btnU</code> is pressed, the counter should be <em>exactly</em> 4 times faster than when it isn't pressed. </p>
+</div>
+<p>The 9-bit counter is a sequential block. It uses the system clock <code>clk</code> and the clock enable signal <code>enable</code> to count up a 9-bit number <code>addr</code>. That is, for every positive edge of <code>clk</code>, if <code>enable</code> is high, the counter should increment by 1. <code>addr</code> is the only output of this module.</p>
+<p><code>addr[7:1]</code> should be used to address both <code>IROM</code> and <code>DMEM</code>. The ROMs will both output whatever value is present in the address <code>addr[7:1]</code>. Then, depending on <code>addr[8]</code>, a multiplexer should choose whether to display the instruction memory or the data memory. The output of this multiplexer is <code>data</code>.</p>
+<p><code>data</code> is connected as an input to <code>Seven_Seg</code> directly, and the seven-segment displays will display the value from <code>data</code> as a hexadecimal value on the seven-segment display on the board. <code>Seven_Seg_Nexys</code> is already created and does not need to be modified or understood at an implementation level.</p>
+<p><code>data</code> is also then split into two 16-bit numbers, <code>data[31:16]</code> and <code>data[15:0]</code>. We use <code>addr[0]</code> as a select input to another multiplexer, to choose whether to display the upper or the lower 16 bits on the LEDs.</p>
+<p>The sequence of events expected, if no buttons are pressed, is:</p>
+<ol>
+<li>
+<p>For one second, the seven-segment displays display the content of <code>IROM[0]</code>, while the LEDs show <code>IROM[0][31:16]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>IROM[0]</code>, while the LEDs show <code>IROM[0][15:0]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>IROM[1]</code>, while the LEDs show <code>IROM[1][31:16]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>IROM[1]</code>, while the LEDs show <code>IROM[1][15:0]</code>.</p>
+</li>
+<li>
+<p>Repeat until the last instruction in <code>IROM</code> is displayed.</p>
+</li>
+<li>
+<p>For one second, the seven-segment displays display the content of <code>DMEM[0]</code>, while the LEDs show <code>DMEM[0][31:16]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>DMEM[0]</code>, while the LEDs show <code>DMEM[0][15:0]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>DMEM[1]</code>, while the LEDs show <code>DMEM[1][31:16]</code>.</p>
+</li>
+<li>
+<p>For one second, the seven segment displays display the content of <code>DMEM[1]</code>, while the LEDs show <code>DMEM[1][15:0]</code>.</p>
+</li>
+<li>
+<p>Repeat until the last datum (singular form of "data"!) in <code>DMEM</code> is displayed.</p>
+</li>
+<li>
+<p>Start again from step 1.</p>
+</li>
+</ol>
+<p>If <code>btnU</code> is pressed, the sequence should be the same, but the interval should be shortened to 250 milliseconds instead of 1 second. The display should not be interrupted or reset, only sped up.</p>
+<p>If <code>btnC</code> is pressed, the sequence should be paused as long as it is held down, and resume from the same place as soon as it is released.</p>
+<p>There is no need to add more logic to skip through the empty parts of <code>IROM</code> and <code>DMEM</code>. The design can cycle through the whole memory. </p>
+<p>We do not care about what happens when the empty/uninitialized parts of <code>IROM</code> and <code>DMEM</code> are accessed, neither in simulation nor in hardware. It can be all <code>X</code> or all <code>0</code>, or anything random. The synthesis tool will probably initialize the empty parts to <code>0</code> or repeat the valid data to fill the uninitialized parts anyway. In a real computer system, access to these unused parts of memory would be considered illegal anyway, and should never happen in a properly written program. </p>
+<h3 id="design-guide">Design guide</h3>
+<p>Download the template for Assignment 1 from <a href="https://github.com/NUS-CG3207/labs/tree/main/docs/code_templates/Asst_01">the labs file repository</a>. Choose the files appropriate for your setup - that is, in your language of preference (Verilog or VHDL), and the constraints file corresponding to the FPGA board model you have. Create a new project and import these files, setting the Top module correctly. Note that using these templates is not mandatory; you may wish to implement completely on your own.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Vivado (like many other IDEs) does not take too kindly to project paths that are too long, contain special/non-English characters, or are in some cloud synchronised folder like OneDrive, Google Drive or Dropbox. All sorts of weird bugs may crop up, which are hard to debug. </p>
+<p>Vivado projects should ideally be stored in a folder with a short and sweet name, that is not continuously synchronised to the cloud. For backups, collaboration and version control, <code>git</code> should be used - whether GitHub, Gitlab or any other implementation.</p>
+</div>
+<p>In total, we will need <code>Top_Nexys</code>, <code>Seven_Seg_Nexys</code>, <code>Clock_Enable</code>, <code>Get_MEM</code>, and one <code>.xdc</code> file corresponding to our board.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The Nexys 4 and Nexys 4 DDR/Nexys A7 use the same FPGA chip on board, but the pins are connected differently. Thus, the part number we choose when creating a new project is the same for both (xc7a100tcsg324-1), however, the constraints file <strong>is different</strong>. Using the wrong constraints file will work for simulation, synthesis, implementation and even bitstream generation - but the bitstream will not work on the board!</p>
+</div>
+<p>We need to fill out <code>Clock_Enable</code>, <code>Get_MEM</code> and <code>Top_Nexys</code> to achieve the functionality described above. </p>
+<p>The hexadecimal text dump should be saved with a <code>.mem</code> file extension. These files can be imported into our Vivado project as design sources, and used to initialise memories using the <code>$readmemh()</code> command. </p>
+<p>Do <strong>NOT</strong> use a clock divider, like you may have used in EE2026. They can cause all sorts of issues, since it becomes difficult for the synthesis tool to route the clocks. </p>
+<h3 id="how-to-design-a-clock-enable">How to design a clock enable</h3>
+<p>Here is some example code that may help better illustrate how a clock enable should be implemented. This is just an example, not necessarily something you will be able to just copy/paste and use; but it should give you an idea of how it should be implemented. </p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Verilog</label><label for="__tabbed_2_2">VHDL</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="k">always</span><span class="w"> </span><span class="p">@(</span><span class="k">posedge</span><span class="w"> </span><span class="n">clk</span><span class="p">)</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">    </span><span class="n">count_fast</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">count_fast</span><span class="o">+</span><span class="mh">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">count_fast</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">26'h3FFFFFF</span><span class="p">)</span><span class="w"> </span><span class="k">begin</span><span class="w"> </span><span class="c1">// EITHER change this to a lower value (say 26'h0000004) for simulation (recommended)</span>
+<span class="w">        </span><span class="n">count_slow_enable</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mh">1</span><span class="mb">'b1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">end</span>
+<span class="w">    </span><span class="k">else</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">        </span><span class="n">count_slow_enable</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mh">1</span><span class="mb">'b0</span><span class="p">;</span><span class="w"> </span><span class="c1">// OR change this to 1'b1 for simulation</span>
+<span class="w">    </span><span class="k">end</span>
+<span class="k">end</span>
+
+<span class="k">always</span><span class="w"> </span><span class="p">@(</span><span class="k">posedge</span><span class="w"> </span><span class="n">clk</span><span class="p">)</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">count_slow_enable</span><span class="p">)</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">        </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">count</span><span class="o">+</span><span class="mh">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">end</span>
+<span class="k">end</span><span class="w"> </span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="k">process</span><span class="p">(</span><span class="n">clk</span><span class="p">)</span>
+<span class="w">    </span><span class="k">variable</span><span class="w"> </span><span class="n">count_fast</span><span class="w"> </span><span class="o">:</span><span class="kt">std_logic_vector</span><span class="p">(</span><span class="mi">25</span><span class="w"> </span><span class="k">downto</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">:=</span><span class="p">(</span><span class="k">others</span><span class="o">=&gt;</span><span class="sc">'0'</span><span class="p">);</span>
+<span class="k">begin</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">clk</span><span class="na">'event</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">clk</span><span class="o">=</span><span class="sc">'1'</span><span class="w"> </span><span class="k">then</span>
+<span class="w">        </span><span class="n">count_fast</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="n">count_fast</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">count_fast</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">x"3FFFFFF"</span><span class="w"> </span><span class="k">then</span><span class="w"> </span><span class="c1">-- EITHER change this to a lower value (say x"0000004") for simulation</span>
+<span class="w">            </span><span class="n">count_slow_enable</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="sc">'1'</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">count_slow_enable</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="sc">'0'</span><span class="p">;</span><span class="w"> </span><span class="c1">-- OR change this to '1' for simulation;</span>
+<span class="w">        </span><span class="k">end</span><span class="w"> </span><span class="k">if</span><span class="p">;</span>
+<span class="w">    </span><span class="k">end</span><span class="w"> </span><span class="k">if</span><span class="p">;</span>
+<span class="k">end</span><span class="w"> </span><span class="k">process</span><span class="p">;</span>
+
+<span class="k">process</span><span class="p">(</span><span class="n">clk</span><span class="p">)</span>
+<span class="k">begin</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">clk</span><span class="na">'event</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">clk</span><span class="o">=</span><span class="sc">'1'</span><span class="w"> </span><span class="k">then</span><span class="w"> </span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">count_slow_enable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sc">'1'</span><span class="w"> </span><span class="k">then</span>
+<span class="w">            </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">count</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">end</span><span class="w"> </span><span class="k">if</span><span class="p">;</span>
+<span class="w">    </span><span class="k">end</span><span class="w"> </span><span class="k">if</span><span class="p">;</span>
+<span class="k">end</span><span class="w"> </span><span class="k">process</span><span class="p">;</span><span class="w"> </span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h3 id="simulation">Simulation</h3>
+<p>Simulation is required for this assignment, but nothing too complicated - a simple simulation of the <code>Top_Nexys</code> module will suffice. The simulation should cover all possible input cases. Needless to say, the simulation should be show the correct result!</p>
+<p>For more info on simulation controls, see the <a href="https://nus-cs2100de.github.io/labs/manuals/01/lab_01.html#simulation-in-vivado">CS2100DE section on simulation</a>. These are extremely handy once you figure out how to use them. Similar in spirit to using a software debugger, but with notable differences given HDLs have very different semantics.</p>
+<p>For simulation, checking the raw 32-bit <code>data[31:0]</code> to the Seven_Seg module will suffice, as making sense of anodes and cathodes, especially given the time-division multiplexing used, is hard. It can be checked by dragging it into the waveform window; there is no need to make it as a port of the top level module just for simulation purposes. To see data, go to scope window &gt; testbench_name &gt; uut, and then drag <code>data</code> signal from object window to the waveform window (scope and object windows are to the immediate left of the waveform window). Need to rerun (no need to relaunch) the simulation to see the <code>data</code> waveform. Save the waveform configuration file (Ctrl+S) and add it to the project (it will ask whether you wish to add to project when you save), and it'll be available when you stimulate in the future.</p>
+<p>Feel free to make your simulation more rigorous by automatically checking test cases, and using $error() to halt the simulation if any don't pass. This is not required, but will make for an impressive demo. </p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do not move on to the next step without writing a good simulation, and making sure the design can pass it! If the simulation doesn't work, there is no chance the hardware will. However, if the simulation does work, the hardware is almost guaranteed to work too. The most common reason for designs that work in simulation not to work on hardware is mistakes in the constraints file, or faulty hardware. </p>
+</div>
+<p>Do <strong>either</strong> of the two modifications mentioned as comments in the code in the previous section. Else, you will have to wait for about <strong>2^26 cycles</strong> (for a ~1Hz clock) before you can see the effect of 1 clock edge in simulation! This will take a long long time, and is really unnecessary in the simulation. Do not forget to revert these changes before synthesis and implementation. </p>
+<p>We can get a very very good sense of whether it will work on hardware by doing a post-synthesis functional simulation by Simulate &gt; Post-synthesis functional simulation. Obviously, synthesis should be done before this, but further steps such as implementation need not be done.
+The same testbench can be used, so it requires zero extra effort. However, debugging is much harder than it is with behavioral simulation as some of the internal signals are optimized away and/or renamed (still easier than try to debug directly on hardware).
+As with standard simulation, use a low value for clock enable threshold, so that you don't have to run sim for very long to see results. For actual hardware implementation, change the threshold to the original high value, run synthesis and implementation.</p>
+<p>Simulation (especially when done at the top/system level) is meant to simulate a real life user interacting with the system. Say, you plan to press <code>btnU</code> 3 seconds after powering on, and release it 2 seconds after pressing. In your testbench initial block, delay by 3 x threshold_count x 10 ns (#480 if the threshold is 16), assert <code>btnU</code>, wait for 320 ns (#320), deassert <code>btnU</code>.</p>
+<h3 id="constraints">Constraints</h3>
+<p>Before run synthesis and implementation, remember to set up the constraints file correctly. Uncomment the lines corresponding to the pins used - no more, no less. Make sure the names in the constraints file match the inputs and outputs of the <code>Top_Nexys</code> module. Then, run Synthesis, Implementation and Generate Bitstream to generate the bitstream to upload to your board. </p>
+<h2 id="tips">Tips</h2>
+<ul>
+<li>Chapter 2 from the lecture notes contains important design guidelines - these should be followed religiously. In particular, Chapter 2B explains how to write synthesisable HDL code, which is very useful for making designs that work optimally and as intended.</li>
+<li>Clock enables should be used if the clock needs only be active in certain situations, i.e., to get the effect of a slow clock, e.g., to change data on LEDs. Clock dividers should be avoided.</li>
+<li>Instead of making the whole design in one go and praying that it synthesises correctly, we can always set individual modules as Top and synthesise one by one. This makes errors and bugs much easier to detect and solve.</li>
+<li>"View Elaborated Design" -&gt; "Schematic" is a very powerful tool to visualise the circuit generated. Liberal use of the schematic can help prevent bugs and unexpected design oddities.</li>
+<li>Similarly, the synthesis report can contain some hints on where things are going wrong. We can check to see if the primitives being inferred make sense for our design.</li>
+<li>Vivado's text editor is, perhaps, not the greatest ever made. We recommend using a more cromulent alternative, such as <a href="https://notepad-plus-plus.org/">Notepad++</a> or <a href="https://code.visualstudio.com/">Visual Studio Code</a>.</li>
+<li>Writing good HDL code is a skill that takes a lot of practice. It is a completely different paradigm to (and should <strong>never ever</strong> be confused with) software programming. The best teacher is experience, and practice really does help. Following the guidelines from Chapter 2, and being very conscious about the hardware we expect our code to generate, is key.</li>
+<li>For this design, debouncing the switches is really quite extra and not necessary. (Why?) Feel free to look into a <a href="https://en.wikipedia.org/wiki/Metastability_(electronics)">metastable filter</a>, although it is also unnecessary for this design.</li>
+</ul>
+<h2 id="submission-and-demonstration-instructions">Submission and demonstration instructions</h2>
+<h3 id="submission">Submission</h3>
+<p>Once you have finished the assignment, you must submit your work to Canvas. You should submit <strong>a single zip file</strong>. The file should contain:</p>
+<ol>
+<li>The assembly language program (ending with <code>.s</code> or <code>.asm</code>), if you have modified it. If not, skip this one. </li>
+<li>The HDL sources for your project, i.e. all of the <code>.v</code>/<code>.vhd</code>/<code>.sv</code> files for modules, testbenches, etc.</li>
+<li>The <code>.xdc</code> constraints file.</li>
+<li>The <code>.bit</code> bitstream file.</li>
+<li>A screenshot of the simulation waveform as a <code>.jpg</code> file. All of the signals in the design should be captured - there aren't that many, so they should fit on your screen. If you need to use multiple screenshots to make it clear, feel free to do so. </li>
+</ol>
+<p>Your submission must be made to Canvas before the start of your lab session in Week 5. The exact deadline for your submission will be visible on Canvas. </p>
+<h3 id="demonstration">Demonstration</h3>
+<p>Before your lab session in Week 5, you will be assigned a time slot of 7 minutes for your demonstration. </p>
+<p>Arrive at the lab at least 30 minutes before your assigned time slot. If you are one of the earlier time slots, you need not arrive more than 15 minutes before the start of the lab timing (i.e. before 17:45 or 08:45). </p>
+<p>The time will be split as follows:</p>
+<ul>
+<li>2 minutes to demonstrate Task 1, using RARS. You should show that you are able to follow the instructions in Task 1. </li>
+<li>2 minutes to demonstrate Task 2, on the FPGA board. You should show that the design specified for Task 2 is implemented correctly with all features functional.</li>
+<li>3 minutes for two questions from the GA assessing you.</li>
+</ul>
+<p>The time is extremely tight - with so many of you, we do have to be quick :3. If you are not there when we are ready to assess you, we will skip past you and start assessing others. You will be bumped to the bottom of the queue, and we will not assess you until everyone else is done. (On the flip side, if you are nice and early, and someone misses their turn - good news, you might get to go home early :D)</p>
+<p>Note that you will <strong>not</strong> have extra time to open programs, load projects, etc.. Make sure you have opened RARS and Vivado, and have the bitstream ready to upload to your board. Any extra time you take to do these tasks will eat into the time for the demonstration. We will not exceed your allotted time for demonstration.</p>
+<h3 id="penalties-for-late-submission">Penalties for late submission</h3>
+<p>Late submissions and demonstrations up to one week will be allowed, with a penalty of 50%. Beyond one week, submissions will not be accepted. </p>
+<p>This policy is non-negotiable, aside from the usual NUS clauses such as being unwell (Medical Certificate strictly required), authorised competitions, family emergencies etc. </p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Congratulations! With the first assignment finished, we are now comfortable with FPGA design and assembly programming. We are ready to dive into the proper content of the course. In the next assignment, we will have our CPU up and running - it's going to be exciting.</p>
+<div class="admonition success">
+<p class="admonition-title">What we should know</p>
+<ul>
+<li>How to write and simulate RISC-V assembly programs.</li>
+<li>How to use MMIO in our RISC-V assembly programs to control peripherals.</li>
+<li>How to use Vivado to create a design for the FPGA board.</li>
+<li>How to translate a block diagram into an implemented design for FPGA.</li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://nus-cg3207.github.io">NUS CG3207 Labs</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/nus-CG3207">NUS CG3207 Team</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC-SA 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1" alt=""></a></p>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/nus-cg3207" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="mailto:neil@nus.edu.sg" target="_blank" rel="noopener" title="" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4l208 156a48 48 0 0 0 57.6 0l208-156c12.1-9.1 19.2-23.3 19.2-38.4 0-26.5-21.5-48-48-48zM0 196v188c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64V196L313.6 344.8c-34.1 25.6-81.1 25.6-115.2 0z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tooltips", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

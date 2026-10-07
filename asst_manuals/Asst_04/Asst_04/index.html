@@ -1,0 +1,1649 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://nus-cg3207.github.io/asst_manuals/Asst_04/Asst_04/">
+      
+      
+        <link rel="prev" href="../../Asst_03/Asst_03/">
+      
+      
+        <link rel="next" href="../../../rv_resources/rv_memmap/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Assignment 4 [Weeks 9-12] - NUS CG3207 Labs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12.3%207.29c.2-.18.44-.29.7-.29.27%200%20.5.11.71.29.19.21.29.45.29.71%200%20.27-.1.5-.29.71-.21.19-.44.29-.71.29-.26%200-.5-.1-.7-.29-.19-.21-.3-.44-.3-.71%200-.26.11-.5.3-.71m-2.5%204.68s2.17-1.72%202.96-1.79c.74-.06.59.79.52%201.23l-.01.06c-.14.53-.31%201.17-.48%201.78-.38%201.39-.75%202.75-.66%203%20.1.34.72-.09%201.17-.39.06-.04.11-.08.16-.11%200%200%20.08-.08.16.03.02.03.04.06.06.08.09.14.14.19.02.27l-.04.02c-.22.15-1.16.81-1.54%201.05-.41.27-1.98%201.17-1.74-.58.21-1.23.49-2.29.71-3.12.41-1.5.59-2.18-.33-1.59-.37.22-.59.36-.72.45-.11.08-.12.08-.19-.05l-.03-.06-.05-.08c-.07-.1-.07-.11.03-.2M22%2012c0%205.5-4.5%2010-10%2010S2%2017.5%202%2012%206.5%202%2012%202s10%204.5%2010%2010m-2%200c0-4.42-3.58-8-8-8s-8%203.58-8%208%203.58%208%208%208%208-3.58%208-8%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Merriweather:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Merriweather";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/isa-tutorial.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="nus" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#assignment-4-near-complete-processor-pipelining-bells-whistles" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-header__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NUS CG3207 Labs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Assignment 4 [Weeks 9-12]
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-nav__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NUS CG3207 Labs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/howto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to use this website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/prereq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lab Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/nexys4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting to know your Nexys 4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/vivado_install_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation Guide for Vivado
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment manuals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assignment manuals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_01/Asst_01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 1 [Weeks 4-5]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_02/Asst_02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 2 [Weeks 5-7]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Asst_03/Asst_03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 3 [Weeks 7-9]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 4 [Weeks 9-12]
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 4 [Weeks 9-12]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-pipelining-our-cpu-10-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Pipelining our CPU [10 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-open-ended-enhancement-10-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Open-ended Enhancement [10 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Instructions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submission-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission Info
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources for RISC-V
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources for RISC-V
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/rv_memmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/peripherals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Peripheral Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/rv_programming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programming Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/web_sim/riscv_simulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V ISA Tutorial
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RISC-V ISA Tutorial
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/registers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruction Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/dp-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Processing Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/memory-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/control-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/assembly/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Assembly Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rv_resources/isa_tutorial/isa-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ISA Designer's Dilemma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Miscellaneous
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Miscellaneous
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../misc/Prefetching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prefetching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-pipelining-our-cpu-10-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Pipelining our CPU [10 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-open-ended-enhancement-10-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Open-ended Enhancement [10 points]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-instructions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Instructions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submission-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submission Info
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="assignment-4-near-complete-processor-pipelining-bells-whistles">Assignment 4: (Near) Complete Processor + Pipelining + Bells + Whistles</h1>
+<div class="admonition danger">
+<p class="admonition-title">Danger</p>
+<p>This page is a work in progress; major updates may be made for AY26/27. Feel free to read for a general idea, but do not start working on the assignment until it is specified as ready.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Assignment 4 involves <strong>2 compulsory tasks</strong> and the rest is <strong>open-ended.</strong></p>
+<p>Demonstrate Post-synthesis simulation <strong>AND</strong> FPGA hardware incorporating all the mandatory and open-ended parts. Use a single assembly program that can be entirely compiler-generated, entirely handcrafted, or a combination of the two. Let your imagination run wild!</p>
+</div>
+<h2 id="task-1-pipelining-our-cpu-10-points">Task 1: Pipelining our CPU [10 points]</h2>
+<p>Implement basic pipelining. Hazard hardware is optional and will count as an open-ended enhancement if done, but it is not counted for the compulsory task points. Pipelining should be done such that the processor supports all the requirements for Assignment 2, Assignment 3, and the additional instructions / features mentioned in Assignment 4 Compulsory Task 1 above.</p>
+<p>As long as your code works after inserting sufficient <code>nop</code>s, this task requirement can be satisfied. If you have full hazard hardware, of course, <code>nop</code>s are unnecessary.</p>
+<details class="tip">
+<summary>Tips for implementing pipelining</summary>
+<ul>
+<li>The WE of the PC given in the templates is active high, while the one given in the pipelined design (Chapter 6) is active low. You might want to change the PC WE in the templates to active low to be consistent.</li>
+<li>Even though the pipeline registers are shown as big registers storing a lot of stuff, each data stored can be thought of as being in a separate register. In other words, in your HDL code, you don't have to try and 'collect' all the bits to form a single register entity.</li>
+</ul>
+<h4 id="systematic-procedure-for-pipelining">Systematic procedure for Pipelining</h4>
+<p>Follow these steps to implement pipelining.</p>
+<ol>
+<li>
+<p>Start by inserting the appropriate suffixes (F/D/E/M/W) for each wire, port, register, and signal. Refer to slide 11 of Chapter 6 for this. For every signal that goes through multiple pipeline stages, it will need to be split into two signals, separated by a pipeline register. <strong>Note:</strong> Generally, the signals going into every component will have the same suffix, since every component is part of one and only one pipeline stage. The exception to this is the register file, where <code>A3</code> and <code>WD3</code> (ARM) or <code>WD</code> (RISC-V).</p>
+</li>
+<li>
+<p>Make the appropriate datapath connection(s) for every signal going through a pipeline register. Some connections were made implicitly, such as ALUControl. These connections will need to be made explicitly. For RISC-V, a multiplexer must be inserted to select between <code>PC_F</code> and <code>PC_E</code>, controlled by <code>PCSrc_E</code>. Remember to change the datatype from <code>wire</code> to <code>reg</code> where necessary.</p>
+<ul>
+<li><strong>Verilog</strong>: Use a combinational always block with non-blocking assignments. For example:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="k">always</span><span class="w"> </span><span class="p">@(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">    </span><span class="n">ExtImm_E</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">ExtImm_D</span><span class="p">;</span>
+<span class="k">end</span>
+</code></pre></div>
+<p>in ARM.v or RV.v</p>
+<ul>
+<li><strong>VHDL</strong>: Use a concurrent statement (<strong>NOT</strong> inslude a clocked process for now). For example, <code>ExtImm_E &lt;= ExtImm_D;</code> in ARM.vhd</li>
+</ul>
+</li>
+<li>
+<p>Verify that your design works <strong>EXACTLY as it did previously</strong>, without any changes to the assembly language program. We have NOT yet inferred any registers, so there should not be any pipelining going on (yet!). If something has broken, now is a good time to debug it.</p>
+</li>
+<li>
+<p>Now, we implement the pipeline registers.</p>
+<ul>
+<li><strong>VHDL</strong>: Move all the signals that are supposed to go through a particular pipeline register into one clocked process in ARM/RISC-V architecture (everything in one big clocked process is fine too, but it is better to keep it in separate processes for better organization).</li>
+<li><strong>Verilog</strong>: Change the combinational <code>always @(*)</code> to <code>always @(posedge clk)</code>.</li>
+</ul>
+</li>
+<li>
+<p>Initialize all your signals and registers to zero. Add a condition that sets all these signals and registers to zero when RESET is asserted, and otherwise, assigns the RHS to the LHS at the clock edge.</p>
+</li>
+<li>
+<p>Modify the Register file slightly, to read the clock at negative edges as follows.
+<span style="color: brown;">Alternatively, you can leave it as posedge clk, and insert 3 <code>nop</code>s later instead of 2.</span></p>
+<ul>
+<li><strong>VHDL</strong>: <code>CLK'event and CLK='1'</code> becomes <code>CLK'event and CLK='0'</code>.</li>
+<li><strong>Verilog</strong>: <code>always @(posedge clk)</code> becomes <code>always @(negedge clk)</code>.</li>
+</ul>
+</li>
+<li>
+<p>Your processor should now be pipelined, your old program may not work as it did. You will need to add <code>nop</code>s wherever there is any kind of hazard, to avoid these. For a start, just insert nops such that each pair of instructions having a data hazard is spaced by at least 2 instructions, for example, insert 2 nops if the two instructions are consecutive (or 3 if using the same clock edge). After each branch, insert 2 nops (or more if necessary, depending on which stage the branch is taken).</p>
+</li>
+<li>
+<p>Verify that your design works as it used to (it will just be slower because of all the nops).</p>
+</li>
+</ol>
+<p>For hazard resolution hardware (not a basic requirement), follow the design in Chapter 5. Do it systematically and incrementally, one hazard at a time, and testing at each step.</p>
+</details>
+<details class="tip">
+<summary>Increasing the clock speed</summary>
+<p>Now that you have pipelined your processor, you might be able to run it without any clock division, at the full 100 MHz, especially if your program memory and data memory are small. Change <code>CLK_DIV_BITS</code> to 0 to test if this is the case.</p>
+<p>However, note that even with the standard 5-stage pipeline, 100 MHz may not always be achievable, especially if your memory size is large.
+Up to ~430 MHz is possible, though very unlikely with a 5-stage pipeline. To increase the clock beyond 100 MHz, you will need to make use of the FPGA's built-in clocking resource called MMCM (which uses phase-locked loops). This can be configured using a clocking wizard (Google for more info).</p>
+<p>Tips for faster clock speeds:</p>
+<ul>
+<li>Identify the bottleneck by looking at the timing report.</li>
+<li>Use smaller memories.</li>
+<li>For larger memories, use block ram templates, and allow at least 2 clock edges, and maybe even 3 for a read. This, of course, is a major design change as the pipeline is no longer 5-stage.</li>
+<li>Use a hierarchy of memories.</li>
+<li>If the bottleneck is the execute stage, try to make it shorter by moving the PC logic to the M stage.</li>
+</ul>
+<p>Now, how do we know what frequency it can run at? You do synthesis and then implementation, and see the warnings. You'll get a critical warning that some timing constraints are not met if the frequency you set cannot be obtained. If you get this warning, the functionality is not reliable even if it runs on the board, and you must either change your design to make it run faster, or change your clock frequency via <code>CLK_DIV_BITS</code> and/or introducing a Clocking Wizard.</p>
+</details>
+<h2 id="task-3-open-ended-enhancement-10-points">Task 3: Open-ended Enhancement [10 points]</h2>
+<p>This is the fun part - you get 10 points for Assignment 4 for implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed.</p>
+<details class="tip">
+<summary>Idea: Hazard hardware</summary>
+<p>This is somewhat low-hanging fruit. After implementing simple pipelining, you'll probably get very annoyed, very quickly, by having to put <code>nop</code>s in the correct places. And this is before you make a mistake and spend hours debugging a bug caused by too few nops!</p>
+<p>You may choose to implement something simple that just stalls the processor, or perhaps something more interesting that forwards data when necessary. The complexity of your implementation will decide how well you score. </p>
+</details>
+<details class="tip">
+<summary>Idea: Additional instructions</summary>
+<p>You may choose to implement some additional instructions for your processor for your enhancement, or features of instructions that have not been fully implemented. The score you get for this will depend on how much additional logic you need to add for these features.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Suggestions for RISC-V</label><label for="__tabbed_1_2">Suggestions for ARM</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h4 id="rv-implement-half-wordbyte-load-and-store">RV: Implement half-word/byte load and store</h4>
+<p>You might want to add support for byte and half-word load and store: <code>lb</code>, <code>lh</code>, <code>lbu</code>, <code>lhu</code>, <code>sb</code>, <code>sbu</code>. This can be useful for data memory, all read-only peripherals that have meaningful bytes/half-words, and for 7-segment display.</p>
+<p><code>ReadData_in</code> is the whole word that contains the word/half-word/byte you want.
+You need to extract what you want, with a sign/zero(<code>u</code>) extension as required by the instruction.
+For example, when running <code>lbu</code> (load byte unsigned) instruction, if the last 2 bits of the address is <code>2'b01</code>, and the address location specified in the instruction has <code>8'hAB</code>, <code>ReadData_in</code> is <code>32'hxxxxABxx</code>. <code>ReadData</code>, the word to be written into the destination register is <code>32'h000000AB</code> (0s as MSBs as it is <code>lbu</code>).<br />
+For <code>lb</code>, <code>ReadData_in[15]</code> should be replicated to the 24 MSBs. You have to do this conversion.
+This is better done in the W stage in a pipelined processor.</p>
+<p><code>WriteData_out</code> is a word, with word/byte/half-word aligned to where you wish to write it to within the word. The <code>MemWrite_out</code> bits of every byte to be modified should be 1. For example, when running <code>sb</code> (store byte) instruction, if the last 2 bits of the address is <code>2'b10</code> and the byte to be written is <code>8'hAB</code> (or <code>32'b000000AB</code>), <code>WriteData_out</code> should be <code>32'hxxABxxxx</code> and <code>MemWrite_out</code> should be <code>4'h0100</code>.You have to do this conversion.<br />
+Another example: when running <code>sh</code> (store halfword), if the last 2 bits of the address is <code>2'b10</code> and the half-word to be written is <code>16'hABCD</code> (or <code>32'h0000ABCD</code>), <code>WriteData_out</code> should be <code>32'hABCDxxxx</code> and <code>MemWrite_out</code> should be <code>4'h1100</code>. You have to do this conversion.</p>
+<p>CAUTION: Unaligned data reads and writes are NOT supported.
+If the instruction is <code>lh</code>/<code>lhu</code>/<code>sh</code> (load/store halfword), the data memory address should be divisible by 2 (the last bit should be 0)
+If the instruction is <code>lw</code>/<code>sw</code>, the data memory address should be divisible by 4 (the last two bits should be 0s)</p>
+<p>Please read the relevant comments in Wrapper.v carefully.</p>
+<p>Potential enhancement: Unaligned requests can be detected and used to generate interrupts by editing the wrapper. This interrupt could be used to do a software emulation of unaligned access via aligned access.</p>
+<h4 id="rv-implement-isa-extensions">RV: Implement ISA extensions</h4>
+<p>See the <a href="https://riscv.org/wp-content/uploads/2019/12/riscv-spec-20191213.pdf">RISC-V Specification</a> for ideas. Floating-point, vector and cryptography are potentially interesting ISA extensions. </p>
+</div>
+<div class="tabbed-block">
+<h4 id="arm-implement-more-dp-instructions">ARM: Implement more DP instructions</h4>
+<ul>
+<li>Implement all 16 Data Processing instructions. See Section "A3.4 Data processing instructions" in page A3-9 to A3-11 (page 75) of ARM <a href="https://canvas.nus.edu.sg/courses/62251/files/folder/Lab%20Resources?preview=4733362">Architecture Reference Manual</a> for the details of the instructions. Page A3-11 has links to Sections 4.xx, where the instruction behavior is explained in more detail. Make sure you look at the ARM (32-bit) instructions, not Thumb (16-bit) instructions.</li>
+<li>It mainly involves modifying the ALU and the ALU Decoder.</li>
+<li>The C flag has to be an output from the CondLogic component/module, to act as an input for the ALU component/module (to support ADC instruction).</li>
+<li>Implement it efficiently, hopefully without additional adders.</li>
+<li>Support the additional multiplication instructions like <code>SMULL</code> and <code>UMULL</code>. There is not much point in implementing <code>SMLAL</code> and <code>UMLAL</code> since we already cannibalized the <code>MLA</code> instruction for division.</li>
+<li>Support other instructions like <code>SWP</code> and <code>BL</code>.</li>
+<li>Support other variants of existing instructions such as pre-indexed and post-indexed <code>LDR</code>/<code>STR</code>, Register Shifted Register Src2, <code>MUL</code> setting <code>Z</code> and <code>N</code> flags, etc.</li>
+<li>Support Src2 for DP instructions with rotated immediates.</li>
+<li>You can use the same shifter unit that we have used so far. Just make the appropriate connections.</li>
+<li>This will need a 32-bit mux at the shifter input, a 1-bit mux for <code>Shamt5[0]</code> (which is '0' when <em>rot</em> is used), as well as a 2-bit mux for sh (which is "11" for immediate Src2) - all the muxes can be controlled using the same control signal.</li>
+<li>An alternative (more hardware efficient) is to move the shifter after the multiplexer controlled by <code>ALUSrc</code> (i.e., to just before SrcB of the ALU), and you can continue to use the same <code>ALUSrc</code> control signal. This will eliminate the need for a 32-bit multiplexer. However, you will need a 5-bit multiplexer for Shamt5, with a 2-bit control signal - select <code>Shamt5</code> for register Src2, (<code>Shamt5[4:1], 0</code>) for immediate Src2 and <code>00000</code> for all others. A 2-bit mux for sh will be required too, which selects "11" for immediate Src2, sh for register Src2, and either for all others (as the shift amount is zero for others anyway).</li>
+<li>Your shifter could be modified to generate a carry ('C') based on the last bit that is shifted out (<code>shifter_carry_out</code>). This can be used to set the carry flag for instructions such as <code>MOVS</code>, <code>ANDS</code>, <code>ORRS</code>, etc. (see ARM reference manual for the explanation of <code>MOVS</code>, etc.).</li>
+<li>This will require <code>FlagW</code> to be used differently (now that 'C' and 'V' are not always written together).</li>
+<li>Effective 'C' will be instruction-dependent - need more logic to channel the appropriate carry into the input of 'C' flipflop/register. This logic can be inside the ALU (in which case the carry from the shifter will have to be an input to the ALU) or in the main ARM module.</li>
+</ul>
+<h4 id="tips">Tips</h4>
+<ul>
+<li>You may require additional read/write ports for the register file. You could also use micro-operations to avoid the need for more than 2 read ports / more than two write ports for some of the instructions - you will need additional logic to write results one by one over two cycles while PC is stalled. For example, for <code>SMULL</code>, <code>UMULL</code> etc, you can have an internal register (which is not in the visible register set) for storing the second word, to be written in the second cycle. You will also need to generate two sets of control signals - one for the first cycle and one for the second cycle. A multiplexer is required to select one of the two sets of control signals, which are passed to the E pipeline register over successive clock cycles.</li>
+<li>You don't have to worry about how xPSR is dealt with in the special case of Rd=R15, as mentioned in the manual.</li>
+<li>Note that when I bit of the instruction is 0, and bits 7 and 4 of the instruction are both 1's, the instruction is not a usual DP instruction (could be <code>MUL</code>, etc.).</li>
+<li>You can modify the ARM processor to work even for <code>LDR PC,..</code> without that much of an effort. If <code>LDR</code> with PC as destination needs to be supported, we need to create a separate signal <code>PCWriteLDR</code> specifically for this case. <code>PCWriteLDRM + PCWriteLDRW</code> should stall D and Flush E., in addition to <code>PCSrcE</code> flushing D and E (effectively, we will be flushing 4 instructions). You will need to retain the multiplexer as in the original circuit to enable the result read from the memory to go into the PC. So essentially, you will have 2 multiplexers for PC input - one as in the original branch, and one for early BTA.</li>
+<li>Forwarding data from W to D will allow you to write the register file at the positive edge, which will most likely reduce your critical path and improve the frequency at which your processor can operate.</li>
+</ul>
+</div>
+</div>
+</div>
+</details>
+<details class="tip">
+<summary>Idea: Exception handling and interrupt support</summary>
+<p>You can implement some simple interrupt handling. There is no need to conform to the RISC-V interrupt architecture.</p>
+<p>External interrupt generation logic can be done inside the wrapper fairly easily. For example, if you want an interrupt to be raised when any of the pushbuttons are pressed, you can do interrupt = <code>PB[3] | PB[2] | PB[1] | PB[0]</code>. This interrupt can then be fed into ARM/RV module from the wrapper.</p>
+<p>Other possible exception/interrupt sources are:</p>
+<ul>
+<li>other peripherals - e.g., counter from Wrapper</li>
+<li>invalid memory address - <code>bad_MEM_addr</code> from the address decoder of Wrapper</li>
+<li>unaligned address - easy to detect in Wrapper or RV. The additional instructions page has some info on it</li>
+<li>illegal instruction - from your instruction decoder</li>
+<li>division by zero - from MCycle</li>
+</ul>
+<p>Some other tips:</p>
+<ul>
+<li>You can have a hardcoded exception handler address input to the multiplexer controlling the PC input. The interrupt input itself can be used as (part of the) multiplexer select input.</li>
+<li>You can write your interrupt service routine in your assembly code, figure out the starting address, and use this value as a hardcoded input to the mux. An alternative is to decide on a fixed handler address, and fill up spaces/nops in your code until the handler starts address. For example, if you fix the handler starting address to be 0x100 and your 'main' program contains 30 instructions, you will need to add 34 nops before the first instruction in the handler code so that handler code will indeed be at 0x100.</li>
+<li>ARM: You should also have some mechanism to save <code>PC+4</code> into a register (say, <code>LR</code> in ARM) and to restore it when the handler has finished (use <code>MOV PC, LR</code> to return from the handler).</li>
+<li>RISC-V: The address of the instruction that caused the exception/ that was about to be executed when an interrupt came in is saved into <em>epc</em>^ (exception program counter, and not <code>ra</code>). Since we aren't aiming for compliance, saving automatically to another general-purpose register that isn't used in your program is an option too. Saving to <code>ra</code> can be problematic when you have function calls as <code>ra</code> gets overwritten. You can then use <code>jalr</code> aka <code>jr</code> to return from an interrupt.</li>
+</ul>
+<p>^ Note that <em>epc</em> is not a register that can be used like a general-purpose register. You need <code>csrr</code> to move its content to a general-purpose register.
+*   If you wish to have vectored interrupts, you need to associate a number with each interrupt. You need a table/ROM with the starting addresses, which will be indexed by the interrupt number. The output of this ROM is to be fed into the PC multiplexer. The PC multiplexer control signal can be the logical OR of all the interrupt lines.</p>
+</details>
+<details class="tip">
+<summary>Idea: Branch prediction</summary>
+<p>Branch prediction is a very cool feature you can implement. There are many ways to approach this; a simple scheme is explored in the lecture. More complex and advanced ones are out there, but we will not teach you about them; they're for you to discover for yourself. </p>
+<p>Do not be afraid to go and read some research papers on branch prediction schemes. Trying to implement something from a paper that has been published can be a very rewarding and educational exercise. </p>
+</details>
+<details class="tip">
+<summary>Idea: Use other hardware peripherals</summary>
+<p>This is not an improvement in and of itself; however, implementing more peripherals in your design might help you better demonstrate the features of your processor. </p>
+<p>For example, the Nexys 4 has an onboard microphone - perhaps that can be used to demonstrate DSP capabilities? RGB LEDs? VGA port? USB host? The world is your oyster. </p>
+<p><a href="https://github.com/Digilent/Nexys-4-DDR-OOB">Digilent's GitHub repository for the Nexys 4</a> contains some useful code to help implement these peripherals. </p>
+</details>
+<h2 id="design-instructions">Design Instructions</h2>
+<ul>
+<li>You are required to have your own, comprehensive programs to have a convincing demo.</li>
+<li>You may have to tweak the templates given in Assignment 2 for use in Assignment 4. Specifically, you will have to change the <code>ALUControl</code> to 4 bits for ARM, <code>PCSrc</code> and <code>ALUSrcA</code>/<code>B</code> width for RISC-V, etc.</li>
+<li>All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU. <em>Exceptions</em>: <code>+</code> for calculating <code>PC+4</code>, <code>PC+8</code> (in ARM), multiplication, division, enhancements such as branch prediction. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.</li>
+<li>In the ALU, DO NOT use additional <code>+</code> signs -&gt; this could infer additional adders. The existing addition framework should be good enough.</li>
+<li>All operators are permitted on 32-bit values outside the ARM/RISC-V module. For example, you will have to do 32-bit comparisons in the wrapper for address decoding.</li>
+<li>Use of arithmetic operators:<ol>
+<li>Do not use <code>*</code> operator. It is synthesizable, but in this course, we are implementing multi-cycle multiplication. <code>/</code> is not synthesizable, except on constants.</li>
+<li>All operators (including <code>**</code>, <code>*</code>, <code>/</code>, <code>sll</code>, <code>rem</code>, <code>mod</code> etc.) are allowed on constants (operations on constants are done at synthesis time, and will not infer any hardware).</li>
+</ol>
+</li>
+</ul>
+<h2 id="submission-info">Submission Info</h2>
+<ul>
+<li>Assignment 4 will be evaluated in <strong>Week 12</strong>. The presentation schedule can be found on Canvas.</li>
+<li>Include<ul>
+<li><strong>.v/vhd</strong> files you have created/modified [ RTL Sources, Testbench(es) ]</li>
+<li><strong>.c/h</strong> files used to generate assembly</li>
+<li><strong>.bit</strong> files</li>
+<li><strong>.s/.asm</strong> files (assembly programs)</li>
+<li><strong>.ppt</strong> file - 2 to 6 slides showing performance enhancement techniques you have implemented.</li>
+</ul>
+</li>
+</ul>
+<p>in an archive with the filename <strong>GroupXX</strong><strong>_Monday/Friday_Lab4.zip</strong> (replace XX with your group number) and upload it to Canvas. One submission per group is sufficient – if there are multiple submissions, the file with the latest timestamp will be taken as the final submission. <strong><em>Do not</em></strong> zip and upload the complete project folder – only those files mentioned above should be included. <strong>The files should be the exact same files that you used for the demo.</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://nus-cg3207.github.io">NUS CG3207 Labs</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/nus-CG3207">NUS CG3207 Team</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC-SA 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1" alt=""></a></p>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/nus-cg3207" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="mailto:neil@nus.edu.sg" target="_blank" rel="noopener" title="" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4l208 156a48 48 0 0 0 57.6 0l208-156c12.1-9.1 19.2-23.3 19.2-38.4 0-26.5-21.5-48-48-48zM0 196v188c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64V196L313.6 344.8c-34.1 25.6-81.1 25.6-115.2 0z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tooltips", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,42 @@
+/* =========================================================================
+   RISC-V ISA Tutorial — figures and typography
+   ========================================================================= */
+.md-typeset figure {
+  margin: 1.2em 0;
+}
+
+.md-typeset figure img,
+.md-typeset p > img[src$=".svg"] {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* Wide bit-field diagrams: allow horizontal scroll instead of squashing. */
+.wide-figure {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wide-figure img {
+  max-width: none;
+  min-width: 760px;
+}
+
+.md-typeset figure figcaption {
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color--light);
+  text-align: center;
+  margin-top: 0.4em;
+}
+
+/* Encoding tables read better in a monospaced face. */
+.md-typeset table code {
+  white-space: nowrap;
+}
+
+/* ARM mnemonics are written in CAPS throughout, per the source deck. */
+.arm {
+  font-variant: small-caps;
+  letter-spacing: 0.02em;
+}

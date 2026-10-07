@@ -1,0 +1,2751 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/">
+      
+      
+        <link rel="prev" href="../../rv_programming/">
+      
+      
+        <link rel="next" href="../../isa_tutorial/getting-started/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>RISC-V Simulator - NUS CG3207 Labs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12.3%207.29c.2-.18.44-.29.7-.29.27%200%20.5.11.71.29.19.21.29.45.29.71%200%20.27-.1.5-.29.71-.21.19-.44.29-.71.29-.26%200-.5-.1-.7-.29-.19-.21-.3-.44-.3-.71%200-.26.11-.5.3-.71m-2.5%204.68s2.17-1.72%202.96-1.79c.74-.06.59.79.52%201.23l-.01.06c-.14.53-.31%201.17-.48%201.78-.38%201.39-.75%202.75-.66%203%20.1.34.72-.09%201.17-.39.06-.04.11-.08.16-.11%200%200%20.08-.08.16.03.02.03.04.06.06.08.09.14.14.19.02.27l-.04.02c-.22.15-1.16.81-1.54%201.05-.41.27-1.98%201.17-1.74-.58.21-1.23.49-2.29.71-3.12.41-1.5.59-2.18-.33-1.59-.37.22-.59.36-.72.45-.11.08-.12.08-.19-.05l-.03-.06-.05-.08c-.07-.1-.07-.11.03-.2M22%2012c0%205.5-4.5%2010-10%2010S2%2017.5%202%2012%206.5%202%2012%202s10%204.5%2010%2010m-2%200c0-4.42-3.58-8-8-8s-8%203.58-8%208%203.58%208%208%208%208-3.58%208-8%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Merriweather:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Merriweather";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/isa-tutorial.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="nus" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#risc-v-simulator-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-header__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NUS CG3207 Labs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              RISC-V Simulator
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NUS CG3207 Labs" class="md-nav__button md-logo" aria-label="NUS CG3207 Labs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NUS CG3207 Labs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/howto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to use this website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/prereq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lab Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/nexys4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting to know your Nexys 4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/vivado_install_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation Guide for Vivado
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment manuals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assignment manuals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../asst_manuals/Asst_01/Asst_01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 1 [Weeks 4-5]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../asst_manuals/Asst_02/Asst_02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 2 [Weeks 5-7]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../asst_manuals/Asst_03/Asst_03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 3 [Weeks 7-9]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../asst_manuals/Asst_04/Asst_04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assignment 4 [Weeks 9-12]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources for RISC-V
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources for RISC-V
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rv_memmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../peripherals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Peripheral Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rv_programming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programming Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Simulator
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-your-first-five-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Your first five minutes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Your first five minutes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-writing-and-assembling-a-program" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Writing and assembling a program
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Writing and assembling a program">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-while-you-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help while you type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing C
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-running-and-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Running and debugging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-reading-the-panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Reading the panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Reading the panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disassembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disassembly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datapath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Datapath
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-5-stage-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 5-stage pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locals-c-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locals (C mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#peripherals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Peripherals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Keyboard shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-running-your-own-verilog-hdl-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Running your own Verilog (HDL mode)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Running your own Verilog (HDL mode)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting started
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirements-your-verilog-must-meet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements your Verilog must meet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-different-from-js-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is different from JS mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-my-verilog-synthesisable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is my Verilog synthesisable?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-a-bug-in-your-processor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding a bug in your processor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watching-the-waveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watching the waveform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-things-in-the-hdl-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other things in the HDL tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-where-things-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Where things are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-running-it-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Running it locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V ISA Tutorial
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RISC-V ISA Tutorial
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/registers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruction Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/dp-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Processing Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/memory-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/control-instructions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control Instructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/assembly/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RISC-V Assembly Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../isa_tutorial/isa-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ISA Designer's Dilemma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Miscellaneous
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Miscellaneous
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../misc/Prefetching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prefetching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-your-first-five-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Your first five minutes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Your first five minutes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-writing-and-assembling-a-program" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Writing and assembling a program
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Writing and assembling a program">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-while-you-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help while you type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing C
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-running-and-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Running and debugging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-reading-the-panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Reading the panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Reading the panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disassembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disassembly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datapath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Datapath
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-5-stage-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 5-stage pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locals-c-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locals (C mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#peripherals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Peripherals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Keyboard shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-running-your-own-verilog-hdl-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Running your own Verilog (HDL mode)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Running your own Verilog (HDL mode)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting started
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirements-your-verilog-must-meet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements your Verilog must meet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-different-from-js-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is different from JS mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-my-verilog-synthesisable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is my Verilog synthesisable?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-a-bug-in-your-processor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding a bug in your processor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watching-the-waveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watching the waveform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-things-in-the-hdl-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other things in the HDL tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-where-things-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Where things are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-running-it-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Running it locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="risc-v-simulator-user-guide">RISC-V Simulator User Guide</h1>
+<p align="center">
+  <a href="../riscv_simulator.html" target="_blank" rel="noopener">
+    <img alt="Start the Simulator" src="https://img.shields.io/badge/▶%20Start%20the%20Simulator-2ea44f?style=for-the-badge">
+  </a>
+</p>
+
+<p>A RISC-V simulator built for <strong>NUS CG3207</strong>. Write assembly or C, assemble it, then step
+or run it against either a fast JS functional model or your own synthesizable Verilog core.
+Registers, memory, the disassembly and a simulated Nexys 4 board (LEDs, switches, buttons,
+7-segment, OLED, UART, accelerometer) all update as it executes.</p>
+<p>Click the button above, or open <a href="../riscv_simulator.html"><code>riscv_simulator.html</code></a>
+yourself: nothing to install.</p>
+<hr />
+<h2 id="1-your-first-five-minutes">1. Your first five minutes</h2>
+<ol>
+<li>Pick something from <strong>Example:</strong>. <strong>DIP to LED (start here)</strong>.</li>
+<li>It assembles automatically. Press <strong>▶ Run</strong>.</li>
+<li>Watch the <strong>Registers</strong> panel fill in, and the status bar report what happened.</li>
+</ol>
+<p>That is the whole loop. Everything below is detail.</p>
+<h3 id="the-screen">The screen</h3>
+<p><code>ASM | C</code> picks the language. <code>JS | HDL</code> picks the engine: the built-in model, or your
+own Verilog processor (<a href="#7-running-your-own-verilog-hdl-mode">§7</a>).</p>
+<p>Panel chips show, hide or float any combination of panels, and the layout is remembered
+between sessions.</p>
+<p>The status bar reads <code>Cycles: 3 est | Instr: 3 | PC: 0x0040000c</code>. <code>est</code> is JS mode's
+estimate, <code>hw</code> is a real count from your Verilog. <strong>PC</strong> is the <em>next</em> instruction, not
+the one just executed.</p>
+<hr />
+<h2 id="2-writing-and-assembling-a-program">2. Writing and assembling a program</h2>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Load an example</td>
+<td><strong>Example:</strong> dropdown</td>
+</tr>
+<tr>
+<td>Open your own file</td>
+<td><strong>📂 Open</strong>: <code>.asm</code>, <code>.s</code>, <code>.c</code>, <code>.h</code> (and <code>.v</code>, see <a href="#7-running-your-own-verilog-hdl-mode">§7</a>)</td>
+</tr>
+<tr>
+<td>Save your work</td>
+<td><strong>💾 Save</strong>, or <code>Ctrl/Cmd+S</code></td>
+</tr>
+<tr>
+<td>Assemble / compile</td>
+<td><strong>⚙ Assemble</strong>, or <code>Ctrl/Cmd+Enter</code></td>
+</tr>
+</tbody>
+</table>
+<p>Picking an example also sets the two <strong>Linker</strong> segment sizes from the memory depths its
+row in <code>examples/index.txt</code> declares, and with them the stack pointer the C startup shim
+loads. Each program states the same two numbers at the top of its source. Change them, in
+Settings → Linker and in your <code>Wrapper.v</code>, if you change the program: HDL mode refuses to
+run a program that does not fit the Wrapper you loaded rather than loading half of it.</p>
+<p>Examples and opened files assemble themselves, so <strong>Run</strong> and <strong>Step</strong> are live at once.</p>
+<p><code>ecall</code> works here because the simulator implements the RARS syscall services. It will not
+work on a processor with no trap support and no OS behind it, so use the MMIO peripherals
+for anything headed to hardware. Examples that use it say so at the top.</p>
+<h3 id="help-while-you-type">Help while you type</h3>
+<ul>
+<li><strong>Autocomplete</strong> appears as you type: instructions at the start of a line, registers
+  and labels in the operand positions. <code>Ctrl+Space</code> forces it open.</li>
+<li>A <strong>signature tooltip</strong> floats above the cursor showing the operand you are on
+  (<code>PARAM 2: rs1</code>).</li>
+<li><strong>Hover</strong> any mnemonic, register or label for a documentation card.</li>
+<li><code>Ctrl/Cmd+F</code> / <code>Ctrl/Cmd+H</code>: find and replace.</li>
+</ul>
+<h3 id="writing-c">Writing C</h3>
+<p>Switch to <strong>C</strong>. The code is compiled by Compiler Explorer (Godbolt) and the resulting
+assembly is what actually runs, so you can step through <strong>C source lines</strong> directly.
+C mode therefore needs the network, the built-in examples included; assembly mode does
+not. Compiler, optimisation level and ABI flags are under <strong>⚙ Settings → Compiler</strong>.</p>
+<p>MMIO is available as macros: <code>LEDS</code>, <code>SWITCHES</code>, <code>BUTTONS</code>, <code>SEVSEG</code>, <code>UART_TX</code>,
+<code>ACCEL_DATA</code>, <code>OLED_COL</code>, <code>OLED_ROW</code>, <code>OLED_DATA</code>, <code>OLED_CTRL</code>.</p>
+<p>Hover a C variable while it's in scope, or open the <strong>Locals</strong> panel, to see where it
+actually lives in memory (derived from the compiled stack layout, so it's best-effort,
+not real debug info). Useful once a bug turns out to be a wrong address rather than
+wrong logic.</p>
+<hr />
+<h2 id="3-running-and-debugging">3. Running and debugging</h2>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Key</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>▶ Run</strong> / <strong>⏸ Pause</strong> / <strong>▶ Resume</strong></td>
+<td><code>F5</code></td>
+<td>Run to the end, a breakpoint, or the instruction limit</td>
+</tr>
+<tr>
+<td><strong>⏭ Step</strong></td>
+<td><code>F8</code></td>
+<td>One instruction (or one statement, see below); one clock cycle when pipelined</td>
+</tr>
+<tr>
+<td><strong>⏮ Back</strong></td>
+<td><code>Shift+F8</code></td>
+<td>Undo the last step, registers, memory and peripherals included</td>
+</tr>
+<tr>
+<td><strong>⟲ Reset</strong></td>
+<td></td>
+<td>Back to the start, keeping the assembled program</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Breakpoints</strong> go in the gutter, or on <code>F9</code>. Set one on a comment, a blank or a <code>}</code> and
+it moves to the next real instruction; the console says where it went.</p>
+<p><strong>Step Back</strong> restores registers, memory and peripheral state. It is not a re-run from the
+start.</p>
+<p><strong>Statement Stepping</strong> (⚙ Settings → Simulation) makes one <strong>Step</strong>
+cover a whole C statement, or a whole pseudo-instruction like <code>li x1, 0x12345678</code>,
+instead of one machine instruction at a time. <strong>Back</strong> undoes exactly the same distance.
+Pipelined, a Step runs until the statement's last instruction has left Write-back, when
+its results show; the datapath's <strong>▶</strong> still moves one cycle.</p>
+<p><strong>A program that never ends</strong> pauses itself after <em>Max Instructions Per Run</em>
+(⚙ Settings → Simulation, default 100,000,000) rather than freezing the browser.</p>
+<p><strong>Clock</strong> (⚙ Settings → Simulation) takes <code>CLK_DIV_BITS</code> as in <code>TOP_Nexys.vhd</code>: the CPU runs
+at 100 MHz ÷ 2^(N+1), 1.56 MHz at the default 5, about 0.75 Hz at 26. The toolbar shows how
+long the cycles so far take at that clock. Set <em>Real time</em> and Run keeps to the clock, so a
+delay loop written for the board takes as long as it does there; below about 1 kHz you can
+watch each instruction go by. If the browser cannot keep up (100 MHz, or the pipeline above a
+few MHz) the toolbar shows the fraction of real time it reaches. In HDL mode the run is
+recorded first and then played back at the clock; Run pauses the playback.</p>
+<hr />
+<h2 id="4-reading-the-panels">4. Reading the panels</h2>
+<p>On a narrow screen the panels become tabs, the waveform and the datapath among them, so
+stepping and watching do not compete for the screen.</p>
+<p>The 🔍 in a panel header (on a phone, at the end of the tab strip) narrows it to matching rows: one register out of 32, or every
+<code>jal</code> in a few hundred instructions. Labels match too, so filtering Disassembly by <code>loop</code>
+gives you the whole block under <code>loop:</code>, not just the instruction sitting on it. In Memory
+it filters the rows already on screen, so move the address window first.</p>
+<h3 id="registers">Registers</h3>
+<p>All 32 integer registers, hex and decimal, editable. Decimal is signed unless you flip
+the ±/U switch in the column header. In the double-click editor, and the Memory word
+editor, <code>0x…</code> is hex and plain digits are decimal.</p>
+<h3 id="memory">Memory</h3>
+<ul>
+<li><strong>Word / Byte</strong> switches between one 32-bit little-endian word per row and separate
+  editable bytes.</li>
+<li><strong>Text</strong> is read-only; edit your source and re-assemble instead. <strong>Data</strong> and <strong>Stack</strong>
+  are editable.</li>
+<li><strong>MMIO is editable per register, matching hardware</strong>: a writable register (LED, 7SEG,
+  UART TX, OLED, ...) commits the moment you type, no need to Step first; a read-only
+  one (DIP, PB, UART RX VALID, ACCEL DATA, CYCLECOUNT, ...) is greyed out, the same as
+  hardware ignoring a write to it. (<code>UART RX</code> is the exception: writing it queues a
+  byte for the program to read, not a real register write.)</li>
+<li><strong>Stack</strong> counts <em>downwards</em>, the way the stack actually grows.</li>
+<li>Orange <strong>labels</strong> sit above the word they name, with a trailing <code>:</code>, like <code>main:</code>.
+  Yellow bytes were written at runtime.</li>
+<li><strong>⭳ Download</strong> in the toolbar exports <code>AA_IROM.mem</code> / <code>AA_DMEM.mem</code> for Vivado, and in
+  HDL mode the recorded waveform and a testbench that replays the run: the switch, button
+  and accelerometer inputs, every change you made to them and every UART byte you typed,
+  each at its cycle. Simulate it with the two <code>.mem</code> files beside it.</li>
+</ul>
+<h3 id="disassembly">Disassembly</h3>
+<p>What the processor actually executes, after pseudo-instructions are expanded, so
+<code>li x1, 0x12345678</code> shows as the <code>lui</code> + <code>addi</code> pair it really is. Label headers and
+jump targets (<code>&lt;loop&gt;</code>) are annotated; machine code can be shown as bytes or whole
+words, hex or binary.</p>
+<p>The <strong>Native instruction</strong> column names registers as the encoding does: <code>x0</code> to <code>x31</code>,
+so <code>add t0, t0, t1</code> reads <code>add x5, x5, x6</code>. ABI names stay in <strong>Original source</strong> beside
+it. Only rows where a real pseudo-instruction was expanded are coloured as such; a
+register renamed from <code>t0</code> to <code>x5</code> is not an expansion.</p>
+<p>An immediate with a dotted underline reads more than one way. Hover it, or tap it on a
+phone, for the others: <code>-1</code> is also <code>0xffffffff</code> and <code>4294967295</code>, which is what makes
+<code>sltiu x1, x2, -1</code> a comparison against the largest unsigned value. A branch target gives
+the address it resolves to and the distance from the instruction. Every operand the
+column prints, and every reading it offers, is one this assembler would take back, so a
+shift amount and a <code>lui</code> immediate have no signed reading — those fields are unsigned,
+and <code>slli x11, x5, -1</code> is not an instruction.</p>
+<h3 id="datapath">Datapath</h3>
+<p>The single-cycle datapath from the lecture, with the instruction at the PC going through
+it. <strong>⧉ Datapath</strong> in the toolbar shows or hides it along the bottom of the window (a panel
+on a phone), and ⤢ gives it the whole window. On a phone its step buttons float at the
+bottom right, as the toolbar's do once it scrolls out of view.</p>
+<p>The diagrams draw RV32I's ALU, jump and branch instructions, <code>lw</code> and <code>sw</code>. A program
+using anything else (<code>mul</code>/<code>div</code>, <code>lbu</code>, <code>ecall</code>, floating point, atomics) runs as usual,
+but the button is off and its tooltip names the first such line.</p>
+<p><strong>▶</strong> takes the instruction one step further, through the pipeline's five stages: Fetch;
+Decode (Decoder, Register Read, Extend); Execute (ALU and PC Logic); Memory; and Writeback
+(Register Write, PC Increment, Retire). Values travel along their wires and stay beside
+them. The clock at the left of the drawing shows all nine steps inside one clock period,
+coloured by stage as the pipeline colours them. <strong>▶</strong> at Retire is the rising edge: it
+executes the instruction, the only point where registers, memory and the PC change, as in
+the hardware. <strong>▶▶</strong> plays the rest of the phases and then executes; <strong>◀</strong> goes back a phase, from the first one into the instruction before.
+Step, Back and Run carry on working as usual.</p>
+<p>Beside it, the instruction is laid out in its format (R, I, S, B, U or J): all 32 bits,
+grouped into fields coloured by where they go (Decoder, register file, Extend), with what
+each field means and the immediate Extend builds from the scattered bits. Below that is the
+Decoder's control table from the lecture, with the row this instruction selects lit.</p>
+<p>Red wires carry data, purple the instruction's fields, blue the control signals. A dashed
+wire has a value on it that nothing uses: <code>addi</code> still reads a second register, and a
+store still has a Result, but no mux or enable lets them through. A dotted grey control
+signal is a don't-care.</p>
+<p>The values are worked out from the lecture's control tables, as <code>RV/Decoder.v</code>,
+<code>Extend.v</code>, <code>ALU.v</code> and <code>PC_Logic.v</code> implement them, not taken from the simulator. So
+what you see is what that hardware does, and your own processor should do the same.</p>
+<h3 id="the-5-stage-pipeline">The 5-stage pipeline</h3>
+<p><em>Microarchitecture</em> in ⚙ Settings → Simulation sets what a cycle is: Single-cycle
+takes one per instruction, Multi-cycle takes each instruction category's count from the
+table below it (there is no datapath drawing for it), and 5-stage pipeline counts clock
+edges. Switching resets the program. The datapath header offers Single-cycle and
+<strong>Pipelined</strong> too.</p>
+<p>Pipelined, <strong>Step</strong> and <strong>Back</strong> move one clock cycle, the toolbar shows
+cycles, instructions retired and CPI, and the editor gutter and Disassembly mark which
+stage holds each instruction. PC is PCF, the address being fetched. A breakpoint stops the
+run once its instruction reaches Execute; from there nothing can flush it.</p>
+<p>The datapath becomes the pipelined one, one clock cycle per <strong>▶</strong> (<strong>◀</strong> goes back one,
+<strong>▶▶</strong> keeps clocking until pressed again). Each stage's wires are in its own colour with
+its instruction above it, and a forwarded value keeps the colour of the stage it came
+from. The hazard unit's active signals are lit, and the caption says why. Beside the
+drawing are the five instructions' encodings, oldest first. <strong>Diagram | Timeline</strong> in the
+header swaps the drawing for the pipeline chart, one row per instruction and one column per
+cycle, with stalls hatched, flushed instructions struck out and those no longer in the
+pipeline dimmed. Bubbles are drawn dashed: the nop a stall inserts has a row of its own,
+and a flushed instruction carries on in its row as a bubble. The last column, <strong>next</strong>, is
+the cycle the next ▶ clocks, so the numbered columns match the log. The chart shows as many
+cycles as fit across, and on a phone only the instructions in flight. The ⚙ beside
+<strong>Pipelined</strong> opens Settings at the hazard switches and branch prediction.</p>
+<p>The pipeline runs all of RV32IM: <code>mul</code>/<code>div</code> take one cycle in Execute, and floating
+point, atomics and <code>ecall</code> wait in Decode until the stages ahead have emptied, then run
+there. None of those can be drawn, so a program using them runs without the diagram.</p>
+<p>Each part of the hazard unit can be switched off: forwarding to Execute, W to D
+forwarding, the mem-mem copy, the load-use stall and branch flushing. Off means the
+hardware without it, so the program computes what that hardware would, wrong answers
+included. The load-use stall only stalls for a register the instruction in Decode really
+reads, and not for a store's data, which the mem-mem copy delivers.</p>
+<p><strong>Branch prediction</strong> (off by default, in the same Settings card) adds a BHT to Fetch,
+indexed by PC[k+1:2] with 4 to 256 entries and no tags. Each entry holds a predicted
+PCSrc (the last outcome, or a 2-bit saturating counter) and a predicted target. Fetch
+cannot tell what it has fetched, so every instruction is predicted, and instructions whose
+PCs share an entry disturb each other. Execute checks the prediction against PCSrcE and
+the real target; a wrong one flushes D and E, sends the PC to the right address and updates
+the entry. The toolbar counts mispredicts and the Timeline marks them. The diagram gains a
+Branch Predictor block and a Mispredict mux in front of the PC, and the side column lists
+the BHT with the entries Fetch and Execute read marked. Click the block to see its insides.</p>
+<h3 id="locals-c-mode">Locals (C mode)</h3>
+<p>For the function the PC is currently in: each local's name, address and value (hex,
+signed and unsigned). Best-effort, derived from the compiled stack layout rather than
+real debug info, so it can miss an unusual declaration. Hidden outside C mode.</p>
+<h3 id="peripherals">Peripherals</h3>
+<p>A simulated Nexys 4 board. Everything here is live: click it while the program is
+paused and the program will see the change. The course's own
+<a href="https://nus-cg3207.github.io/labs/rv_resources/rv_memmap/">memory map</a> and
+<a href="https://nus-cg3207.github.io/labs/rv_resources/peripherals/">peripherals reference</a>
+cover these registers in full.</p>
+<p>A section unfolds itself the first time your program reads or writes it. Fold it back
+down and it stays down until you assemble a different program.</p>
+<table>
+<thead>
+<tr>
+<th>Peripheral</th>
+<th>Address</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LEDs / DIP switches</td>
+<td><code>0xFFFF0060</code> / <code>0xFFFF0064</code></td>
+<td>Click a switch to flip it</td>
+</tr>
+<tr>
+<td>Push buttons</td>
+<td><code>0xFFFF0068</code></td>
+<td>L / C / R: click to <strong>toggle</strong>, or hold <code>J</code> <code>K</code> <code>L</code> for a real <strong>momentary</strong> press (down = pressed, up = released)</td>
+</tr>
+<tr>
+<td>7-segment</td>
+<td><code>0xFFFF0080</code></td>
+<td>32-bit value as 8 hex digits</td>
+</tr>
+<tr>
+<td>UART console</td>
+<td><code>0xFFFF0000</code>–<code>0xFFFF000C</code></td>
+<td>Type in the box and press <strong>Send</strong></td>
+</tr>
+<tr>
+<td>OLED 96×64</td>
+<td><code>0xFFFF0020</code>–<code>0xFFFF002C</code></td>
+<td>Colour and auto-advance modes, set through <code>OLED_CTRL</code>; see below</td>
+</tr>
+<tr>
+<td>Accelerometer + temp</td>
+<td><code>0xFFFF0040</code></td>
+<td>Sliders, Flat / Tilt / Shake presets, or hold <code>X</code>/<code>Y</code>/<code>Z</code>/<code>T</code> and press <code>,</code>/<code>.</code> to nudge that axis (T = temperature)</td>
+</tr>
+<tr>
+<td>Cycle counter</td>
+<td><code>0xFFFF00A0</code></td>
+<td>Cycles since reset</td>
+</tr>
+</tbody>
+</table>
+<p>The UART box takes <strong>ASCII</strong> (including <code>\r</code>, <code>\n</code>, <code>\xHH</code>) or <strong>Hex</strong> (<code>0x41, 0x0D</code>).</p>
+<p><strong>Arrival</strong> sets how fast characters reach your program. The board has one receive
+register and no FIFO: a character arriving before you have read the previous one is
+discarded, the older one kept, and nothing records that it happened. At 115200 baud a
+character is 8640 cycles of the 100 MHz clock, 135 CPU cycles at the default
+<code>CLK_DIV_BITS</code>. That is your polling loop's budget.</p>
+<table>
+<thead>
+<tr>
+<th>Arrival</th>
+<th>What it models</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Paste</strong></td>
+<td>pressing Send in a terminal: one character per character time, read or not</td>
+</tr>
+<tr>
+<td><strong>Typed</strong></td>
+<td>a person at a keyboard: the same, with a much larger gap</td>
+</tr>
+<tr>
+<td><strong>Forgiving</strong></td>
+<td>nothing on the board. Each character waits until you have read the one before, so none is ever dropped. Useful while you are debugging your logic rather than your timing.</td>
+</tr>
+</tbody>
+</table>
+<p>The box beside the selector is that gap, in clock cycles. For Paste it follows the clock in
+Settings; for Typed you set it.</p>
+<p>If characters go missing, the console says so and why. Fix it by reading <code>UART_RX</code> promptly
+rather than doing work between characters; the budget shrinks as you lower <code>CLK_DIV_BITS</code>.</p>
+<p><code>OLED_CTRL</code> low nibble picks what triggers a pixel (<code>0</code> data, <code>1</code> column, <code>2</code> row, <code>4</code>
+auto-advance along the row, <code>5</code> auto-advance down the column) and the high nibble picks
+the colour format (<code>0</code> 8-bit 3R-3G-2B, <code>1</code> 16-bit 5R-6G-5B, <code>2</code> 24-bit). Four things catch
+people out, all of them matching the board rather than being worked around here.</p>
+<ul>
+<li>Narrow colour components are <strong>left-aligned and zero-filled</strong>, so full red in 8-bit mode
+  is <code>0xE0</code>, not <code>0xFF</code>, and the display is a little darker than a naive scaling would
+  give.</li>
+<li>Each format has a <strong>minimum store width</strong>: 8-bit takes <code>sb</code>, 16-bit needs at least <code>sh</code>,
+  and 24-bit updates one byte lane per byte you store. A store too narrow for the format
+  still paints a pixel, using whatever colour was already in the register.</li>
+<li><strong>The panel is 16-bit throughout</strong>, so 24-bit mode is really 5-6-5 with the low three,
+  two and three bits of each channel discarded on the way out. Use it for convenience, not
+  for precision.</li>
+<li><strong><code>OLED_COL</code> is 7 bits and out-of-range columns do not wrap.</strong> 96 to 127 fold back onto
+  32 to 63; above 127 the top bits are lost. A column past 95 therefore lands mid-screen,
+  not at the start of the next row. Auto-advance handles the edge; if you step the column
+  yourself, keep it under 96.</li>
+</ul>
+<p>Writing <code>OLED_CTRL</code> with <strong>bit 3</strong> set presents a frame rather than configuring anything.
+The other bits of that write are ignored and the mode you set earlier is kept, so you never
+have to re-send it in order to present.</p>
+<p>The controller keeps two pages: one on the display, one you draw into. <strong>Both start as the
+same page</strong>, so a program that never sets bit 3 is single-buffered and behaves as it always
+did. <strong>The first present splits them</strong>, and from then on you are double-buffered until you
+Reset; there is no bit that switches it back. A present exchanges the pages at a frame boundary, then copies the newly displayed page
+back into the one you draw into. Partial updates therefore keep working: you do not have to
+repaint all 6144 pixels every frame.
+<code>OLED_STATUS</code> at <code>0xFFFF0030</code> tells you when the present has landed: its bit 0 stays set
+until it has.</p>
+<div class="highlight"><pre><span></span><code><span class="o">*</span><span class="n">OLED_CTRL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x21</span><span class="p">;</span><span class="w">              </span><span class="c1">// configure once</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">drawFrame</span><span class="p">();</span>
+<span class="w">    </span><span class="o">*</span><span class="n">OLED_CTRL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x08</span><span class="p">;</span><span class="w">          </span><span class="c1">// present</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">OLED_STATUS</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">;</span><span class="w">  </span><span class="c1">// wait until it is safe to draw again</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Skipping that poll is the OLED's one silent failure on the board. A present waits for the
+scanout to reach the end of a frame, up to 24,576 instructions at the default clock
+divider, and then spends 192 more copying the page back. Pixels written before the
+boundary appear in the frame being presented, and pixels written during the copy are
+discarded, because the copy owns the write port while it runs. Neither leaves a trace you
+can read.</p>
+<p>Here the poll returns immediately: the whole canvas is painted at once, so neither delay
+exists and a program that skips the wait looks correct. The console says so if you draw
+after a present without reading <code>OLED_STATUS</code>. The flip side: a program that paces itself
+off the poll needs its own delay to run at a sensible speed here.</p>
+<hr />
+<h2 id="5-settings">5. Settings</h2>
+<p><strong>⚙ Settings…</strong> has four tabs:</p>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>What is in it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>⚡ Compiler</strong></td>
+<td>C compiler, <code>-O</code> level, <code>-march</code>/<code>-mabi</code>, M-extension toggle (off by default)</td>
+</tr>
+<tr>
+<td><strong>🗺 Linker</strong></td>
+<td>Segment bases and sizes, stack top, MMIO base</td>
+</tr>
+<tr>
+<td><strong>⏱ Simulation</strong></td>
+<td>For both engines, Statement Stepping and the clock. Then the active engine's own: in JS mode single-cycle, multi-cycle (with its cycles per instruction) or 5-stage pipeline (with the hazard switches), and max instructions per run; in HDL mode your Verilog sources and everything for the hardware engine</td>
+</tr>
+</tbody>
+</table>
+<p>Changing anything on the <strong>Compiler</strong> tab clears the compiled program: what was loaded
+no longer matches the settings, so compile again afterwards.</p>
+<p>The <strong>M extension is off by default</strong>. With it off, a <code>*</code> or <code>%</code> in C compiles to a call
+to a helper like <code>__mulsi3</code> that this assembler does not provide, and you will be told to
+enable it.</p>
+<blockquote>
+<p><strong>On a real FPGA</strong> the RAM size is fixed in hardware. If you raise the segment sizes
+beyond what your board provides or provisioned in HDL (whichever is lower), it will work here and fail there.</p>
+</blockquote>
+<hr />
+<h2 id="6-keyboard-shortcuts">6. Keyboard shortcuts</h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>F5</code></td>
+<td>Run / Pause / Resume</td>
+</tr>
+<tr>
+<td><code>F8</code> / <code>Shift+F8</code></td>
+<td>Step / Step back</td>
+</tr>
+<tr>
+<td><code>F9</code></td>
+<td>Toggle breakpoint on the cursor's line</td>
+</tr>
+<tr>
+<td><code>Ctrl/Cmd+Enter</code></td>
+<td>Assemble / Compile</td>
+</tr>
+<tr>
+<td><code>Ctrl/Cmd+S</code></td>
+<td>Save source</td>
+</tr>
+<tr>
+<td><code>Ctrl+Space</code></td>
+<td>Autocomplete</td>
+</tr>
+<tr>
+<td><code>Ctrl/Cmd+F</code> / <code>Ctrl/Cmd+H</code></td>
+<td>Find / Replace</td>
+</tr>
+<tr>
+<td><code>Tab</code> / <code>Shift+Tab</code></td>
+<td>Insert a tab, or indent / dedent a selection</td>
+</tr>
+<tr>
+<td><code>Ctrl+Z</code> / <code>Ctrl+Y</code></td>
+<td>Undo / Redo</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Close find, autocomplete or the settings dialog</td>
+</tr>
+</tbody>
+</table>
+<p>Shortcuts are suppressed while you are typing in a text box, so <code>F5</code> in the UART field
+types rather than runs.</p>
+<hr />
+<h2 id="7-running-your-own-verilog-hdl-mode">7. Running your own Verilog (HDL mode)</h2>
+<p>The same program, the same breakpoints and the same board, driven by the processor you
+wrote.</p>
+<h3 id="getting-started">Getting started</h3>
+<ol>
+<li>Click <strong>HDL</strong>. Settings opens on <strong>⏱ Simulation</strong>, since nothing can happen
+   without your sources.</li>
+<li>Drop your <code>.v</code> files anywhere on the page, or use <strong>browse…</strong>, or <strong>📂 Open</strong>. You need
+   the file declaring <code>module Wrapper</code>, your processor, and <em>every</em> submodule either
+   instantiates.</li>
+<li>Assemble a program as usual, then <strong>▶ Run</strong>.</li>
+</ol>
+<p>Your Verilog is never uploaded anywhere. It is compiled inside your browser by Icarus
+Verilog, and it disappears when you close the tab, so you load it once per session.</p>
+<p><strong>Prebuilt processor</strong> loads a working RV32I+M core and the fixed Wrapper instead: something
+to run before yours does, and to compare against once it does. It is pre-synthesised into
+one flattened module with its names discarded, so there is nothing in it to read. Its
+register file is left intact, so the <strong>Registers</strong> panel still works. It is fetched from
+<code>examples/hdl/</code> and needs the page served over <code>http://</code>.</p>
+<h3 id="requirements-your-verilog-must-meet">Requirements your Verilog must meet</h3>
+<p>The simulator never edits your design; it only wraps it in a testbench, the way you
+would in Vivado. That testbench is generated automatically, which is what makes three
+things about the Wrapper non-negotiable:</p>
+<ul>
+<li><strong>Exactly one file declares <code>module Wrapper</code>.</strong> That is how your design is found at
+  all; everything else hangs off it.</li>
+<li><strong>Its port names, widths and directions are fixed.</strong> The testbench connects to it by
+  name, so reordering the ports is harmless but renaming one is not: the testbench will
+  not compile against a Wrapper missing a port it expects. Start from the
+  <a href="https://github.com/NUS-CG3207/labs/tree/main/docs/code_templates/Asst_02">wrapper template</a>,
+  which also has the other modules you will need for the eventual Nexys 4 / Nexys 4 DDR /
+  Nexys A7 build.</li>
+<li><strong>It owns an IROM and a DMEM, sized by two localparams</strong> (<code>IROM_DEPTH_BITS</code>,
+  <code>DMEM_DEPTH_BITS</code>) it declares, and loads them itself with its own <code>$readmemh</code> calls.
+  The simulator assembles your program and writes the two files to match; it doesn't
+  create the memories or a default size for you. Each program needs its own pair, so
+  check them every time: HDL mode refuses one that doesn't fit and names the two values
+  to raise.</li>
+</ul>
+<p>One more thing affects debugging, not simulation: the <strong>Registers</strong> panel wants a
+32-entry array of 32-bit registers reachable somewhere inside the core your Wrapper
+instantiates, whatever it is called or however it is wired. That's what <strong>Register
+file</strong> auto-detects, and what typing a path there overrides if it can't be found. A
+program still runs correctly without it; you only lose the live register view, and the
+Registers panel says so when that happens.</p>
+<h3 id="what-is-different-from-js-mode">What is different from JS mode</h3>
+<ul>
+<li><strong>Run becomes Resume.</strong> It continues to the next breakpoint, or to the end of what has
+  been recorded, and records another <em>Cycles</em> worth when it gets there. <strong>⟲ Reset</strong>
+  starts the hardware over.</li>
+<li><strong>Step and Back are instant</strong>, and Back works: a run is recorded in full, and stepping
+  moves through the recording rather than re-simulating.</li>
+<li><strong>Unwritten registers show <code>xxxxxxxx</code>, not <code>0</code>.</strong> Real hardware powers up undefined,
+  and pretending otherwise would hide exactly the bugs you are looking for.</li>
+<li><strong><code>Cycles</code> counts real clock edges</strong> (tagged <code>hw</code>) instead of the estimate JS mode
+  shows (tagged <code>est</code>).</li>
+<li><strong>Registers and memory are read-only.</strong> Every Step rebuilds them by replaying the
+  recording from reset, so a typed-in value would vanish on the next one. Inputs are the
+  exception and still work: change them in the Peripherals panel, which re-simulates the
+  run around your new value.</li>
+<li><strong>An input changed while paused takes effect at the current cycle.</strong> Flip a switch or
+  send UART input, then Resume: the cycles already recorded are unchanged, and the next
+  instruction sees the new value.</li>
+<li><strong>You cannot change one mid-Run.</strong> Icarus simulates a whole <em>Cycles</em> budget in one
+  uninterruptible pass, so the page is frozen until the run stops. A change made during
+  it applies when the run ends. JS mode has no such limit. A smaller <em>Cycles per
+  Run/Resume</em> (⚙ Settings → Simulation) gives more openings to change an input,
+  at the cost of pressing Run more often on a long program.</li>
+</ul>
+<h3 id="is-my-verilog-synthesisable">Is my Verilog synthesisable?</h3>
+<p>Whenever you load sources, they are linted for things that don't survive synthesis:
+delays, <code>$display</code>, <code>real</code>, unbounded loops, <code>casex</code>, a blocking assignment in a clocked
+block, an incomplete sensitivity list on combinational logic. Anything found is listed
+in the console with a file and a line. It never stops a simulation.</p>
+<p>Treat it as a first pass, not a verdict: it catches common mistakes but doesn't prove
+anything. To actually prove it, tick <strong>Post-synthesis functional simulation</strong>
+(⚙ Settings → Simulation). Every run then happens twice: once as you wrote it, and
+once as a gate-level netlist produced by <strong>Yosys</strong>. If the two behave differently, you're
+told the first point where they part company. That's what an inferred latch, an
+incomplete sensitivity list, or a race between blocking assignments actually looks like.</p>
+<p>Ticking that box downloads the synthesiser the first time you use it, about <strong>13 MB</strong>.
+Nothing is fetched until you tick it, and your browser keeps it cached for a year, so
+after the first time it starts immediately. Synthesis takes 20–35 seconds and is redone
+only when your Verilog changes.</p>
+<p>Your registers still come from the RTL run while this is on: synthesis turns the register
+file into gates, so there is no register array left in the netlist to read. The PC,
+memory and every peripheral are compared in full.</p>
+<h3 id="finding-a-bug-in-your-processor">Finding a bug in your processor</h3>
+<p>Tick <strong>Cross-check against the JS model</strong> (⚙ Settings → Simulation). After each
+run, the same program is replayed on the functional model and the two are compared by
+their effects: the order in which registers change and data memory is written. You are
+told the <strong>first difference</strong>, with its cycle, both values, and the instruction and line
+that produced the model's. That is almost always where the RTL bug is. It works the same
+for a single-cycle, multi-cycle or pipelined core. If an input changed during the run, the
+comparison stops at that cycle.</p>
+<p>Step, Back, breakpoints and the instruction count follow your Wrapper's <code>PC</code>, the address
+being fetched. In a pipelined core that runs a few instructions ahead of the results, and
+includes fetches a flush then discards; the console says so after a run.</p>
+<h3 id="watching-the-waveform">Watching the waveform</h3>
+<p>In HDL mode <strong>∿ Waveform</strong> in the toolbar shows or hides a waveform strip along the bottom
+of the page. The first Run after a Reset opens it. On a narrow screen it is a panel
+alongside Registers and the rest instead.</p>
+<p>Its cursor sits on the cycle you are stopped at, so Step and Back walk it with you. That is
+the quickest way to see what your RTL did on the cycle an instruction went wrong.</p>
+<p>The dump covers your whole design, not just the Wrapper's ports, so anything inside your
+core is available. Press <strong>+ Signal</strong> and type part of a name or path: <code>alu</code> finds
+everything under any ALU instance, however deep. The 32 architectural registers are there
+too, as <code>x5_t0</code> and the like, so either spelling finds them. Click a row to add or drop it,
+or use the ✕ beside a name on the left. Your choice is remembered and survives a re-run.
+Memories are the exception to what you can add, since a Verilog array is not written to a
+VCD; read those in the Memory panel.</p>
+<p>Ctrl+scroll zooms, shift+scroll pans, a plain scroll moves down the signal list, and
+dragging pans. The <code>‹</code> <code>›</code> buttons pan half a window at a time and <code>−</code> <code>+</code> <code>Fit</code> set the
+zoom, which is all a phone has. Clicking a waveform moves the <em>whole simulator</em> to that
+cycle: registers, memory and the disassembly all follow.</p>
+<p>The strip stops where your PC does. Once the program halts or spins on one instruction
+there is nothing further to step to, so the cycles after that are greyed out rather than
+drawn.
+<strong>⭳ Download → Waveform (.vcd)</strong> saves the file, which is what you want for a long run or for the
+things a full waveform viewer does better. GTKWave and <a href="https://surfer-project.org/">Surfer</a>
+both open it.</p>
+<h3 id="other-things-in-the-hdl-tab">Other things in the HDL tab</h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Why you would touch it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Cycles per Run / Resume</strong></td>
+<td>How much to simulate at a time. Raise it for long programs.</td>
+</tr>
+<tr>
+<td><strong>Record the architectural trace</strong></td>
+<td>On by default; needed for Step and Back.</td>
+</tr>
+<tr>
+<td><strong>Verilog standard</strong></td>
+<td>Verilog-2005 by default; switch if your code needs it.</td>
+</tr>
+<tr>
+<td><strong>Dump a VCD waveform</strong></td>
+<td>On by default. Without it there is no waveform to show or download.</td>
+</tr>
+<tr>
+<td><strong>Register file</strong></td>
+<td>Detected automatically. Type a path only if detection fails.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-troubleshooting">8. Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>What is going on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Run and Step are greyed out</strong></td>
+<td>The program is not assembled. Press <strong>⚙ Assemble</strong>.</td>
+</tr>
+<tr>
+<td><strong>"Breakpoint set at line X (moved from line Y)"</strong></td>
+<td>You put it on a line with no instruction; it moved to the next real one.</td>
+</tr>
+<tr>
+<td><strong>Program pauses on its own</strong></td>
+<td>It hit the instruction limit, usually an infinite loop. Raise it in ⚙ Settings → Simulation, or find the loop.</td>
+</tr>
+<tr>
+<td><strong>A program stops part-way through</strong></td>
+<td>It did not fit in the Code segment. The status bar after assembling says how many instructions too many. Raise <strong>Code (.text) size</strong> in ⚙ Settings → Linker, and the instruction-memory depth in your wrapper for HDL mode. Low optimisation levels make this more likely.</td>
+</tr>
+<tr>
+<td><strong>A warning about <code>__mulsi3</code> or another libgcc helper</strong></td>
+<td>Your C multiplies or divides but the M extension is off, so the compiler called a library routine that is not part of your program. Tick <strong>Include M extension</strong> in ⚙ Settings → Compiler, or raise the optimisation level: from <code>-O1</code> up, a multiply by a constant often becomes shifts and adds and the call disappears. That is why a program can work at <code>-Os</code> and fail at <code>-O0</code>.</td>
+</tr>
+<tr>
+<td><strong><code>This program uses ecall (N sites)</code></strong></td>
+<td>Information, not a problem. <code>ecall</code> works here because the simulator implements the RARS syscalls; a processor with no trap support and no OS behind it will not run those programs, so use the MMIO peripherals for anything headed to hardware.</td>
+</tr>
+<tr>
+<td><strong>A store to memory seems ignored</strong></td>
+<td>Check the address is in Data, not Text. The text segment is read-only.</td>
+</tr>
+<tr>
+<td><strong>An example will not load (the editor keeps its old content, and the console says <code>Failed to fetch</code>)</strong></td>
+<td>Needs <code>http://</code>, see <a href="#10-running-it-locally">§10</a>.</td>
+</tr>
+<tr>
+<td><strong>C code will not compile</strong></td>
+<td>C mode compiles on Godbolt's servers, so it needs the network, every C example included.</td>
+</tr>
+<tr>
+<td><strong>Nothing happens in HDL mode</strong></td>
+<td>Check the chip beside <code>JS \| HDL</code>. Amber means no sources, or none of them declares <code>module Wrapper</code>.</td>
+</tr>
+<tr>
+<td><strong>HDL: compile error</strong></td>
+<td>The Verilog compiler's message is in the console under the editor, with file and line. Drag the console taller if it is long.</td>
+</tr>
+<tr>
+<td><strong>Registers all show <code>xxxxxxxx</code> in HDL mode</strong></td>
+<td>Either the hardware genuinely has not written them yet, or the register file could not be found; the Registers panel says which.</td>
+</tr>
+<tr>
+<td><strong>HDL mode is slow</strong></td>
+<td>It simulates every clock edge. Reduce <em>Cycles</em>, or use JS mode for long runs.</td>
+</tr>
+<tr>
+<td><strong>Layout has gone strange</strong></td>
+<td>Use the panel chips to show or hide panels; double-click a splitter to even it out.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-where-things-are">9. Where things are</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../riscv_simulator.html"><code>riscv_simulator.html</code></a></td>
+<td>The simulator</td>
+</tr>
+<tr>
+<td><a href="./"><code>riscv_simulator.md</code></a></td>
+<td>This guide</td>
+</tr>
+<tr>
+<td><a href="../riscv_simulator_specs/"><code>riscv_simulator_specs.md</code></a></td>
+<td>Full reference: MMIO map, ISA, syscalls, architecture, changelog</td>
+</tr>
+<tr>
+<td><code>examples/</code></td>
+<td>Every example but DIP to LED, one file each, listed in <code>index.txt</code> with the memory depths each needs; add one by adding a row and a file, no HTML edit (needs the page served over <code>http://</code>)</td>
+</tr>
+<tr>
+<td><code>riscv_simulator_tests/</code></td>
+<td>The automated test suite</td>
+</tr>
+<tr>
+<td><a href="../vendor/"><code>vendor/</code></a></td>
+<td>Local copies of CodeMirror (loaded from here first), Icarus Verilog and Yosys (used when the CDN cannot be reached, which needs the page served over <code>http://</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-running-it-locally">10. Running it locally</h2>
+<p>Every example but <strong>DIP to LED</strong> assumes the page is served over <code>http://</code>, not opened
+straight from disk. Opened directly (double-clicked, <code>file://</code>), the browser refuses
+the page's own <code>fetch()</code> calls, so only DIP to LED, baked directly into the page,
+loads; picking anything else prints <code>Could not load '...': Failed to fetch</code> in the
+console.</p>
+<p><strong>To get every example and C compilation, serve the repository root instead of
+opening the file directly.</strong> From a terminal, in the folder that contains
+<code>riscv_simulator.html</code>:</p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span>
+</code></pre></div>
+<p>Leave that running, then open <a href="http://localhost:8000/riscv_simulator.html">http://localhost:8000/riscv_simulator.html</a>, not the
+file directly, and every example loads the same way DIP to LED does. The one server
+covers every tab you point at that address; there is no need to restart it between
+examples, only when you are done (<code>Ctrl+C</code>). No <code>python3</code>? Anything that serves
+static files works the same way: <code>npx serve</code>, <code>php -S localhost:8000</code>, VS Code's
+<em>Live Server</em> extension. The only requirement either way: <code>examples/</code> and <code>vendor/</code>
+stay siblings of <code>riscv_simulator.html</code>, exactly as checked out.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://nus-cg3207.github.io">NUS CG3207 Labs</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/nus-CG3207">NUS CG3207 Team</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC-SA 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1" alt=""></a></p>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/nus-cg3207" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="mailto:neil@nus.edu.sg" target="_blank" rel="noopener" title="" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4l208 156a48 48 0 0 0 57.6 0l208-156c12.1-9.1 19.2-23.3 19.2-38.4 0-26.5-21.5-48-48-48zM0 196v188c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64V196L313.6 344.8c-34.1 25.6-81.1 25.6-115.2 0z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tooltips", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
