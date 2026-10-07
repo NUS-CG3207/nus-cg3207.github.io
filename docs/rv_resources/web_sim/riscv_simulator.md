@@ -99,14 +99,22 @@ it moves to the next real instruction; the console says where it went.
 **Step Back** restores registers, memory and peripheral state. It is not a re-run from the
 start.
 
-**Statement Stepping** (⚙ Settings → JS Simulation or HDL Simulation) makes one **Step**
+**Statement Stepping** (⚙ Settings → Simulation) makes one **Step**
 cover a whole C statement, or a whole pseudo-instruction like `li x1, 0x12345678`,
 instead of one machine instruction at a time. **Back** undoes exactly the same distance.
 Pipelined, a Step runs until the statement's last instruction has left Write-back, when
 its results show; the datapath's **▶** still moves one cycle.
 
 **A program that never ends** pauses itself after *Max Instructions Per Run*
-(⚙ Settings → JS Simulation, default 100,000,000) rather than freezing the browser.
+(⚙ Settings → Simulation, default 100,000,000) rather than freezing the browser.
+
+**Clock** (⚙ Settings → Simulation) takes `CLK_DIV_BITS` as in `TOP_Nexys.vhd`: the CPU runs
+at 100 MHz ÷ 2^(N+1), 1.56 MHz at the default 5, about 0.75 Hz at 26. The toolbar shows how
+long the cycles so far take at that clock. Set *Real time* and Run keeps to the clock, so a
+delay loop written for the board takes as long as it does there; below about 1 kHz you can
+watch each instruction go by. If the browser cannot keep up (100 MHz, or the pipeline above a
+few MHz) the toolbar shows the fraction of real time it reaches. In HDL mode the run is
+recorded first and then played back at the clock; Run pauses the playback.
 
 ---
 
@@ -201,7 +209,7 @@ what you see is what that hardware does, and your own processor should do the sa
 
 ### The 5-stage pipeline
 
-*Microarchitecture* in ⚙ Settings → JS Simulation sets what a cycle is: Single-cycle
+*Microarchitecture* in ⚙ Settings → Simulation sets what a cycle is: Single-cycle
 takes one per instruction, Multi-cycle takes each instruction category's count from the
 table below it (there is no datapath drawing for it), and 5-stage pipeline counts clock
 edges. Switching resets the program. The datapath header offers Single-cycle and
@@ -277,21 +285,20 @@ The UART box takes **ASCII** (including `\r`, `\n`, `\xHH`) or **Hex** (`0x41, 0
 **Arrival** sets how fast characters reach your program. The board has one receive
 register and no FIFO: a character arriving before you have read the previous one is
 discarded, the older one kept, and nothing records that it happened. At 115200 baud a
-character is 135 instructions at the default clock divider. That is your polling loop's
-budget.
+character is 8640 cycles of the 100 MHz clock, 135 CPU cycles at the default
+`CLK_DIV_BITS`. That is your polling loop's budget.
 
 | Arrival | What it models |
 |---|---|
-| **Paste** | pressing Send in a terminal: one character every 135 instructions, read or not |
+| **Paste** | pressing Send in a terminal: one character per character time, read or not |
 | **Typed** | a person at a keyboard: the same, with a much larger gap |
 | **Forgiving** | nothing on the board. Each character waits until you have read the one before, so none is ever dropped. Useful while you are debugging your logic rather than your timing. |
 
-The box beside the selector is that gap, in instructions, and you can edit it for Paste and
-Typed; Forgiving greys it out because it does not use one.
+The box beside the selector is that gap, in clock cycles. For Paste it follows the clock in
+Settings; for Typed you set it.
 
 If characters go missing, the console says so and why. Fix it by reading `UART_RX` promptly
-rather than doing work between characters, and note that the budget shrinks if you lower
-`CLK_DIV_BITS`.
+rather than doing work between characters; the budget shrinks as you lower `CLK_DIV_BITS`.
 
 `OLED_CTRL` low nibble picks what triggers a pixel (`0` data, `1` column, `2` row, `4`
 auto-advance along the row, `5` auto-advance down the column) and the high nibble picks
@@ -356,8 +363,7 @@ off the poll needs its own delay to run at a sensible speed here.
 |---|---|
 | **⚡ Compiler** | C compiler, `-O` level, `-march`/`-mabi`, M-extension toggle (off by default) |
 | **🗺 Linker** | Segment bases and sizes, stack top, MMIO base |
-| **⏱ JS Simulation** | Statement Stepping · single-cycle, multi-cycle (with its cycles per instruction) or 5-stage pipeline (with the hazard switches) · max instructions per run |
-| **🔌 HDL Simulation** | Statement Stepping · your Verilog sources · everything for the hardware engine |
+| **⏱ Simulation** | For both engines, Statement Stepping and the clock. Then the active engine's own: in JS mode single-cycle, multi-cycle (with its cycles per instruction) or 5-stage pipeline (with the hazard switches), and max instructions per run; in HDL mode your Verilog sources and everything for the hardware engine |
 
 Changing anything on the **Compiler** tab clears the compiled program: what was loaded
 no longer matches the settings, so compile again afterwards.
@@ -398,7 +404,7 @@ wrote.
 
 ### Getting started
 
-1. Click **HDL**. Settings opens on **🔌 HDL Simulation**, since nothing can happen
+1. Click **HDL**. Settings opens on **⏱ Simulation**, since nothing can happen
    without your sources.
 2. Drop your `.v` files anywhere on the page, or use **browse…**, or **📂 Open**. You need
    the file declaring `module Wrapper`, your processor, and *every* submodule either
@@ -463,7 +469,7 @@ Registers panel says so when that happens.
 - **You cannot change one mid-Run.** Icarus simulates a whole *Cycles* budget in one
   uninterruptible pass, so the page is frozen until the run stops. A change made during
   it applies when the run ends. JS mode has no such limit. A smaller *Cycles per
-  Run/Resume* (⚙ Settings → 🔌 HDL Simulation) gives more openings to change an input,
+  Run/Resume* (⚙ Settings → Simulation) gives more openings to change an input,
   at the cost of pressing Run more often on a long program.
 
 ### Is my Verilog synthesisable?
@@ -475,7 +481,7 @@ in the console with a file and a line. It never stops a simulation.
 
 Treat it as a first pass, not a verdict: it catches common mistakes but doesn't prove
 anything. To actually prove it, tick **Post-synthesis functional simulation**
-(⚙ Settings → 🔌 HDL Simulation). Every run then happens twice: once as you wrote it, and
+(⚙ Settings → Simulation). Every run then happens twice: once as you wrote it, and
 once as a gate-level netlist produced by **Yosys**. If the two behave differently, you're
 told the first point where they part company. That's what an inferred latch, an
 incomplete sensitivity list, or a race between blocking assignments actually looks like.
@@ -491,7 +497,7 @@ memory and every peripheral are compared in full.
 
 ### Finding a bug in your processor
 
-Tick **Cross-check against the JS model** (⚙ Settings → 🔌 HDL Simulation). After each
+Tick **Cross-check against the JS model** (⚙ Settings → Simulation). After each
 run, the same program is replayed on the functional model and the two are compared by
 their effects: the order in which registers change and data memory is written. You are
 told the **first difference**, with its cycle, both values, and the instruction and line
@@ -550,7 +556,7 @@ both open it.
 |---|---|
 | **Run and Step are greyed out** | The program is not assembled. Press **⚙ Assemble**. |
 | **"Breakpoint set at line X (moved from line Y)"** | You put it on a line with no instruction; it moved to the next real one. |
-| **Program pauses on its own** | It hit the instruction limit, usually an infinite loop. Raise it in ⚙ Settings → JS Simulation, or find the loop. |
+| **Program pauses on its own** | It hit the instruction limit, usually an infinite loop. Raise it in ⚙ Settings → Simulation, or find the loop. |
 | **A program stops part-way through** | It did not fit in the Code segment. The status bar after assembling says how many instructions too many. Raise **Code (.text) size** in ⚙ Settings → Linker, and the instruction-memory depth in your wrapper for HDL mode. Low optimisation levels make this more likely. |
 | **A warning about `__mulsi3` or another libgcc helper** | Your C multiplies or divides but the M extension is off, so the compiler called a library routine that is not part of your program. Tick **Include M extension** in ⚙ Settings → Compiler, or raise the optimisation level: from `-O1` up, a multiply by a constant often becomes shifts and adds and the call disappears. That is why a program can work at `-Os` and fail at `-O0`. |
 | **`This program uses ecall (N sites)`** | Information, not a problem. `ecall` works here because the simulator implements the RARS syscalls; a processor with no trap support and no OS behind it will not run those programs, so use the MMIO peripherals for anything headed to hardware. |

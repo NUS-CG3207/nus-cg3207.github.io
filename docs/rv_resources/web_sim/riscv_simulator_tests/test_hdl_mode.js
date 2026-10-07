@@ -135,8 +135,9 @@ setTimeout(async () => {
       [...doc.querySelectorAll('#panelStack > .tab-content')]
         .map(e => e.id.replace('tab-', '')).sort().join(',') ===
       'datapath,disassembly,locals,memory,peripherals,registers,waveform');
-    check('Settings has a dedicated HDL tab',
-      !!doc.getElementById('settingsTabBtn-hdl') && !!doc.getElementById('settingsContent-hdl'));
+    check('Settings has one Simulation tab, holding the HDL group',
+      !doc.getElementById('settingsTabBtn-hdl') && !!doc.getElementById('simGroupHdl') &&
+      doc.getElementById('simGroupHdl').closest('#settingsContent-simulator') !== null);
     check('Engine toggle has JS and HDL buttons',
       !!doc.getElementById('engBtnJs') && !!doc.getElementById('engBtnHdl'));
     check('File drop zone and file input exist',
@@ -169,28 +170,16 @@ setTimeout(async () => {
     check('JS-only settings sit under "Functional model"',
       doc.getElementById('simMaxInstrPerRun').closest('#simGroupJs') !== null &&
       doc.getElementById('cyclesConfigBody').closest('#simGroupJs') !== null);
-    check('Every HDL setting is on the HDL tab',
+    check('Every HDL setting is in the HDL group',
       ['hdlCycles', 'hdlGeneration', 'hdlVcd', 'hdlCompare', 'hdlTrace', 'hdlRegPath',
-       'hdlDropZone', 'hdlFileList'].every(id => inTab(id, 'hdl')));
+       'hdlDropZone', 'hdlFileList'].every(id => inTab(id, 'simulator') &&
+         doc.getElementById(id).closest('#simGroupHdl') !== null));
     check('The duplicate in-panel Run button is gone', !doc.getElementById('hdlRunBtn'));
-    check('Each simulation tab is named for the engine it configures',
-      /JS Simulation/.test(doc.getElementById('settingsTabBtn-simulator').textContent) &&
-      /HDL Simulation/.test(doc.getElementById('settingsTabBtn-hdl').textContent));
-    // Statement Stepping reaches both engines, so it is offered on both tabs -
-    // as one setting with two controls, not two settings.
-    check('Statement Stepping appears on the HDL tab too',
-      !!doc.getElementById('hdlStatementStep') &&
-      doc.getElementById('hdlStatementStep').closest('#settingsContent-hdl') !== null);
-    win.statementStepping = false;
-    win.buildCyclesPanel();
-    doc.getElementById('hdlStatementStep').checked = true;
-    doc.getElementById('hdlStatementStep').onchange();
-    check('Ticking it on the HDL tab turns it on for both',
-      win.statementStepping === true && doc.getElementById('simStatementStep').checked === true);
-    doc.getElementById('simStatementStep').checked = false;
-    doc.getElementById('simStatementStep').onchange();
-    check('And clearing it on the JS tab clears both',
-      win.statementStepping === false && doc.getElementById('hdlStatementStep').checked === false);
+    check('The tab is named Simulation',
+      /^\W*Simulation$/.test(doc.getElementById('settingsTabBtn-simulator').textContent.trim()));
+    check('Statement Stepping and the clock appear once, for both engines',
+      !doc.getElementById('hdlStatementStep') && doc.querySelectorAll('[data-clk="div"]').length === 1 &&
+      doc.querySelector('[data-clk="div"]').closest('#simGroupBoth') !== null);
     check('Register-file path field and its hint exist',
       !!doc.getElementById('hdlRegPath') && !!doc.getElementById('hdlRegPathHint'));
     check('Peripherals panel is untouched (still present)', !!doc.getElementById('tab-peripherals'));
@@ -205,23 +194,21 @@ setTimeout(async () => {
     check('HDL mode marks the body', doc.body.classList.contains('hdl-mode'));
     check('HDL button becomes active', doc.getElementById('engBtnHdl').classList.contains('active'));
     win.refreshSimSettingsScope();
-    check('In HDL mode the functional-model settings are dimmed, not hidden',
-      doc.getElementById('simGroupJs').classList.contains('sim-group-off'));
-    check('The dimmed group says why it is inactive',
-      /HDL engine/.test(doc.getElementById('simGroupJsNote').textContent));
+    check('In HDL mode the Simulation tab shows the HDL settings, not the JS ones',
+      doc.getElementById('simGroupJs').hidden && !doc.getElementById('simGroupHdl').hidden);
     check('Switching to HDL with no sources asks for them',
       doc.getElementById('settingsOverlay').classList.contains('open') &&
-      doc.getElementById('settingsContent-hdl').classList.contains('active'));
+      doc.getElementById('settingsContent-simulator').classList.contains('active'));
     win.closeSettingsModal();
     check('The toolbar chip warns that no Verilog is loaded',
       /no Verilog/.test(doc.getElementById('hdlFilesChip').textContent));
     win.setSimEngineMode('js');
     check('Switching back to JS clears the body class', !doc.body.classList.contains('hdl-mode'));
     win.refreshSimSettingsScope();
-    check('In JS mode the functional-model settings are live again',
-      !doc.getElementById('simGroupJs').classList.contains('sim-group-off'));
-    check('Settings shared by both engines are never dimmed',
-      !doc.getElementById('simGroupBoth').classList.contains('sim-group-off'));
+    check('In JS mode the JS settings are back and the HDL ones hidden',
+      !doc.getElementById('simGroupJs').hidden && doc.getElementById('simGroupHdl').hidden);
+    check('Settings shared by both engines are always shown',
+      !doc.getElementById('simGroupBoth').hidden);
     win.setSimEngineMode('hdl');
     win.closeSettingsModal();
 
@@ -324,8 +311,8 @@ setTimeout(async () => {
     console.log('\n[3c] Post-synthesis plumbing');
     check('The synthesis checkbox exists and is off by default',
       !!doc.getElementById('hdlSynth') && doc.getElementById('hdlSynth').checked === false);
-    check('It sits on the HDL Simulation tab',
-      doc.getElementById('hdlSynth').closest('#settingsContent-hdl') !== null);
+    check('It sits in the Simulation tab\'s HDL group',
+      doc.getElementById('hdlSynth').closest('#simGroupHdl') !== null);
     check('Only the core is synthesised — the fixed Wrapper is excluded',
       win.hdlCoreFiles().length === 9 &&
       !win.hdlCoreFiles().some(f => /Wrapper/.test(f.name)));
@@ -406,23 +393,17 @@ setTimeout(async () => {
       /Ready to run/.test(doc.getElementById('statusBar').textContent));
 
     // Layout: sources first, then the three settings that matter most.
-    const hdlTab = doc.getElementById('settingsContent-hdl');
+    const hdlTab = doc.getElementById('simGroupHdl');
     const groups = [...hdlTab.querySelectorAll('.sim-group-title')].map(e => e.textContent.trim());
     check('Sources come first, then Simulation',
       groups[0] === 'Processor sources' && groups[1] === 'Simulation');
-    check('Post-synthesis, Cycles and Fast Mode are the Simulation group',
-      ['hdlSynth', 'hdlCycles', 'hdlStatementStep']
+    check('Post-synthesis and Cycles are the Simulation group',
+      ['hdlSynth', 'hdlCycles']
         .every(id => doc.getElementById(id).closest('.sim-group').id === 'hdlGroupBoth'));
     check('Post-synthesis is named as a functional simulation',
       /Post-synthesis functional simulation/.test(hdlTab.textContent));
     check('Its long explanation is folded away',
       [...hdlTab.querySelectorAll('details')].some(d => /13 MB/.test(d.textContent)));
-    check('Statement Stepping is worded identically on both tabs', (() => {
-      const strip = t => t.replace(/Shared with .*/, '').replace(/\s+/g, ' ').trim();
-      const hdl = strip(doc.getElementById('hdlStatementStep').closest('.sim-card').textContent);
-      const js = strip(doc.getElementById('simStatementStep').closest('.sim-card').textContent);
-      return hdl === js && hdl.length > 40;
-    })());
 
     // --- 4. The testbench is program-independent -----------------------
     console.log('\n[4] Generated testbench carries no program-specific data');
@@ -697,6 +678,31 @@ setTimeout(async () => {
         check('A wrong register value is reported at its own cycle, with the value the model expected',
           new RegExp('first difference at cycle ' + wLine.split(' ')[1] + ': the hardware set x\\d+ = 0x0000beaf; ' +
             'the model.s next register change is x\\d+ = 0x0000bead').test(verdictW), verdictW);
+
+        // --- 8c. Real time plays the recording back at the clock -------
+        console.log('\n[8c] Real-time playback of a recording');
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        win.hdlLoadTrace(runA, 400);
+        const nSteps = win.hdlParseTrace(runA).steps.length;
+        win.setRunPace('real');
+        win.setClkDivBits(16);                   // 763 Hz: 400 cycles in about 0.52 s
+        win.hdlSeek(0);
+        let played = false;
+        win.hdlPlayTo(nSteps, () => { played = true; });
+        await sleep(200);
+        const mid = win.eval('hdlIdx');
+        check('part-way through, playback is between the start and the end (' + mid + ' of ' + nSteps + ')',
+          mid > 20 && mid < nSteps - 20 && !played);
+        check('and the Run button pauses it', /Pause/.test(doc.getElementById('runPauseBtn').textContent));
+        win.hdlStopPlay();
+        await sleep(150);
+        check('paused, it stays put', win.eval('hdlIdx') === mid && !played);
+        win.setClkDivBits(12);                   // 12.2 kHz: the rest in a few ms
+        win.hdlPlayTo(nSteps, () => { played = true; });
+        await sleep(250);
+        check('resumed, it reaches the end and reports done', played && win.eval('hdlIdx') === nSteps);
+        win.setRunPace('max');
+        win.setClkDivBits(5);
 
         // --- 8b. Seeking = stepping ------------------------------------
         // vvp cannot be paused, so stepping is navigation through the

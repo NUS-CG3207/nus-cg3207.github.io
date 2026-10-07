@@ -581,22 +581,12 @@ setTimeout(async () => {
     }
     console.log('ASM menu survives asm → c → asm unchanged, and both mark a starting point');
 
-    // Statement Stepping is one setting on two tabs; the wording must match
-    // apart from the clause naming the other tab.
-    const stripShared = (t) => (t || '').replace(/Shared with (JS|HDL) Simulation\./, '')
-      .replace(/\s+/g, ' ').trim();
-    const jsBlurb  = doc.querySelector('#simStatementStep')
-      .closest('.sim-card').querySelector('span').textContent;
-    const hdlBlurb = doc.querySelector('#hdlStatementStep')
-      .closest('.sim-card').querySelector('span').textContent;
-    if (stripShared(jsBlurb) !== stripShared(hdlBlurb)) {
-      throw new Error('Statement Stepping is worded differently on the two tabs:\n' +
-        '  JS : ' + stripShared(jsBlurb) + '\n  HDL: ' + stripShared(hdlBlurb));
-    }
-    if (stripShared(jsBlurb).length > 130) {
-      throw new Error('The Statement Stepping blurb has grown back: ' + stripShared(jsBlurb));
-    }
-    console.log(`Statement Stepping reads the same on both tabs: "${stripShared(jsBlurb)}"`);
+    // Statement Stepping is one setting; its blurb stays short.
+    const jsBlurb = doc.querySelector('#simStatementStep')
+      .closest('.sim-card').querySelector('span').textContent.replace(/\s+/g, ' ').trim();
+    if (doc.querySelector('#hdlStatementStep')) throw new Error('Statement Stepping should appear once');
+    if (jsBlurb.length > 130) throw new Error('The Statement Stepping blurb has grown back: ' + jsBlurb);
+    console.log(`Statement Stepping appears once: "${jsBlurb}"`);
     console.log('✅ Example menu and shared-setting wording verified!');
 
     // 15. A symbol offset is a number in the assembler's own syntax, and the

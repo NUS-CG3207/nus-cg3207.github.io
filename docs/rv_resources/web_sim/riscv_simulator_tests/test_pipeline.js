@@ -694,6 +694,37 @@ setTimeout(async () => {
     win.dpNext();
     check('the strip\'s ▶ still clocks one cycle with Statement Stepping on', ev('totalCycles') === 7);
     ev("statementStepping = false; setJsArch('single')");
+
+    // [8] The clock: CLK_DIV_BITS as on the board, and Run paced to it.
+    console.log('\n[8] The clock, and real time');
+    const hzOf = n => { win.setClkDivBits(n); return ev('cpuHz()'); };
+    check('CLK_DIV_BITS divides 100 MHz by 2^(N+1), or not at all at 0',
+      hzOf(0) === 100e6 && hzOf(5) === 1562500 && Math.abs(hzOf(26) - 0.745) < 0.001);
+    win.setClkDivBits(3);
+    const uartBox = doc.getElementById('uartCharInstr');
+    check('the UART\'s character time follows the clock (540 cycles at 6.25 MHz)',
+      ev('uartGapInstr()') === 540 && uartBox.value === '540' && uartBox.disabled);
+    win.setClkDivBits(5);
+    check('and is 135 at the default divider', ev('uartGapInstr()') === 135);
+    check('the stats bar shows the time those cycles take, then the cycles, then the instructions', /^\s*[\d.]+ (µs|ms|s)\s*\|\s*Cycles: \d+ \w+\s*\|\s*Instr/.test(doc.getElementById('statsBar').textContent),
+      doc.getElementById('statsBar').textContent);
+    assembleSrc('.text\nmain: addi t0, x0, 0\nloop: addi t0, t0, 1\n    jal x0, loop\n');
+    win.setClkDivBits(17);                       // 381 Hz
+    win.setRunPace('real');
+    ev('resetAll()');
+    win.runProgram();
+    await sleep(600);
+    const paced = ev('totalCycles');
+    win.toggleRunPause();
+    check('Real time at 381 Hz: about 229 cycles in 0.6 s', paced >= 120 && paced <= 300, String(paced));
+    win.setRunPace('max');
+    ev('resetAll()');
+    win.runProgram();
+    await sleep(300);
+    const fast = ev('totalCycles');
+    win.toggleRunPause();
+    check('Max speed runs far past it', fast > 50000, String(fast));
+    win.setClkDivBits(5);
   } catch (e) {
     console.log('  ❌ threw: ' + (e.stack || e.message));
     failed++;

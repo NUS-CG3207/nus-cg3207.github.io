@@ -1866,6 +1866,7 @@
     }
     /* Dimmed, never hidden, so a setting that does nothing is still findable. */
     .sim-group.sim-group-off { opacity: 0.45; }
+    #simGroupJs[hidden], #simGroupHdl[hidden] { display: none; }
     .sim-dim { opacity: 0.45; }
     .pipe-select {
       padding: 2px 4px;
@@ -2108,6 +2109,7 @@
     body.dp-in-panel #tab-datapath .dp-caption:empty { display: none; }
     /* Below the drawing: the instruction and the picture belong together. */
     .dp-caption { order: 1; border-bottom: none; border-top: 1px solid #313244; }
+    .stat-lag { color: #fab387; }
     #dpClock .dp-clk-wave { fill: none; stroke: #4c4f69; stroke-width: 9; }
     #dpClock .dp-clk-next { fill: none; stroke: #4c4f69; stroke-width: 9; stroke-dasharray: 16 12; }
     #dpClock .dp-clk-arrow { fill: #4c4f69; }
@@ -3958,8 +3960,7 @@
         <div class="settings-tab-bar">
           <button class="settings-tab-btn active" id="settingsTabBtn-compiler" onclick="switchSettingsTab('compiler')">⚡ Compiler</button>
           <button class="settings-tab-btn" id="settingsTabBtn-linker" onclick="switchSettingsTab('linker')">🗺 Linker</button>
-          <button class="settings-tab-btn" id="settingsTabBtn-simulator" onclick="switchSettingsTab('simulator')">⏱ JS Simulation</button>
-          <button class="settings-tab-btn" id="settingsTabBtn-hdl" onclick="switchSettingsTab('hdl')">🔌 HDL Simulation</button>
+          <button class="settings-tab-btn" id="settingsTabBtn-simulator" onclick="switchSettingsTab('simulator')">⏱ Simulation</button>
         </div>
         <!-- Tab 1: Compiler -->
         <div class="settings-tab-content active" id="settingsContent-compiler">
@@ -4031,14 +4032,9 @@
             <div class="cycle-field"><label for="ms-mmio">MMIO base</label><input id="ms-mmio" type="text" value="0xFFFF0000"></div>
           </div>
         </div>
-        <!-- Tab 3: Simulation — grouped by the engine each setting reaches,
-             because "simulation settings" previously meant the JS model only
-             while the HDL ones lived in a different place entirely. -->
+        <!-- Tab 3: Simulation. What reaches both engines, then the active
+             engine's own settings; the other engine's are hidden. -->
         <div class="settings-tab-content" id="settingsContent-simulator">
-          <div class="cycle-hint" style="margin-bottom:12px;">
-            Settings for the built-in JavaScript model. They take effect immediately.
-            In HDL mode they are dimmed, because they do not reach that engine.
-          </div>
 
           <div class="sim-group" id="simGroupBoth">
             <div class="sim-group-hdr"><span class="sim-group-title">Both engines</span></div>
@@ -4048,14 +4044,30 @@
                 Statement Stepping (Fast Mode)
               </label>
               <span style="font-size:11.5px;color:#a6adc8;line-height:1.4;">
-                Step and Back move a whole C statement or pseudo-op expansion at a time, not one machine instruction. <i>Shared with HDL Simulation.</i>
+                Step and Back move a whole C statement or pseudo-op expansion at a time, not one machine instruction.
               </span>
+            </div>
+            <div class="sim-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-weight:600;color:#cba6f7;font-size:13px;"
+                  title="The CPU clock on the board: TOP_Nexys.vhd divides 100 MHz by 2^(CLK_DIV_BITS+1), or not at all when it is 0. The same setting for both engines.">Clock</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a6adc8;">
+                  CLK_DIV_BITS
+                  <input type="number" data-clk="div" min="0" max="26" step="1" value="5" class="pipe-select" style="width:52px;"
+                    title="As in TOP_Nexys.vhd: 0 is 100 MHz, 5 is 1.56 MHz, 26 is about 0.75 Hz">
+                  <span data-clk="hz" style="min-width:62px;color:#cdd6f4;">1.56 MHz</span>
+                  <select data-clk="pace" class="pipe-select"
+                    title="Max speed runs as fast as the browser can. Real time runs at the clock above, so delay loops take as long as on the board; if the browser cannot keep up, the toolbar shows the fraction of real time it reaches. In HDL mode a run is recorded first and then played back at the clock.">
+                    <option value="max">Max speed</option>
+                    <option value="real">Real time</option>
+                  </select>
+                </span>
+              </div>
             </div>
           </div>
 
           <div class="sim-group" id="simGroupJs">
-            <div class="sim-group-hdr"><span class="sim-group-title">JavaScript model</span>
-              <span class="sim-group-note" id="simGroupJsNote"></span></div>
+            <div class="sim-group-hdr"><span class="sim-group-title">JavaScript model</span></div>
             <div class="sim-card">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <label for="simMicroarch" style="font-weight:600;color:#cba6f7;font-size:13px;">Microarchitecture</label>
@@ -4095,12 +4107,8 @@
             </div>
           </div>
 
-        </div>
-        <!-- Tab 4: HDL — the Verilog engine's setup. All of it is done once per
-             session, which is why it is here rather than in a panel. Run, Step
-             and Back are on the toolbar; output goes to the console below the
-             editor, alongside the assembler's. -->
-        <div class="settings-tab-content" id="settingsContent-hdl">
+          <!-- The Verilog engine's setup, done once per session. -->
+          <div id="simGroupHdl">
           <div class="cycle-hint" style="margin-bottom:12px;">
             Your Verilog is compiled inside your browser and is never uploaded anywhere,
             so it has to be loaded once per session.
@@ -4173,15 +4181,6 @@
               </span>
             </div>
 
-            <div class="sim-card">
-              <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:#cba6f7;cursor:pointer;font-size:13px;">
-                <input type="checkbox" id="hdlStatementStep" style="accent-color:#cba6f7;width:16px;height:16px;cursor:pointer;">
-                Statement Stepping (Fast Mode)
-              </label>
-              <span style="font-size:11.5px;color:#a6adc8;line-height:1.4;">
-                Step and Back move a whole C statement or pseudo-op expansion at a time, not one machine instruction. <i>Shared with JS Simulation.</i>
-              </span>
-            </div>
           </div>
 
           <div class="sim-group">
@@ -4252,6 +4251,7 @@
               sees the new value.
             </div>
           </details>
+          </div>
         </div>
         <!-- Footer -->
         <div class="c-foot" style="margin-top:0;border-top:1px solid #313244;padding:12px 20px;">
@@ -4339,7 +4339,7 @@
                 <button type="button" id="engBtnHdl" class="eng-btn" onclick="setSimEngineMode('hdl')">HDL</button>
               </div>
               <button type="button" id="hdlFilesChip" class="hdl-chip" style="display:none;"
-                onclick="openSettingsModal('hdl')">no Verilog</button>
+                onclick="openSettingsModal('simulator')">no Verilog</button>
               <label class="example-label" title="Select an example program"><span class="example-label-text">Example:</span>
                 <!-- Filled from EXAMPLE_MENU by updateExampleSelectorOptions(). -->
                 <select id="exampleSelect" onchange="loadExample(this.value)"></select>
@@ -4586,7 +4586,7 @@
                     title="How fast the characters arrive. The board holds one byte at a time, so anything the program does not read before the next arrives is lost.">Arrival</label>
                   <select id="uartSendMode" onchange="setUartSendMode(this.value)"
                     style="height:24px;padding:1px 4px;font-size:11px;box-sizing:border-box;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;flex:0 0 auto;"
-                    title="Sets the gap between arriving characters, shown in the box beside this. Paste and Typed both keep to that gap whether or not your program has read the previous byte, so a slow polling loop loses characters. Paste uses one character time at 115200 baud, 135 instructions by default. Typed uses a much larger gap, as if someone were typing it in. Forgiving ignores the gap and holds each character until your program has read the one before, so nothing is ever dropped. The board cannot do that.">
+                    title="Sets the gap between arriving characters, shown in the box beside this. Paste and Typed both keep to that gap whether or not your program has read the previous byte, so a slow polling loop loses characters. Paste uses one character time at 115200 baud at the clock set in Settings. Typed uses a much larger gap, as if someone were typing it in. Forgiving ignores the gap and holds each character until your program has read the one before, so nothing is ever dropped. The board cannot do that.">
                     <option value="paste" selected>Paste (baud rate)</option>
                     <option value="typed">Typed (slow)</option>
                     <option value="forgiving">Forgiving (never drops)</option>
@@ -4595,9 +4595,9 @@
                     <input type="number" id="uartCharInstr" value="135" min="1" max="999999"
                       style="width:56px;height:24px;padding:2px 4px;font-size:11px;box-sizing:border-box;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;text-align:center;flex:0 0 auto;"
                       onchange="setUartCharInstr(this.value)"
-                      title="Instructions between characters. 135 is one character at 115200 baud with the default clock divider: 10 bit-times x 864 clocks / 64. Lower CLK_DIV_BITS and this gets smaller.">
+                      title="Clock cycles between characters. In Paste mode it is one character at 115200 baud at the clock set in Settings (135 at CLK_DIV_BITS 5); in Typed mode, set it here.">
                     <span style="color:#a6adc8;" id="uartCharUnit"
-                      title="Instructions between characters at the chosen arrival rate; clock cycles when pipelined">instr/char</span>
+                      title="Clock cycles between characters">cycles/char</span>
                   </span>
                 </div>
                 <div class="uart-queue-info" id="uartQueueInfo"
@@ -5340,6 +5340,47 @@
     // loop has to read one before the next arrives. Settable, because it moves
     // with the clock divider.
     const UART_CHAR_INSTR_DEFAULT = 135;
+
+    // The board's CPU clock. TOP_Nexys.vhd divides 100 MHz by
+    // 2^(CLK_DIV_BITS+1), or not at all when CLK_DIV_BITS is 0.
+    let clkDivBits = 5;
+    let runPace = 'max';             // 'max' | 'real'
+    let rtRatio = 1;                 // real time reached while pacing, 0..1
+    function clkDivider() { return clkDivBits === 0 ? 1 : 2 ** (clkDivBits + 1); }
+    function cpuHz() { return 100e6 / clkDivider(); }
+    function fmtHz(f) {
+      return f >= 1e6 ? +(f / 1e6).toPrecision(3) + ' MHz' : f >= 1e3 ? +(f / 1e3).toPrecision(3) + ' kHz'
+        : +f.toPrecision(3) + ' Hz';
+    }
+    function fmtSimTime(cycles) {
+      const t = cycles / cpuHz();
+      return t < 1e-3 ? +(t * 1e6).toFixed(1) + ' µs' : t < 1 ? +(t * 1e3).toFixed(2) + ' ms' : +t.toFixed(2) + ' s';
+    }
+    // One character at 115200 baud is 8640 clocks of uart.vhd's 100 MHz.
+    function uartCharCycles() { return Math.max(1, Math.round(8640 / clkDivider())); }
+    function syncClockControls() {
+      document.querySelectorAll('[data-clk="div"]').forEach(el => { el.value = String(clkDivBits); });
+      document.querySelectorAll('[data-clk="hz"]').forEach(el => { el.textContent = fmtHz(cpuHz()); });
+      document.querySelectorAll('[data-clk="pace"]').forEach(el => { el.value = runPace; });
+    }
+    function setClkDivBits(v) {
+      const n = parseInt(v, 10);
+      if (Number.isFinite(n)) clkDivBits = Math.max(0, Math.min(26, n));
+      uartCharInstr = uartCharCycles();
+      syncClockControls();
+      setUartSendMode(uartSendMode);
+      updateStats();
+    }
+    function setRunPace(v) {
+      runPace = v === 'real' ? 'real' : 'max';
+      syncClockControls();
+      updateStats();
+    }
+    function clockInitControls() {
+      document.querySelectorAll('[data-clk="div"]').forEach(el => { el.onchange = () => setClkDivBits(el.value); });
+      document.querySelectorAll('[data-clk="pace"]').forEach(el => { el.onchange = () => setRunPace(el.value); });
+      syncClockControls();
+    }
     let uartCharInstr = UART_CHAR_INSTR_DEFAULT;
     let uartSendMode = 'paste';      // 'paste' | 'typed' | 'forgiving'
     let uartTypedInstr = 20000;      // gap for 'typed', a stand-in for human speed
@@ -7046,7 +7087,7 @@
       // the mode rather than sitting there meaning nothing.
       if (el) {
         el.value = uartSendMode === 'typed' ? uartTypedInstr : uartCharInstr;
-        el.disabled = (uartSendMode === 'forgiving');
+        el.disabled = uartSendMode !== 'typed';
         el.style.opacity = el.disabled ? '0.5' : '';
       }
       updatePeripherals();
@@ -7079,14 +7120,14 @@
       if (!uartRxDropped || uartPending.length) return;
       log(`UART RX: ${uartRxDropped} byte${uartRxDropped > 1 ? 's' : ''} lost - ` +
           `the program did not read UART_RX before the next character arrived ` +
-          `(${uartGapInstr()} ${pipeMode ? 'cycles' : 'instructions'} apart). The hardware holds one byte and ` +
+          `(${uartGapInstr()} cycles apart). The hardware holds one byte and ` +
           `discards the rest without any flag, so this would be silent on the board.`, 'warning');
       uartRxDropped = 0;
     }
 
     // The UART's clock. A character time is a count of single-cycle
     // instructions, which is a count of cycles once the pipeline is on.
-    function uartNow() { return pipeMode ? totalCycles : instructionCount; }
+    function uartNow() { return totalCycles; }
 
     // Called once per executed instruction, or per cycle when pipelined.
     // Moves bytes from the PC's buffer into the holding register as their
@@ -10648,7 +10689,7 @@
           const sentCount = Math.max(0, uartSendTotal - uartPending.length);
           autoStatusEl.innerText = uartSendMode === 'forgiving'
             ? `Sending: ${sentCount}/${uartSendTotal} (waiting for the program)`
-            : `Sending: ${sentCount}/${uartSendTotal} (${uartGapInstr()} instr apart)`;
+            : `Sending: ${sentCount}/${uartSendTotal} (${uartGapInstr()} cycles apart)`;
         } else {
           if (btnEl && btnEl.innerText === 'Cancel') {
             btnEl.innerText = 'Send';
@@ -12688,7 +12729,7 @@ int main()
 
     // Statement Stepping reaches both engines, so it is offered on both tabs.
     // The two checkboxes are the same setting, and are kept identical.
-    const STMT_STEP_IDS = ['simStatementStep', 'hdlStatementStep'];
+    const STMT_STEP_IDS = ['simStatementStep'];
     function syncStatementStepBoxes() {
       STMT_STEP_IDS.forEach(id => {
         const el = document.getElementById(id);
@@ -12750,19 +12791,12 @@ int main()
     }
 
     // --- Unified Settings Modal Controller (Compiler, Linker, Simulator) ---
-    // Which half of the Simulation tab is live depends on the active engine.
-    // Both halves stay readable - a dimmed setting you can still find beats a
-    // hidden one, and beats one that quietly does nothing.
+    // The Simulation tab shows the active engine's settings only.
     function refreshSimSettingsScope() {
       const hdl = (typeof simEngineMode !== 'undefined' && simEngineMode === 'hdl');
-      const set = (id, off, note) => {
-        const g = document.getElementById(id);
-        if (g) g.classList.toggle('sim-group-off', off);
-        const nEl = document.getElementById(id + 'Note');
-        if (nEl) nEl.textContent = note;
-      };
-      set('simGroupJs', hdl, hdl ? 'not in use - the HDL engine is running your Verilog' : 'active');
-      set('simGroupHdl', !hdl, hdl ? 'active' : 'not in use - switch the toolbar to HDL');
+      const js = document.getElementById('simGroupJs'), hw = document.getElementById('simGroupHdl');
+      if (js) js.hidden = hdl;
+      if (hw) hw.hidden = !hdl;
       pipeSyncControls();
     }
 
@@ -12946,8 +12980,7 @@ int main()
       // 2. Apply Simulator CPI, Statement Stepping & Max Instructions
       getCyclesFromPanel();
       // Either copy is authoritative; they are mirrored on change.
-      const stmtEl = document.getElementById('simStatementStep') ||
-                     document.getElementById('hdlStatementStep');
+      const stmtEl = document.getElementById('simStatementStep');
       if (stmtEl) statementStepping = stmtEl.checked;
       syncStatementStepBoxes();
 
@@ -12994,9 +13027,9 @@ int main()
         set('ms-stack', DEFAULT_DATA_BASE + 0x200);
         set('ms-mmio', 0xFFFF0000);
         setStatus('Linker defaults filled in - Apply to use them', 'info');
-      } else if (currentSettingsTab === 'simulator') {
+      } else if (currentSettingsTab === 'simulator' && simEngineMode !== 'hdl') {
         resetCyclesConfig();
-      } else if (currentSettingsTab === 'hdl') {
+      } else if (currentSettingsTab === 'simulator') {
         // Settings only - the loaded sources are the user's work, and Clear
         // files is right there for them.
         const set = (id, v, prop) => {
@@ -14240,6 +14273,11 @@ int main()
       const INFINITE_LOOP_CAP = 100000000;
       const maxRunLimit = (typeof maxInstructionsPerRun === 'number' && maxInstructionsPerRun > 0) ? maxInstructionsPerRun : 100000000;
       const BATCH_SIZE = Math.min(10000, maxRunLimit); // per-tick chunk for UI responsiveness
+      // Real time: each tick runs the cycles the clock has owed since the run
+      // started. More than a quarter second behind, the debt is dropped and
+      // the shortfall shows as a fraction of real time.
+      let rt = null;
+      rtRatio = 1;
       const initialLine = sourceLineForPc(pc);
       let resumeLine = (initialLine >= 1 && breakpoints.has(initialLine)) ? initialLine : -1;
 
@@ -14292,8 +14330,17 @@ int main()
         let batchCount = 0;
         let stopReason = null;
         const hasBreakpoints = breakpoints.size > 0;
+        const paced = runPace === 'real';
+        const tick0 = performance.now(), hz = cpuHz();
+        let due = Infinity;
+        if (paced) {
+          if (!rt) rt = { wall: tick0, cyc: totalCycles, lastWall: tick0, lastCyc: totalCycles };
+          due = rt.cyc + (tick0 - rt.wall) / 1000 * hz;
+        }
 
-        while (running && count < INFINITE_LOOP_CAP && count < maxRunLimit && batchCount < BATCH_SIZE) {
+        while (running && count < INFINITE_LOOP_CAP && count < maxRunLimit &&
+               (paced ? totalCycles < due && ((batchCount & 1023) || performance.now() - tick0 < 30)
+                      : batchCount < BATCH_SIZE)) {
           const execAddr = pc;
 
           // Pipelined, a count is a cycle, and a breakpoint stops the run
@@ -14361,8 +14408,22 @@ int main()
 
         updatePeripherals();
 
+        let wait = 0;
+        if (paced) {
+          const t = performance.now();
+          if (totalCycles < due - hz / 4) { rt.wall = t; rt.cyc = totalCycles; }
+          if (t - rt.lastWall >= 500) {
+            rtRatio = Math.min(1, (totalCycles - rt.lastCyc) / ((t - rt.lastWall) / 1000 * hz));
+            rt.lastWall = t; rt.lastCyc = totalCycles;
+          }
+          if (totalCycles >= due) wait = Math.max(0, Math.min(100, rt.wall + (totalCycles + 1 - rt.cyc) / hz * 1000 - t));
+          updateStats();
+          // A clock slow enough to watch: show each instruction as it runs.
+          if (hz <= 1000) { currentExecLine = sourceLineForPc(pc); highlightCurrentLine(); updateRegisters(); }
+        }
+
         if (running && count < INFINITE_LOOP_CAP && count < maxRunLimit && !stopReason) {
-          runTimerId = setTimeout(runBatch, 0);
+          runTimerId = setTimeout(runBatch, wait);
         } else {
           finishRun(stopReason || (count >= maxRunLimit ? 'paused' : null), count);
         }
@@ -14377,6 +14438,10 @@ int main()
       // whole simulation in one go; Step and Back then move through that
       // recording, which is why there is no pause to mirror here.
       if (simEngineMode === 'hdl') {
+        if (hdlStopPlay()) {
+          setStatus('HDL playback paused at cycle ' + totalCycles + ' - Run carries on', 'info');
+          return;
+        }
         if (!assembled) {
           setStatus('Please assemble the program first — the Wrapper loads it via $readmemh', 'warn');
           return;
@@ -14514,7 +14579,7 @@ int main()
       // HDL engine's source list, not in the editor.
       if (/^(v|sv|vh|svh)$/.test(ext)) {
         hdlAddFiles(event.target.files).then(() => {
-          openSettingsModal('hdl');
+          openSettingsModal('simulator');
           setStatus('Loaded ' + event.target.files.length + ' Verilog file(s)', 'success');
         });
         event.target.value = '';
@@ -15763,7 +15828,7 @@ int main()
 ${ABI_NAMES.map((n, i) => `  wire [31:0] x${i}_${n} = ${rb}[${i}];`).join('\n')}`
         : `  // No 32 x 32-bit register array could be located in the uploaded
   // sources, so the architectural register view is unavailable. Name the
-  // path explicitly under Settings > HDL to enable it.`;
+  // path explicitly under Settings > Simulation to enable it.`;
 
       const about = run
         ? `// Testbench for one run - RISC-V Simulator (HDL mode)
@@ -16092,7 +16157,7 @@ endmodule
         if (attempt === 0 && rb) {
           hdlLog('Could not resolve the register-file path `' + rb + '`. ' +
             'Retrying without the architectural register view - set the path ' +
-            'explicitly under Settings > HDL to restore it.', 'warn');
+            'explicitly under Settings > Simulation to restore it.', 'warn');
           rb = null;
           tb = hdlBuildTestbench({ regBankPath: null });
           continue;
@@ -16647,6 +16712,7 @@ endmodule
 
     async function hdlWithBusy(fn) {
       if (hdlRunning) return null;
+      hdlStopPlay();
       hdlRunning = true;
       updateHdlReadiness();
       updateToolbarButtonStates();
@@ -16681,17 +16747,18 @@ endmodule
     async function runHdlSimulation() {
       if (hdlTrace && hdlTraceEnabled) {
         return hdlWithBusy(async () => {
-          const r = await hdlResumeRun();
-          if (r.stop === 'breakpoint') {
-            hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
-            setStatus('HDL (' + hdlModeLabel() + ') stopped at breakpoint (line ' +
-              currentExecLine + ', instruction ' + hdlIdx + ')', 'warn');
-          } else {
-            hdlStatus('at the end of ' + hdlTrace.budget + ' recorded cycles', 'ok');
-            setStatus('HDL (' + hdlModeLabel() + ') ran ' + r.ran +
-              ' more instructions - end of the ' + hdlTrace.budget +
-              '-cycle recording', 'success');
-          }
+          await hdlResumeRun(r => {
+            if (r.stop === 'breakpoint') {
+              hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
+              setStatus('HDL (' + hdlModeLabel() + ') stopped at breakpoint (line ' +
+                currentExecLine + ', instruction ' + hdlIdx + ')', 'warn');
+            } else {
+              hdlStatus('at the end of ' + hdlTrace.budget + ' recorded cycles', 'ok');
+              setStatus('HDL (' + hdlModeLabel() + ') ran ' + r.ran +
+                ' more instructions - end of the ' + hdlTrace.budget +
+                '-cycle recording', 'success');
+            }
+          });
           return hdlTrace;
         });
       }
@@ -16702,23 +16769,24 @@ endmodule
         // Honour breakpoints on the very first run too, so a breakpoint set
         // before pressing Run behaves the way it does in the functional model.
         const hit = hdlBreakAt(0);
-        hdlSeek(hit >= 0 ? hit : t.steps.length);
-        hdlLog('--- ' + t.steps.length + ' instructions, ' +
-          uartTxBytes.length + ' UART bytes out ---', 'sys');
-        if (hdlLooksPipelined(t))
-          hdlLog('This core writes registers after its PC has moved on, as a pipeline does. Step, Back, ' +
-            'breakpoints and the instruction count follow the fetch PC, so they run ahead of the results; ' +
-            'registers, memory, peripherals and the cross-check are unaffected.', 'warn');
-        if (hit >= 0) {
-          hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
-          setStatus('HDL (' + hdlModeLabel() + ') stopped at breakpoint (line ' +
-            currentExecLine + ', instruction ' + hit + ')', 'warn');
-        } else {
-          hdlStatus('done - ' + t.budget + ' cycles, LED=0x' +
-            ledState.toString(16).padStart(2, '0'), 'ok');
-          setStatus('HDL ' + hdlModeLabel() + ' run finished - ' + t.steps.length +
-            ' instructions in ' + t.budget + ' cycles', 'success');
-        }
+        if (runPace === 'real') hdlSeek(0);
+        hdlPlayTo(hit >= 0 ? hit : t.steps.length, () => {
+          hdlLog('--- ' + t.steps.length + ' instructions, ' + uartTxBytes.length + ' UART bytes out ---', 'sys');
+          if (hdlLooksPipelined(t))
+            hdlLog('This core writes registers after its PC has moved on, as a pipeline does. Step, Back, ' +
+              'breakpoints and the instruction count follow the fetch PC, so they run ahead of the results; ' +
+              'registers, memory, peripherals and the cross-check are unaffected.', 'warn');
+          if (hit >= 0) {
+            hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
+            setStatus('HDL (' + hdlModeLabel() + ') stopped at breakpoint (line ' +
+              currentExecLine + ', instruction ' + hit + ')', 'warn');
+          } else {
+            hdlStatus('done - ' + t.budget + ' cycles, LED=0x' +
+              ledState.toString(16).padStart(2, '0'), 'ok');
+            setStatus('HDL ' + hdlModeLabel() + ' run finished - ' + t.steps.length +
+              ' instructions in ' + t.budget + ' cycles', 'success');
+          }
+        });
         if (hdlCompareEnabled) await hdlCompareWithJs();
         waveRevealForRun();
         return t;
@@ -16754,16 +16822,59 @@ endmodule
     // Continue from where we are to the next breakpoint, or to the end of
     // what has been recorded, recording another Cycles-worth first when there
     // is nothing left ahead to stop at.
-    async function hdlResumeRun() {
+    // Real time, a run is recorded and then played back at the clock: the
+    // position moves to the last instruction that has begun by now.
+    let hdlPlay = null;              // { to, trace, wall, cyc0, done, timer }
+    function hdlStepCycle(k) {
+      const steps = hdlTrace.steps;
+      if (k < steps.length) return steps[k].cyc;
+      return hdlTrace.final ? hdlTrace.final.cyc : (steps.length ? steps[steps.length - 1].cyc : 0);
+    }
+    function hdlStopPlay() {
+      if (!hdlPlay) return false;
+      clearTimeout(hdlPlay.timer);
+      hdlPlay = null;
+      updateToolbarButtonStates();
+      updateStats();
+      return true;
+    }
+    function hdlPlayTo(to, done) {
+      hdlStopPlay();
+      if (runPace !== 'real' || to <= hdlIdx) { hdlSeek(to); if (done) done(); return; }
+      const play = hdlPlay = { to, trace: hdlTrace, wall: performance.now(), cyc0: hdlCurrentCycle(), done, timer: null };
+      rtRatio = 1;
+      const frame = () => {
+        if (hdlPlay !== play) return;
+        if (hdlTrace !== play.trace) { hdlStopPlay(); return; }
+        const hz = cpuHz(), elapsed = performance.now() - play.wall;
+        const want = play.cyc0 + elapsed / 1000 * hz;
+        let k = hdlIdx;
+        while (k < to && hdlStepCycle(k + 1) <= want) k++;
+        if (k !== hdlIdx) hdlSeek(k);
+        if (k >= to) {
+          hdlPlay = null;
+          updateToolbarButtonStates();
+          updateStats();
+          if (play.done) play.done();
+          return;
+        }
+        const next = (hdlStepCycle(k + 1) - play.cyc0) / hz * 1000 - elapsed;
+        play.timer = setTimeout(frame, Math.max(16, Math.min(100, next)));
+      };
+      updateToolbarButtonStates();
+      frame();
+    }
+
+    async function hdlResumeRun(done) {
       const steps = () => hdlTrace.steps;
       let hit = hdlBreakAt(hdlIdx + 1);
       if (hit < 0 && ((breakpoints && breakpoints.size) || hdlIdx >= steps().length)) {
         if (await hdlGrowTrace(hdlTrace.budget + hdlCycleBudget)) hit = hdlBreakAt(hdlIdx + 1);
       }
       const to = hit >= 0 ? hit : steps().length;
-      const from = hdlIdx;
-      hdlSeek(to);
-      return { stop: hit >= 0 ? 'breakpoint' : 'end', ran: to - from };
+      const r = { stop: hit >= 0 ? 'breakpoint' : 'end', ran: to - hdlIdx };
+      hdlPlayTo(to, done ? () => done(r) : null);
+      return r;
     }
 
     // Statement Stepping is engine-agnostic: one Step should cover every
@@ -16800,7 +16911,7 @@ endmodule
       // through, so say that rather than silently doing nothing.
       if (!hdlTraceEnabled) {
         hdlLog('Stepping needs the architectural trace. Tick "Record the architectural ' +
-          'trace" under Settings > HDL.', 'warn');
+          'trace" under Settings > Simulation.', 'warn');
         setStatus('HDL stepping needs the Trace option', 'warn');
         return null;
       }
@@ -18017,7 +18128,7 @@ endmodule
         // Nothing can happen in HDL mode without the sources, so ask for them
         // straight away rather than waiting for Run to fail.
         if (!hdlFiles.length) {
-          openSettingsModal('hdl');
+          openSettingsModal('simulator');
           setStatus('HDL mode needs your Verilog sources - drop them here to begin', 'info');
         }
         // A recording survives a trip through the functional engine, so
@@ -18212,7 +18323,11 @@ endmodule
       const hdl = simEngineMode === 'hdl';
       const piped = !hdl && pipeMode;
       const multi = !hdl && jsArch === 'multi';
-      el.innerHTML = 'Cycles: ' + totalCycles +
+      const pacing = runPace === 'real' && (hdl ? !!hdlPlay : running);
+      el.innerHTML = fmtSimTime(totalCycles) +
+        (pacing && rtRatio < 0.95 ? ' <span class="stat-lag" title="The browser cannot keep up with this clock">×' +
+          rtRatio.toFixed(2) + ' real time</span>' : '') +
+        '&nbsp;|&nbsp; Cycles: ' + totalCycles +
         ' <span class="stat-tag">' + (hdl ? 'hw' : piped ? 'pipe' : multi ? 'multi' : 'single') + '</span>' +
         '&nbsp;|&nbsp; Instr: ' + instructionCount +
         ((piped || multi) && instructionCount ? '&nbsp;|&nbsp; CPI: ' + (totalCycles / instructionCount).toFixed(2) : '') +
@@ -18226,6 +18341,7 @@ endmodule
         ? 'Cycles from the per-category table in Settings > Simulation, instructions executed, ' +
           'and cycles per instruction'
         : 'One cycle per instruction, and instructions executed') +
+        '. The time is those cycles at ' + fmtHz(cpuHz()) + ' (CLK_DIV_BITS ' + clkDivBits + ', in Settings)' +
         '. PC is ' + (piped ? 'PCF, the address being fetched.' : 'the address of the instruction about to execute.');
     };
 
@@ -18257,13 +18373,13 @@ endmodule
           hdlCycleBudget + ' cycles');
       const runBtn = document.getElementById('runPauseBtn');
       if (runBtn) {
-        runBtn.innerHTML = (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
+        runBtn.innerHTML = hdlPlay ? '\u23F8 Pause' : (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
         runBtn.style.opacity = ready ? '1' : '0.45';
         runBtn.style.cursor = ready ? 'pointer' : 'not-allowed';
       }
       set('btnStep', ready && hdlTraceEnabled,
         hdlTraceEnabled ? 'Advance one instruction through the recorded hardware trace'
-                        : 'Stepping needs the Trace option under Settings > HDL');
+                        : 'Stepping needs the Trace option under Settings > Simulation');
       set('btnBack', ready && hdlTraceEnabled && !!hdlTrace && hdlIdx > 0,
         'Step back - possible because the run is a recording, not a live simulation');
       updateFloatSteps();
@@ -18454,6 +18570,8 @@ endmodule
       return hdlTrace;
     };
     window.hdlCompareWithJs = hdlCompareWithJs;
+    window.hdlPlayTo = hdlPlayTo;
+    window.hdlStopPlay = hdlStopPlay;
     window.hdlLooksPipelined = hdlLooksPipelined;
     window.hdlSetBase = (b) => { hdlBase = Object.assign({}, hdlBase, b); };
     window.hdlSetStim = (list) => { hdlStim = list.slice(); };
@@ -18461,6 +18579,8 @@ endmodule
     window.uartTickDelivery = uartTickDelivery;
     window.setUartSendMode = setUartSendMode;
     window.setUartCharInstr = setUartCharInstr;
+    window.setClkDivBits = setClkDivBits;
+    window.setRunPace = setRunPace;
     window.getUartPending = () => uartPending.slice();
     window.getUartRxState = () => ({ byte: uartRxByte, full: uartRxFull, dropped: uartRxDroppedTotal });
     // Load sources programmatically (the drop zone and file picker route
@@ -18865,8 +18985,6 @@ endmodule
       if (box) box.style.display = pipeMode ? '' : 'none';
       const table = document.getElementById('cyclesTableBox');
       if (table) table.style.display = jsArch === 'multi' ? '' : 'none';
-      const unit = document.getElementById('uartCharUnit');
-      if (unit) unit.textContent = pipeMode ? 'cycles/char' : 'instr/char';
     }
 
     function pipeSnapshot() { return pipeCopy(pipe); }
@@ -20645,6 +20763,7 @@ endmodule
       try { dpWanted = localStorage.getItem(DP_OPEN_KEY) === '1'; } catch (e) { dpWanted = false; }
       initFloatSteps();
       pipeInitControls();
+      clockInitControls();
       dpClockInit();
       const bpBlock = document.querySelector('#dpPipeBpSvg [data-e="bp"]');
       if (bpBlock) {

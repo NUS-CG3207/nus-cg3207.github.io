@@ -54,7 +54,6 @@ nav:
     - Memory Map: rv_resources/rv_memmap.md
     - Peripheral Guides: rv_resources/peripherals.md
     - Programming Guide: rv_resources/rv_programming.md
-    - Using Compiled Code: rv_resources/using_compiled_code.md
     - RISC-V Simulator: rv_resources/web_sim/riscv_simulator.md
     - RISC-V ISA Tutorial:
       - Getting Started: rv_resources/isa_tutorial/getting-started.md
