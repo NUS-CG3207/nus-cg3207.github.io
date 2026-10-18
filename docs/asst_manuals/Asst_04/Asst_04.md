@@ -8,7 +8,7 @@
 
     While the instructions are reasonably complete, there could still be minor updates, which will be <span style="color: brown;">highlighted</span>.
 
-## Compulsory Task: Pipelining our CPU [15 points]
+## Compulsory Task: Pipelining our CPU [13 points]
 
 Implement pipelining. Pipelining should be done such that the processor supports all the requirements for Assignment 2, Assignment 3, and the additional instructions / features mentioned in Assignment 4 Compulsory Task in this section.
 
@@ -72,7 +72,7 @@ Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task.
 
     Now, how do we know what frequency it can run at? You set the clock frequency via CLK_DIV_BITS or Clocking Wizard, do synthesis and then implementation, and see the warnings. You'll get a critical warning after place and route that some timing constraints are not met if the frequency you set cannot be obtained. If you get this warning, the functionality is not reliable even if it runs on the board; frequency at which you do not get the warning is the maximum safe frequency.
 
-## Task 3: Open-ended Enhancement [10 points]
+## Task 3: Open-ended Enhancement [12 points]
 
 This is the fun part - you get 10 points for Assignment 4 for implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed.
 
