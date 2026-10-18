@@ -198,7 +198,9 @@ grouped into fields coloured by where they go (Decoder, register file, Extend), 
 each field means and the immediate Extend builds from the scattered bits. Below that is the
 Decoder's control table from the lecture, with the row this instruction selects lit.
 
-Red wires carry data, purple the instruction's fields, blue the control signals. A dashed
+Each step lights its wires and blocks in its stage's colour, as the pipeline and its
+timeline do: Fetch teal, Decode green, Execute orange, Memory purple, Writeback red. A wire
+keeps the colour of the step that first used it; control signals are the thinner lines. A dashed
 wire has a value on it that nothing uses: `addi` still reads a second register, and a
 store still has a Result, but no mux or enable lets them through. A dotted grey control
 signal is a don't-care.

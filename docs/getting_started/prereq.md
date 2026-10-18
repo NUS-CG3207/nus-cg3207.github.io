@@ -17,7 +17,7 @@ If you are coming from CS2100DE - first of all, welcome back! Remembering most o
 
 ## Hardware required
 
-For this course, you will need an FPGA development board. We will provide you a [Nexys 4 board](guides/nexys4.md), and our materials will expect you to use this specific board. You will also need a Windows or Linux (preferred) computer to run the software to program this FPGA. The PCs in the lab will have the software required for this course installed for you, and you may use these as well.
+For this course, you will need an FPGA development board. We will provide you a [Nexys 4 board](nexys4.md), and our materials will expect you to use this specific board. You will also need a Windows or Linux (preferred) computer to run the software to program this FPGA. The PCs in the lab will have the software required for this course installed for you, and you may use these as well.
 
 !!! note
 
@@ -27,9 +27,6 @@ The FPGA board comes with a USB type A to USB micro-B cable. You will need a USB
 
 ## Software required
 
-The software you will use to program your FPGA board is [Vivado](https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vivado.html). Installation instructions can be found [here](guides/vivado_install_guide.md). Please install Vivado before coming for your first lab in Week 4.
+The software you will use to program your FPGA board is [Vivado](https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vivado.html). Installation instructions can be found [here](vivado_install_guide.md). Please install Vivado before coming for your first lab in Week 4.
 
 To explore RISC-V assembly, we will use the [RARS architecture simulator](https://github.com/TheThirdOne/rars). This runs on Windows, macOS and Linux, and does not require any installation and can be run by double clicking the downloaded jar file or by running `java -jar filename.jar` where `filename` is the name of the jar file you downloaded.
-
-!!! note
-    If you choose to implement the ARM architecture for your project, you will need to use ARM's (somewhat antiquated) Keil MDK 4. Instructions to use this IDE are [available on the page about ARM programming](ARM/arm_programming.md).

@@ -121,7 +121,7 @@ There are 5 files we must populate/modify:
 2. `Decoder.v`
 3. `PC_Logic.v`
 4. `RV.v`
-5. `Wrapper.v`: we need to add our Instruction and Data memories here. This can be done in the same way as [Assignment 1](../../Asst_01/Asst_01/#design-guide).
+5. `Wrapper.v`: we need to add our Instruction and Data memories here. This can be done in the same way as [Assignment 1](../Asst_01/Asst_01.md#design-guide).
 6. `TOP_Nexys.vhd`: we may need to modify `CLK_DIV_BITS` depending on the processor clock speed we want to achieve (we can keep it to a low number like 5 if we are using UART). This need not be changed for simulation as `TOP_Nexys.vhd` is not simulated. Changing CLK_DIV_BITS to 0 causes the frequency to be 100 MHz, but unless you do lots of optimizations such as pipelining, it likely won't run at that speed.
 
 You are expected to know the functionality of all components of the RISC-V processor (RV module and its sub-modules*), irrespective of who wrote it - you or your teammate or provided as a part of the templates or assisted by AI (in which case you should declare the prompts used as a comment, and also verbally to the evaluator). You need not understand `TOP`. A fair understanding of `Wrapper` is essential; a deeper understanding is recommended though not mandatory.

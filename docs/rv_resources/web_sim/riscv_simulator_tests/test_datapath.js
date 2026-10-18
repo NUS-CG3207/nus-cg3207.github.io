@@ -216,6 +216,9 @@ setTimeout(async () => {
       names.join(' | ') === 'Fetch | Decode · Decoder | Decode · Register Read | Decode · Extend | Execute · ALU and PC Logic | ' +
         'Memory | Writeback · Register Write | Writeback · PC Increment | Writeback · Retire', names.join(' | '));
     check('the ninth phase is the clock edge', phase() === '9/9 Writeback · Retire', phase());
+    check('each step lights its blocks in its pipeline stage\'s colour (Retire: red)',
+      ev("Array.from(dpSvg().querySelectorAll('.dp-edge')).every(e => e.style.getPropertyValue('--sc') === PDP_COLOUR.W)") &&
+      ev("dpSvg().querySelectorAll('.dp-edge').length") > 0);
     check('and there the clock\'s next rising edge is lit', doc.getElementById('dpClock').classList.contains('dp-clk-edge') &&
       clockSteps()[8].classList.contains('now') && clockSteps()[7].classList.contains('done'));
     check('nothing has executed yet', ev('instructionCount') === 0 && ev('regs[5]') === 0);

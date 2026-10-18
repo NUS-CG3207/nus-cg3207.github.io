@@ -9,7 +9,7 @@
 
 This assignment is designed to test your prerequisite knowledge for smooth completion of this course. It will walk through some basics of desigining for FPGA hardware,  writing RISC-V code, and how to use your RISC-V code in an FPGA design.
 
-It is **imperative** to put in effort and try your best for this assignment. It may take an amount of effort that is quite disproportionately large, compared to the impact on your grade. This is normal. This assignment is designed to prepare you for the later ones, so that you can spend time debugging your design, instead of debugging your knowledge. 
+It is **imperative** to put in effort and try your best for this assignment. It may take an amount of effort that is quite disproportionately large, compared to the impact on your grade. This is normal. This assignment is designed to prepare you for the later ones, so that you can spend time debugging your design, instead of debugging your knowledge.
 
 ## Task 0: Getting familiar with FPGAs [0 points]
 
@@ -71,8 +71,9 @@ For the assessment, you must be able to demonstrate everything you just did in f
 Finally, dump the instruction and data memories. Click the "Dump Memory" button in RARS to do this. We need to dump the "text" (instruction) and "data" sections, using the "Hexadecimal Text" option, and finally choosing to "Dump to File...". Name these with .mem extension and keep them in a safe place to use in the next task.
 
 #### Optional but Recommended
-Simulate a 'Hello World' Program. 
-There are 2 versions provided - 
+
+Simulate a 'Hello World' Program.
+There are 2 versions provided -
 
 * [HelloWorld](../../code_templates/Asst_01/HelloWorld.asm) that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
 and
@@ -103,15 +104,15 @@ A block diagram of the system we want to implement
 
 `IROM` (`INSTR_MEM` in the figure above) and `DMEM` (`DATA_CONST_MEM` in the figure above) are ROMs with 128 words each. We will use RARS to dump our assembly program into these ROMs, so `IROM` will hold the instructions of the assembly program (in machine code, of course), while `DMEM` will hold the constants and initialised variables we declare in the program. In later assignments, the `DMEM` hardware we implement will be writeable, but for now, we assume that it is not, and hence a 'ROM'. The ROMs are both combinational logic and do not need clocking. Both ROMs are only word-addressable, not byte-addressable.
 
-The `Clock_Enable` block generates an `enable` signal, to be used in tandem with the system clock `clk`. A module using this clock enable should, at every edge of `clk`, check if `enable` is high, and only be enabled if it is. 
+The `Clock_Enable` block generates an `enable` signal, to be used in tandem with the system clock `clk`. A module using this clock enable should, at every edge of `clk`, check if `enable` is high, and only be enabled if it is.
 
 `Clock_Enable` takes in the upper and center push buttons as inputs, and uses them as follows:
 
 1. If `btnU` is pressed, `enable` is pulled high every once every 250 milliseconds, and stays high for one clock cycle. Thus, the counter is incremented at 4 Hz.
-    
+
     Example: At t=0 ms, `enable` is high. Then, at the next clock edge, `enable` should be low, and it should remain low until t=250 ms. At t=250 ms, enable should be pulled high. Repeat.  
 
-2. If `btnC` is pressed, `enable` is never pulled high. 
+2. If `btnC` is pressed, `enable` is never pulled high.
 
 3. If neither `btnU` nor `btnC` are pressed, `enable` is pulled high once every 1000 ms (1 second), and stays high for one clock cycle. Thus, the counter is incremented at 1 Hz.
 
@@ -119,10 +120,10 @@ The `Clock_Enable` block generates an `enable` signal, to be used in tandem with
 
 4. Both buttons being pressed simultaneously is undefined behaviour. You may choose the outcome in this case.
 
-4. The system behaviour when both `btnU` and `btnC` are pressed together is unspecified. It is left to your choice.
+5. The system behaviour when both `btnU` and `btnC` are pressed together is unspecified. It is left to your choice.
 
 !!! tip
-    The counter does **not** need to be exactly 1 Hz or 4 Hz. We will allow some (generous) margin of error. Using clock enable thresholds that are powers of two could make the hardware simpler, if done properly (How?). However, when `btnU` is pressed, the counter should be *exactly* 4 times faster than when it isn't pressed. 
+    The counter does **not** need to be exactly 1 Hz or 4 Hz. We will allow some (generous) margin of error. Using clock enable thresholds that are powers of two could make the hardware simpler, if done properly (How?). However, when `btnU` is pressed, the counter should be *exactly* 4 times faster than when it isn't pressed.
 
 The 9-bit counter is a sequential block. It uses the system clock `clk` and the clock enable signal `enable` to count up a 9-bit number `addr`. That is, for every positive edge of `clk`, if `enable` is high, the counter should increment by 1. `addr` is the only output of this module.
 
@@ -160,14 +161,13 @@ If `btnU` is pressed, the sequence should be the same, but the interval should b
 
 If `btnC` is pressed, the sequence should be paused as long as it is held down, and resume from the same place as soon as it is released.
 
-There is no need to add more logic to skip through the empty parts of `IROM` and `DMEM`. The design can cycle through the whole memory. 
+There is no need to add more logic to skip through the empty parts of `IROM` and `DMEM`. The design can cycle through the whole memory.
 
-We do not care about what happens when the empty/uninitialized parts of `IROM` and `DMEM` are accessed, neither in simulation nor in hardware. It can be all `X` or all `0`, or anything random. The synthesis tool will probably initialize the empty parts to `0` or repeat the valid data to fill the uninitialized parts anyway. In a real computer system, access to these unused parts of memory would be considered illegal anyway, and should never happen in a properly written program. 
+We do not care about what happens when the empty/uninitialized parts of `IROM` and `DMEM` are accessed, neither in simulation nor in hardware. It can be all `X` or all `0`, or anything random. The synthesis tool will probably initialize the empty parts to `0` or repeat the valid data to fill the uninitialized parts anyway. In a real computer system, access to these unused parts of memory would be considered illegal anyway, and should never happen in a properly written program.
 
 ### Design guide
 
 Download the template for Assignment 1 from [the labs file repository](https://github.com/NUS-CG3207/labs/tree/main/docs/code_templates/Asst_01). Choose the files appropriate for your setup - that is, in your language of preference (Verilog or VHDL), and the constraints file corresponding to the FPGA board model you have. Create a new project and import these files, setting the Top module correctly. Note that using these templates is not mandatory; you may wish to implement completely on your own.
-
 
 !!! tip
 
@@ -180,15 +180,15 @@ In total, we will need `Top_Nexys`, `Seven_Seg_Nexys`, `Clock_Enable`, `Get_MEM`
 !!! warning
     The Nexys 4 and Nexys 4 DDR/Nexys A7 use the same FPGA chip on board, but the pins are connected differently. Thus, the part number we choose when creating a new project is the same for both (xc7a100tcsg324-1), however, the constraints file **is different**. Using the wrong constraints file will work for simulation, synthesis, implementation and even bitstream generation - but the bitstream will not work on the board!
 
-We need to fill out `Clock_Enable`, `Get_MEM` and `Top_Nexys` to achieve the functionality described above. 
+We need to fill out `Clock_Enable`, `Get_MEM` and `Top_Nexys` to achieve the functionality described above.
 
-The hexadecimal text dump should be saved with a `.mem` file extension. These files can be imported into our Vivado project as design sources, and used to initialise memories using the `$readmemh()` command. 
+The hexadecimal text dump should be saved with a `.mem` file extension. These files can be imported into our Vivado project as design sources, and used to initialise memories using the `$readmemh()` command.
 
-Do **NOT** use a clock divider, like you may have used in EE2026. They can cause all sorts of issues, since it becomes difficult for the synthesis tool to route the clocks. 
+Do **NOT** use a clock divider, like you may have used in EE2026. They can cause all sorts of issues, since it becomes difficult for the synthesis tool to route the clocks.
 
 ### How to design a clock enable
 
-Here is some example code that may help better illustrate how a clock enable should be implemented. This is just an example, not necessarily something you will be able to just copy/paste and use; but it should give you an idea of how it should be implemented. 
+Here is some example code that may help better illustrate how a clock enable should be implemented. This is just an example, not necessarily something you will be able to just copy/paste and use; but it should give you an idea of how it should be implemented.
 
 === "Verilog"
     ```verilog
@@ -222,7 +222,7 @@ Here is some example code that may help better illustrate how a clock enable sho
             end if;
         end if;
     end process;
-    
+
     process(clk)
     begin
         if clk'event and clk='1' then 
@@ -241,13 +241,12 @@ For more info on simulation controls, see the [CS2100DE section on simulation](h
 
 For simulation, checking the raw 32-bit `data[31:0]` to the Seven_Seg module will suffice, as making sense of anodes and cathodes, especially given the time-division multiplexing used, is hard. It can be checked by dragging it into the waveform window; there is no need to make it as a port of the top level module just for simulation purposes. To see data, go to scope window > testbench_name > uut, and then drag `data` signal from object window to the waveform window (scope and object windows are to the immediate left of the waveform window). Need to rerun (no need to relaunch) the simulation to see the `data` waveform. Save the waveform configuration file (Ctrl+S) and add it to the project (it will ask whether you wish to add to project when you save), and it'll be available when you stimulate in the future.
 
-Feel free to make your simulation more rigorous by automatically checking test cases, and using $error() to halt the simulation if any don't pass. This is not required, but will make for an impressive demo. 
-
+Feel free to make your simulation more rigorous by automatically checking test cases, and using $error() to halt the simulation if any don't pass. This is not required, but will make for an impressive demo.
 
 !!! warning
-    Do not move on to the next step without writing a good simulation, and making sure the design can pass it! If the simulation doesn't work, there is no chance the hardware will. However, if the simulation does work, the hardware is almost guaranteed to work too. The most common reason for designs that work in simulation not to work on hardware is mistakes in the constraints file, or faulty hardware. 
+    Do not move on to the next step without writing a good simulation, and making sure the design can pass it! If the simulation doesn't work, there is no chance the hardware will. However, if the simulation does work, the hardware is almost guaranteed to work too. The most common reason for designs that work in simulation not to work on hardware is mistakes in the constraints file, or faulty hardware.
 
-Do **either** of the two modifications mentioned as comments in the code in the previous section. Else, you will have to wait for about **2^26 cycles** (for a ~1Hz clock) before you can see the effect of 1 clock edge in simulation! This will take a long long time, and is really unnecessary in the simulation. Do not forget to revert these changes before synthesis and implementation. 
+Do **either** of the two modifications mentioned as comments in the code in the previous section. Else, you will have to wait for about **2^26 cycles** (for a ~1Hz clock) before you can see the effect of 1 clock edge in simulation! This will take a long long time, and is really unnecessary in the simulation. Do not forget to revert these changes before synthesis and implementation.
 
 We can get a very very good sense of whether it will work on hardware by doing a post-synthesis functional simulation by Simulate > Post-synthesis functional simulation. Obviously, synthesis should be done before this, but further steps such as implementation need not be done.
 The same testbench can be used, so it requires zero extra effort. However, debugging is much harder than it is with behavioral simulation as some of the internal signals are optimized away and/or renamed (still easier than try to debug directly on hardware).
@@ -257,7 +256,7 @@ Simulation (especially when done at the top/system level) is meant to simulate a
 
 ### Constraints
 
-Before run synthesis and implementation, remember to set up the constraints file correctly. Uncomment the lines corresponding to the pins used - no more, no less. Make sure the names in the constraints file match the inputs and outputs of the `Top_Nexys` module. Then, run Synthesis, Implementation and Generate Bitstream to generate the bitstream to upload to your board. 
+Before run synthesis and implementation, remember to set up the constraints file correctly. Uncomment the lines corresponding to the pins used - no more, no less. Make sure the names in the constraints file match the inputs and outputs of the `Top_Nexys` module. Then, run Synthesis, Implementation and Generate Bitstream to generate the bitstream to upload to your board.
 
 ## Tips
 
@@ -276,23 +275,23 @@ Before run synthesis and implementation, remember to set up the constraints file
 
 Once you have finished the assignment, you must submit your work to Canvas. You should submit **a single zip file**. The file should contain:
 
-1. The assembly language program (ending with `.s` or `.asm`), if you have modified it. If not, skip this one. 
+1. The assembly language program (ending with `.s` or `.asm`), if you have modified it. If not, skip this one.
 2. The HDL sources for your project, i.e. all of the `.v`/`.vhd`/`.sv` files for modules, testbenches, etc.
 3. The `.xdc` constraints file.
 4. The `.bit` bitstream file.
-5. A screenshot of the simulation waveform as a `.jpg` file. All of the signals in the design should be captured - there aren't that many, so they should fit on your screen. If you need to use multiple screenshots to make it clear, feel free to do so. 
+5. A screenshot of the simulation waveform as a `.jpg` file. All of the signals in the design should be captured - there aren't that many, so they should fit on your screen. If you need to use multiple screenshots to make it clear, feel free to do so.
 
-Your submission must be made to Canvas before the start of your lab session in Week 5. The exact deadline for your submission will be visible on Canvas. 
+Your submission must be made to Canvas before the start of your lab session in Week 5. The exact deadline for your submission will be visible on Canvas.
 
 ### Demonstration
 
-Before your lab session in Week 5, you will be assigned a time slot of 7 minutes for your demonstration. 
+Before your lab session in Week 5, you will be assigned a time slot of 7 minutes for your demonstration.
 
-Arrive at the lab at least 30 minutes before your assigned time slot. If you are one of the earlier time slots, you need not arrive more than 15 minutes before the start of the lab timing (i.e. before 17:45 or 08:45). 
+Arrive at the lab at least 30 minutes before your assigned time slot. If you are one of the earlier time slots, you need not arrive more than 15 minutes before the start of the lab timing (i.e. before 17:45 or 08:45).
 
 The time will be split as follows:
 
-* 2 minutes to demonstrate Task 1, using RARS. You should show that you are able to follow the instructions in Task 1. 
+* 2 minutes to demonstrate Task 1, using RARS. You should show that you are able to follow the instructions in Task 1.
 * 2 minutes to demonstrate Task 2, on the FPGA board. You should show that the design specified for Task 2 is implemented correctly with all features functional.
 * 3 minutes for two questions from the GA assessing you.
 
@@ -302,16 +301,16 @@ Note that you will **not** have extra time to open programs, load projects, etc.
 
 ### Penalties for late submission
 
-Late submissions and demonstrations up to one week will be allowed, with a penalty of 50%. Beyond one week, submissions will not be accepted. 
+Late submissions and demonstrations up to one week will be allowed, with a penalty of 50%. Beyond one week, submissions will not be accepted.
 
-This policy is non-negotiable, aside from the usual NUS clauses such as being unwell (Medical Certificate strictly required), authorised competitions, family emergencies etc. 
+This policy is non-negotiable, aside from the usual NUS clauses such as being unwell (Medical Certificate strictly required), authorised competitions, family emergencies etc.
 
 ## Conclusion
 
 Congratulations! With the first assignment finished, we are now comfortable with FPGA design and assembly programming. We are ready to dive into the proper content of the course. In the next assignment, we will have our CPU up and running - it's going to be exciting.
 
 !!! success "What we should know"
-    * How to write and simulate RISC-V assembly programs.
+    *How to write and simulate RISC-V assembly programs.
     * How to use MMIO in our RISC-V assembly programs to control peripherals.
-    * How to use Vivado to create a design for the FPGA board.
+    *How to use Vivado to create a design for the FPGA board.
     * How to translate a block diagram into an implemented design for FPGA.

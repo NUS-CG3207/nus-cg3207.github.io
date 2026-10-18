@@ -146,14 +146,16 @@
 
     .toolbar-row-status {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 10px;
+      gap: 0 10px;
       min-height: 16px;
     }
 
+    /* Below this width the metrics take a line of their own. */
     .toolbar-row-status .status {
       flex: 1 1 auto;
-      min-width: 0;
+      min-width: 9em;
     }
 
     /* The PC is the one number you look for while stepping, so it is picked
@@ -2125,12 +2127,13 @@
        instruction gives way (ellipsis) before anything wraps. */
     body.dp-in-panel #tab-datapath .dp-hdr { flex-wrap: nowrap; }
     .dp-hdr .dp-instr:empty, .dp-hdr .dp-phase:empty { display: none; }
-    body.dp-in-panel #tab-datapath .dp-hdr .dp-instr:empty + .dp-phase:empty + .dp-hdr-actions { margin-left: 0; }
     body.dp-in-panel #tab-datapath .dp-instr { font-size: 11px; }
     body.dp-in-panel #tab-datapath .dp-instr-addr { display: none; }
     body.dp-in-panel #tab-datapath .dp-phase { font-size: 10.5px; }
     body.dp-in-panel #tab-datapath .dp-stage-name { display: none; }
-    body.dp-in-panel #tab-datapath .dp-hdr-actions { flex-shrink: 0; }
+    body.dp-in-panel #tab-datapath .dp-hdr-actions { flex-shrink: 0; align-items: center; }
+    body.dp-in-panel #tab-datapath .dp-hdr #dpPipeCfgBtn { min-height: 0; min-width: 28px; padding: 1px 6px; font-size: 12px; }
+    body.dp-in-panel #tab-datapath .dp-hdr .dp-seg button { padding: 1px 8px; font-size: 12px; }
 
     .dp-caption code {
       font-family: 'Consolas', 'Courier New', monospace;
@@ -2154,15 +2157,16 @@
 
     /* A lit wire keeps the diagram's own geometry and only changes colour
        and weight; unused and don't-care paths recede rather than vanish. */
-    .dp-svg [data-e].dp-lit-data { stroke: #e64553 !important; stroke-width: 11px !important; }
-    .dp-svg [data-e].dp-lit-field { stroke: #8839ef !important; stroke-width: 11px !important; }
-    .dp-svg [data-e].dp-lit-ctrl { stroke: #1e66f5 !important; stroke-width: 7px !important; }
+    /* --sc is the colour of the pipeline stage that lit it (single-cycle). */
+    .dp-svg [data-e].dp-lit-data { stroke: var(--sc, #e64553) !important; stroke-width: 11px !important; }
+    .dp-svg [data-e].dp-lit-field { stroke: var(--sc, #8839ef) !important; stroke-width: 11px !important; }
+    .dp-svg [data-e].dp-lit-ctrl { stroke: var(--sc, #1e66f5) !important; stroke-width: 7px !important; }
     .dp-svg [data-e].dp-lit-unused { stroke: #bcc0cc !important; stroke-dasharray: 18 12; }
     .dp-svg [data-e].dp-lit-x { stroke: #bcc0cc !important; stroke-dasharray: 4 10; }
     /* Tinted, not filled: some blocks are drawn over their own labels. */
-    .dp-svg [data-e].dp-glow { stroke: #fe640b !important; stroke-width: 12px !important; fill: #fe640b !important; fill-opacity: 0.08; }
-    .dp-svg [data-e].dp-glow-ctrl { stroke: #1e66f5 !important; stroke-width: 12px !important; fill: #1e66f5 !important; fill-opacity: 0.08; }
-    .dp-svg [data-e].dp-edge { stroke: #40a02b !important; stroke-width: 12px !important; fill: #40a02b !important; fill-opacity: 0.1; }
+    .dp-svg [data-e].dp-glow { stroke: var(--sc, #fe640b) !important; stroke-width: 12px !important; fill: var(--sc, #fe640b) !important; fill-opacity: 0.08; }
+    .dp-svg [data-e].dp-glow-ctrl { stroke: var(--sc, #1e66f5) !important; stroke-width: 12px !important; fill: var(--sc, #1e66f5) !important; fill-opacity: 0.08; }
+    .dp-svg [data-e].dp-edge { stroke: var(--sc, #40a02b) !important; stroke-width: 12px !important; fill: var(--sc, #40a02b) !important; fill-opacity: 0.1; }
 
     .dp-body { position: relative; }
     .dp-body.dp-enc-below { flex-direction: column; align-items: stretch; justify-content: flex-start; }
@@ -3461,8 +3465,8 @@
       .toolbar {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        padding: 6px 8px;
-        gap: 6px;
+        padding: 5px 8px;
+        gap: 5px;
         font-size: 12px;
         width: 100%;
         max-width: 100vw;
@@ -3527,7 +3531,7 @@
       .toolbar-group-file-mode #exampleSelect {
         width: 100%;
         max-width: 100%;
-        height: 32px;
+        height: 30px;
         font-size: 11.5px;
       }
 
@@ -3539,7 +3543,7 @@
         flex: 0 1 auto;
         min-width: 0;
         padding: 0 6px;
-        height: 32px;
+        height: 30px;
         font-size: 11.5px;
         font-weight: 550;
         justify-content: center;
@@ -3597,7 +3601,7 @@
         flex: 1 1 auto;
         min-width: 0;
         padding: 0 5px;
-        height: 32px;
+        height: 30px;
         font-size: 11.5px;
         font-weight: 550;
         justify-content: center;
@@ -3624,7 +3628,7 @@
         flex: 1 1 0;
         min-width: 0;
         padding: 0 2px;
-        height: 32px;
+        height: 30px;
         font-size: 11.5px;
         font-weight: 550;
         justify-content: center;
@@ -3641,14 +3645,20 @@
         margin-right: 0;
         text-align: right;
         white-space: nowrap;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        line-height: 1.3;
       }
+
+      .toolbar .stats .stat-sep { display: none; }
 
       .toolbar .status {
         font-size: 11.5px;
       }
 
       .editor-wrapper {
-        height: 240px;
+        height: 208px;
         min-height: 180px;
         flex: none;
         width: 100%;
@@ -3707,7 +3717,7 @@
       }
 
       .tab-bar button {
-        padding: 8px 10px;
+        padding: 6px 10px;
         font-size: 12px;
         white-space: nowrap;
         flex: 1 0 auto;
@@ -3785,7 +3795,7 @@
         top: 0;
         right: 0;
         width: 44px;
-        height: 39px;
+        height: 35px;
         border: none;
         background: #181825;
         font-size: 16px;
@@ -3794,12 +3804,12 @@
 
       /* A bounded, independently-scrollable body — instead of growing to
          full content height and pushing the page itself down; a long
-         table/board scrolls in place. Slightly taller than the editor above
+         table/board scrolls in place. Taller than the editor above
          it: a panel is what you read on a phone, and the editor still holds
-         a dozen lines. */
+         ten lines. */
       .panel-body {
         overflow: auto;
-        max-height: 246px;
+        max-height: 278px;
         flex: 0 0 auto;
       }
 
@@ -18324,15 +18334,21 @@ endmodule
       const piped = !hdl && pipeMode;
       const multi = !hdl && jsArch === 'multi';
       const pacing = runPace === 'real' && (hdl ? !!hdlPlay : running);
-      el.innerHTML = fmtSimTime(totalCycles) +
+      const SEP = '&nbsp;|&nbsp; ';
+      const lead = [fmtSimTime(totalCycles) +
         (pacing && rtRatio < 0.95 ? ' <span class="stat-lag" title="The browser cannot keep up with this clock">×' +
-          rtRatio.toFixed(2) + ' real time</span>' : '') +
-        '&nbsp;|&nbsp; Cycles: ' + totalCycles +
-        ' <span class="stat-tag">' + (hdl ? 'hw' : piped ? 'pipe' : multi ? 'multi' : 'single') + '</span>' +
-        '&nbsp;|&nbsp; Instr: ' + instructionCount +
-        ((piped || multi) && instructionCount ? '&nbsp;|&nbsp; CPI: ' + (totalCycles / instructionCount).toFixed(2) : '') +
-        (piped && pipeBP.on && pipe ? '&nbsp;|&nbsp; Mispredicts: ' + pipe.mispredicts : '') +
-        '&nbsp;|&nbsp; PC: <span class="stat-pc">' + formatPC() + '</span>';
+          rtRatio.toFixed(2) + ' real time</span>' : ''),
+        'Cycles: ' + totalCycles +
+        ' <span class="stat-tag">' + (hdl ? 'hw' : piped ? 'pipe' : multi ? 'multi' : 'single') + '</span>'];
+      const tail = ['Instr: ' + instructionCount];
+      if ((piped || multi) && instructionCount) tail.push('CPI: ' + (totalCycles / instructionCount).toFixed(2));
+      if (piped && pipeBP.on && pipe) tail.push('Mispredicts: ' + pipe.mispredicts);
+      tail.push('PC: <span class="stat-pc">' + formatPC() + '</span>');
+      // Two halves of about equal width, which a phone stacks rather than
+      // squeeze the status message beside them.
+      if (tail.length > 2) lead.push(tail.shift());
+      el.innerHTML = '<span class="stat-half">' + lead.join(SEP) + '</span><span class="stat-sep">' + SEP +
+        '</span><span class="stat-half">' + tail.join(SEP) + '</span>';
       el.title = (hdl
         ? 'Clock cycles counted by your Verilog simulation, and instructions retired'
         : piped
@@ -19289,7 +19305,6 @@ endmodule
       phases.push({
         stage: 'D', title: 'Decoder',
         glow: ['decoder'],
-        glowKind: 'ctrl',
         routes: [
           ['opcode', 'field', 'op ' + bin(m.op, 7)],
           ['funct3', 'field', 'f3 ' + bin(m.f3, 3)],
@@ -19349,7 +19364,6 @@ endmodule
       phases.push({
         stage: 'E', title: 'ALU and PC Logic',
         glow: ['alu', 'pcLogic'],
-        glowKind: 'mixed',
         muxes: ['a1', 'a0', 'b1', 'b0'],
         routes: [
           ['aMid', used(aSel0 === '1'), '', 'nochip'],
@@ -19494,8 +19508,11 @@ endmodule
       const svg = dpSvg();
       if (!svg) return;
       svg.querySelectorAll('.dp-lit-data, .dp-lit-field, .dp-lit-ctrl, .dp-lit-unused, .dp-lit-x, .dp-glow, .dp-glow-ctrl, .dp-edge')
-        .forEach(el => el.classList.remove('dp-lit-data', 'dp-lit-field', 'dp-lit-ctrl',
-          'dp-lit-unused', 'dp-lit-x', 'dp-glow', 'dp-glow-ctrl', 'dp-edge'));
+        .forEach(el => {
+          el.classList.remove('dp-lit-data', 'dp-lit-field', 'dp-lit-ctrl',
+            'dp-lit-unused', 'dp-lit-x', 'dp-glow', 'dp-glow-ctrl', 'dp-edge');
+          el.style.removeProperty('--sc');
+        });
       svg.querySelectorAll('.pl-lit').forEach(el => {
         el.classList.remove('pl-lit', 'pl-thin');
         el.style.removeProperty('--pl');
@@ -19505,27 +19522,38 @@ endmodule
       if (ov) ov.innerHTML = '';
     }
 
+    // The colour of the pipeline stage the step being drawn belongs to, so a
+    // single-cycle step reads in the same colour as that stage in the
+    // pipeline, its timeline and the clock beside the drawing.
+    let dpStageColour = null;
+
     function dpLight(routeName, kind) {
       const r = DP_ROUTES[routeName];
       if (!r) return;
+      const used = kind !== 'unused' && kind !== 'x';
       for (const i of r.segs) {
         const el = dpEl(i);
         if (!el) continue;
-        // A shared segment keeps the strongest reading: used beats unused.
-        if (kind === 'unused' || kind === 'x') {
-          if (el.classList.contains('dp-lit-data') || el.classList.contains('dp-lit-field') ||
-              el.classList.contains('dp-lit-ctrl')) continue;
+        // A shared segment keeps the strongest reading, used beating unused,
+        // and the colour of the step that first used it.
+        const lit = el.classList.contains('dp-lit-data') || el.classList.contains('dp-lit-field') ||
+          el.classList.contains('dp-lit-ctrl');
+        if (!used) {
+          if (lit) continue;
         } else {
           el.classList.remove('dp-lit-unused', 'dp-lit-x');
+          if (!lit && dpStageColour) el.style.setProperty('--sc', dpStageColour);
         }
         el.classList.add('dp-lit-' + kind);
       }
     }
 
-    function dpGlow(names, kind) {
+    function dpGlow(names) {
       for (const n of names || []) {
         const el = dpEl(DP_BLOCKS[n]);
-        if (el) el.classList.add(kind === 'ctrl' || (kind === 'mixed' && n === 'pcLogic') ? 'dp-glow-ctrl' : 'dp-glow');
+        if (!el) continue;
+        el.classList.add('dp-glow');
+        if (dpStageColour) el.style.setProperty('--sc', dpStageColour);
       }
     }
 
@@ -19544,12 +19572,15 @@ endmodule
         if (shape) shape.classList.add('dp-lit-x');
         return;
       }
-      if (shape) shape.classList.add('dp-glow');
+      if (shape) {
+        shape.classList.add('dp-glow');
+        if (dpStageColour) shape.style.setProperty('--sc', dpStageColour);
+      }
       const from = mx.ins[+bit];
       const ov = dpOverlayEl();
       ov.appendChild(dpNS('polyline', {
         points: `${from[0]},${from[1]} ${(from[0] + mx.out[0]) / 2},${mx.out[1]} ${mx.out[0]},${mx.out[1]}`,
-        fill: 'none', stroke: '#e64553', 'stroke-width': 9, 'stroke-linecap': 'round'
+        fill: 'none', stroke: dpStageColour || '#e64553', 'stroke-width': 9, 'stroke-linecap': 'round'
       }));
     }
 
@@ -19559,7 +19590,9 @@ endmodule
       const w = Math.max(40, text.length * fs * 0.6 + 22), h = fs + 16;
       g.dataset.w = w;
       g.dataset.h = h;
-      g.appendChild(dpNS('rect', { x: -w / 2, y: -h / 2, width: w, height: h, fill: DP_KIND_COLOUR[kind] || '#e64553' }));
+      const used = kind !== 'unused' && kind !== 'x';
+      g.appendChild(dpNS('rect', { x: -w / 2, y: -h / 2, width: w, height: h,
+        fill: (used && dpStageColour) || DP_KIND_COLOUR[kind] || '#e64553' }));
       const t = dpNS('text', { x: 0, y: 0, 'text-anchor': 'middle' });
       t.textContent = text;
       g.appendChild(t);
@@ -19615,6 +19648,7 @@ endmodule
       for (let p = 1; p <= k; p++) {
         const ph = dpPhaseList[p - 1];
         if (!ph) continue;
+        dpStageColour = ph.stage ? PDP_COLOUR[ph.stage] : null;
         for (const [name, kind, text, how] of ph.routes) {
           dpLight(name, kind);
           if (how === 'nochip' || (kind === 'unused' && p < k)) continue;
@@ -19622,14 +19656,19 @@ endmodule
           dpPlace(chip, dpParkPoint(DP_ROUTES[name], chip));
           ov.appendChild(chip);
         }
-        if (p === k) dpGlow(ph.glow, ph.glowKind);
+        if (p === k) dpGlow(ph.glow);
         for (const mx of ph.muxes || []) dpDrawMux(mx);
         if (ph.edge && p === k) {
           const c = dpModel.ctrl;
           const edgeEls = [DP_BLOCKS.pcReg, ...DP_CLOCKS.pc];
           if (c && c.RegWrite === '1' && dpModel.rd !== 0) edgeEls.push(DP_BLOCKS.rf, ...DP_CLOCKS.rf);
           if (c && c.MemWrite === '1') edgeEls.push(DP_BLOCKS.dmem, ...DP_CLOCKS.dmem);
-          edgeEls.forEach(i => { const el = dpEl(i); if (el) el.classList.add('dp-edge'); });
+          edgeEls.forEach(i => {
+            const el = dpEl(i);
+            if (!el) return;
+            el.classList.add('dp-edge');
+            if (dpStageColour) el.style.setProperty('--sc', dpStageColour);
+          });
         }
       }
     }
@@ -19881,7 +19920,8 @@ endmodule
       const my = ++dpAnimToken;
       dpDrawStatic(k - 1);
       const ph = dpPhaseList[k - 1];
-      dpGlow(ph.glow, ph.glowKind);
+      dpStageColour = ph.stage ? PDP_COLOUR[ph.stage] : null;
+      dpGlow(ph.glow);
       for (const mx of ph.muxes || []) dpDrawMux(mx);
       const ov = dpOverlayEl();
       ph.routes.filter(r => r[3] === 'nochip').forEach(([name, kind]) => dpLight(name, kind));
