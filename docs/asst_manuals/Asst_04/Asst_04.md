@@ -149,13 +149,23 @@ This is the fun part - implementing performance enhancements of your choice. The
 
 ## Design Instructions
 
-* You are required to have your own, comprehensive programs to have a convincing demo.
 * All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU or MCycle unit. *Exceptions*: `+` for calculating next `PC`, multiplication, division, enhancements such as branch prediction. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.
 * In the ALU, DO NOT use additional `+` signs -> this could infer additional adders. The existing addition framework should be good enough.
 * All operators are permitted on 32-bit values outside the RV module. For example, you will have to do 32-bit comparisons in the wrapper for address decoding.
 * Use of arithmetic operators:
     1. Do not use `*` operator. It is synthesizable, but in this course, we are implementing multi-cycle multiplication. `/` is not synthesizable, except on constants.
     2. All operators (including `**`, `*`, `/`, `sll`, `rem`, `mod` etc.) are allowed on constants (operations on constants are done at synthesis time, and will not infer any hardware).
+
+## Demo Program Requirements
+
+As before, you must write an assembly program to demonstrate the functionality you have implemented. The program must satisfy these non-negotiable requirements:
+
+1. The program must use at least one input and one output. Programs that simply produce outputs with no response to inputs are strictly **NOT ALLOWED**. 
+2. The program must have some useful or interesting function, and **MUST NOT be simply a testbench that produces a pass/fail message** to "prove" that functions work. Such programs are great for testing, but very bad for demonstration. 
+3. The program must demonstrate convincingly the specific enhancements you have made. Ideally, it should be something that would either not run at all, or run in an inferior fashion (e.g. slower) on your previously built CPU. 
+4. The program must not be trivial or boring. 
+
+If your program fails to meet any of the above requirements, your demonstration will be considered unconvincing. In this case, we cannot necessarily know that your CPU actually does the things you say it does. Showing a waveform in a simulation is NOT a convincing demonstration of functionality (you can't sell a waveform to a customer buying a PC, right?). We may award as low as 0 marks for an enhancement if it is not sufficiently demonstrated with a program. Please take this part seriously and craft something interesting. 
 
 ## Submission Info
 
