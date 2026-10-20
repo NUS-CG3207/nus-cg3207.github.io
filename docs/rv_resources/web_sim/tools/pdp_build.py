@@ -10,6 +10,8 @@ From the lecture's Microarch_pipelined.svg this makes:
         instruction memory and a Mispredict mux in front of the PC; the
         next-PC adder only ever computes PCNextE. Exported as
         Microarch_pipelined_bp.svg.
+  inside the bp drawing's fetch side with the Branch Predictor block opened,
+        shown when the block is clicked. Exported as BranchPred.svg.
 
 For the page, every wire is exploded into straight pieces, split at
 T-junctions and at each stage register's edges (the run through a register
@@ -190,6 +192,8 @@ def build_full():
     # ALUSrcB: RD2 (forwarded), 4 or ExtImmE.
     add_o += [text('x0', 2305, 1144, 32), text('01', 2305, 1191, 32), text('11', 2305, 1238, 32)]
     W((2281, 1175.5), (2300.5, 1175.5)); add_o.append(text('4', 2257, 1191, 40))
+    # Which bits of PCSrcE each mux takes.
+    add_o += [('idx0', text('[0]', 166, 715, 30, ctrl=True)), ('idx10', text('[1:0]', 145, 896, 30, ctrl=True))]
     wires += add_w
     others += [t if isinstance(t, tuple) else ('x%d' % k, t) for k, t in enumerate(add_o)]
     return wires, others, 3320 + SHIFT
@@ -204,7 +208,7 @@ PC_DX = 40
 def build_bp():
     wires, others, width = build_full()
     GONE_W = {126, 127, 206, 117, 105, 'sel'}
-    GONE_O = {'muxPC', 'lblPC01', 'lblPC11', 'lblPC00', 129, 213}
+    GONE_O = {'muxPC', 'lblPC01', 'lblPC11', 'lblPC00', 'idx10', 129, 213}
     wires = [w for w in wires if w[0] not in GONE_W]
     others = [(k, t) for k, t in others if k not in GONE_O]
     for w in wires:
@@ -224,10 +228,17 @@ def build_bp():
         for k in range(len(pts) - 1):
             add_w.append(['b', pts[k], pts[k + 1], CTRL_W if ctrl else WIRE_W])
     # The next-PC adder's base: PCE, or RD1FwdE for jalr. Its output is PCNextE.
-    add_o.append(('muxPC', shape([(169.5, 915), (234.5, 941), (234.5, 995), (169.5, 1021)])))
-    add_o += [text('0', 177, 957, 32), text('1', 177, 1005, 32)]
-    W((234.5, 968), (264.8, 968))
-    W((209.5, 931), (209.5, 636.5), ctrl=True)
+    # Where the full drawing's three-input mux is, at the same size, with its
+    # inputs where every other 2:1 mux has them.
+    MOVE = {(101.5, 944): (101.5, 957), (169.5, 944): (169.5, 957), (102.5, 944): (102.5, 957),
+            (72, 992): (72, 1030), (169.5, 992): (169.5, 1030)}
+    for w in wires:
+        if w[0] == 'x':
+            w[1] = MOVE.get(w[1], w[1]); w[2] = MOVE.get(w[2], w[2])
+    add_o.append(('muxPC', shape([(169.5, 905), (234.5, 951.2), (234.5, 1027.8), (169.5, 1074)])))
+    add_o += [text('0', 178.9, 971.5), text('1', 178.9, 1044.5)]
+    W((234.5, 998.5), (264.8, 998.5))
+    W((209.5, 933.4), (209.5, 636.5), ctrl=True)
     # Mispredict picks the PC: PCNextE to recover, else the prediction.
     add_o.append(('muxM', shape([(398, 865), (433, 885), (433, 960), (398, 980)])))
     add_o += [text('1', 403, 912, 28), text('0', 403, 956, 28)]
@@ -250,10 +261,292 @@ def build_bp():
     W((760, 1551.5), (760, 1435))
     add_o += [text('PCE', 743, 1427, 28), text('PCNextE', 600, 1427, 28)]
     add_o += [text('Mispredict', 585, 1260, 28), text('PredPCF', 585, 1313, 28)]
+    add_o.append(('idx1', text('[1]', 217, 915, 30, ctrl=True)))
     wires += add_w
     others += [t if isinstance(t, tuple) else ('b%d' % k, t) for k, t in enumerate(add_o)]
     return wires, others, width
 
+
+
+# ---------------------------------------------------------------- inside
+# BranchPred.svg: the fetch side of the bp drawing, with the Branch Predictor
+# block opened. Decode's interior is dropped and the stage closed up by
+# IN_DX; E is cut to D's height, PC Logic sits beside it, and the empty band
+# above is cropped off (IN_TOP). The block stays in Fetch, under the
+# instruction memory as in the bp drawing: D and everything after it move
+# right by IN_SHIFT (everything at or right of IN_SPLIT); the block comes down
+# by IN_BOX_DY to clear the memory, and the lanes, the registers' feet and the
+# hazard unit by IN_DROP (everything at or below IN_FLOOR) to pass under it.
+IN_DX, IN_X, IN_TOP = 550, 1100, 540
+IN_BX0, IN_BW, IN_SPLIT = 575, 1380, 880
+IN_DROP, IN_FLOOR, IN_BOX_DY = 260, 1480, 230
+IN_SHIFT = IN_BX0 + IN_BW + 40 - 911
+KEEP_O = {0, 1, 16, 17, 18, 31, 33, 40, 41, 42, 43, 44, 47, 48, 49, 51, 61, 62, 73, 180, 181, 182, 211, 212, 222,
+          223, 247, 248, 249, 250, 251, 265, 266, 268, 278, 279, 280, 281, 'muxPC', 'b1', 'b2', 'muxM', 'b4',
+          'b5', 'b6', 'b8', 'idx0', 'idx1'}
+KEEP_W = {2, 3, 19, 20, 21, 32, 106, 107, 201, 207, 208, 209, 118, 28, 85, 226, 267}
+HALF_DX = {211, 212, 222}       # bus labels that keep to the closed-up gap's middle
+E_TOP, HZ_DY = 761, 0           # E's new top; the hazard unit's drop
+
+
+def ins_x(x):
+    return x - IN_DX if x >= IN_X else x
+
+
+def fin(p):
+    """A closed-up point's place once Decode on moves right of the block."""
+    return (p[0] + IN_SHIFT, p[1]) if p[0] >= IN_SPLIT else p
+
+
+def x_min(t):
+    if t.startswith('<text'):
+        return text_pos(t)[0]
+    if t.startswith('<rect'):
+        return float(re.search(r' x="([^"]*)"', t).group(1)) + OX
+    return min(p[0] for p in abs_pts(t))
+
+
+def drop_tag(t):
+    """Drop an element below IN_FLOOR by IN_DROP; a rect reaching past it grows."""
+    if t.startswith('<text'):
+        top = bot = text_pos(t)[1]
+    elif t.startswith('<rect'):
+        top = float(re.search(r' y="([^"]*)"', t).group(1)) + OY
+        h = float(re.search(r' height="([^"]*)"', t).group(1))
+        if top < IN_FLOOR <= top + h:
+            return re.sub(r' height="[^"]*"', ' height="%g"' % (h + IN_DROP), t)
+        bot = top + h
+    else:
+        ys = [p[1] for p in abs_pts(t)]
+        top, bot = min(ys), max(ys)
+        assert not top < IN_FLOOR <= bot, t
+    return '<g transform="translate(0 %g)">%s</g>' % (IN_DROP, t) if top >= IN_FLOOR else t
+
+
+def drop_pt(p):
+    return (p[0], p[1] + IN_DROP) if p[1] >= IN_FLOOR else p
+
+
+def move(t, dx, dy):
+    """Move a text, rect or untransformed path by (dx, dy)."""
+    if 'transform="matrix(' in t:
+        m = re.search(r'matrix\(([^)]*)\)', t)
+        v = [float(x) for x in m.group(1).split()]
+        v[4] += dx; v[5] += dy
+        return t.replace(m.group(0), 'matrix(%s)' % ' '.join('%g' % x for x in v))
+    if t.startswith('<rect'):
+        t = re.sub(r' x="([^"]*)"', lambda m: ' x="%g"' % (float(m.group(1)) + dx), t)
+        return re.sub(r' y="([^"]*)"', lambda m: ' y="%g"' % (float(m.group(1)) + dy), t)
+    d = re.search(r' d="([^"]*)"', t).group(1)
+    out, k = [], 0
+    for tok in re.split(r'(-?\d+\.?\d*(?:e-?\d+)?)', d):
+        if re.fullmatch(r'-?\d+\.?\d*(?:e-?\d+)?', tok):
+            out.append('%g' % (float(tok) + (dx if k % 2 == 0 else dy))); k += 1
+        else:
+            out.append(tok)
+    return t.replace('d="%s"' % d, 'd="%s"' % ''.join(out))
+
+
+def gate(kind, x, y, attrs=WIRE_W):
+    """A gate facing right, back edge at x, inputs at y -/+ 18."""
+    X, Y = x - OX, y - OY
+    if kind == 'and':
+        d = 'M%g %gL%g %gA40 40 0 0 1 %g %gL%g %gZ' % (X, Y - 40, X + 34, Y - 40, X + 34, Y + 40, X, Y + 40)
+        return '<path d="%s"%s/>' % (d, attrs)
+    d = 'M%g %gQ%g %g %g %gQ%g %g %g %gQ%g %g %g %gZ' % (
+        X, Y - 40, X + 50, Y - 40, X + 74, Y, X + 50, Y + 40, X, Y + 40, X + 17, Y, X, Y - 40)
+    out = '<path d="%s"%s/>' % (d, attrs)
+    if kind == 'xor':
+        out += '<path d="M%g %gQ%g %g %g %g"%s/>' % (X - 12, Y - 40, X + 5, Y, X - 12, Y + 40, attrs)
+    return out
+
+
+def build_inside():
+    wires, others, _ = build_bp()
+    src_o = dict(others)
+    keep = []
+    for k, t in others:
+        if k not in KEEP_O:
+            continue
+        dx = IN_DX // 2 if k in HALF_DX else IN_DX
+        if t.startswith('<text'):
+            moved = text_pos(t)[0] >= IN_X
+        elif t.startswith('<rect'):
+            moved = float(re.search(r' x="([^"]*)"', t).group(1)) + OX >= IN_X
+        else:
+            moved = min(p[0] for p in abs_pts(t)) >= IN_X
+        keep.append((k, shift_tag(t, -dx) if moved else t))
+    # E, cut to D's height; its clock and letter come down with its top.
+    e_dy = E_TOP - 123
+    keep.append((224, re.sub(r' height="[^"]*"', ' height="%g"' % (1512 - E_TOP),
+                             re.sub(r' y="[^"]*"', ' y="%g"' % (E_TOP - OY), shift_tag(src_o[224], -IN_DX)))))
+    keep += [(k, move(shift_tag(src_o[k], -IN_DX), 0, e_dy)) for k in (252, 269)]
+    keep.append((271, move(shift_tag(src_o[271], -IN_DX), 0, e_dy - 16)))
+    # PC Logic, beside E: PCSE leaves E at y 800, and PCSrcE runs back to
+    # Fetch above the registers at y 600.
+    PL_X, PL_Y, PCS_Y, TOP_Y = 1940 - IN_DX, 715, 800, 600
+    keep += [(k, move(src_o[k], PL_X - 2435, PL_Y - 86)) for k in (80, 81, 82)]
+    keep.append((88, move(src_o[88], 1065 - 1463.8, PCS_Y - 170.5)))      # PCSD, where its wire starts
+    keep.append((92, move(src_o[92], 0, TOP_Y - 57.5)))
+    keep.append((228, move(src_o[228], 0, 790 - 702)))      # below the line it now meets
+    # The hazard unit's labels drop with it.
+    keep += [(k, move(shift_tag(src_o[k], -IN_DX) if k == 285 else src_o[k], 0, HZ_DY)) for k in (282, 283, 284, 285)]
+
+    ws = []
+    for key, a, b, attrs in wires:
+        if key in KEEP_W:
+            ws.append([key, (ins_x(a[0]), a[1]), (ins_x(b[0]), b[1]), attrs])
+        if key in (261, 262, 263, 264):       # stalls and flushes, from the lowered hazard unit
+            ws.append([key, (ins_x(a[0]), a[1] + HZ_DY), (ins_x(b[0]), b[1]), attrs])
+        if key == 270:                        # E's clock
+            ws.append([key, (ins_x(a[0]), a[1] + e_dy), (ins_x(b[0]), b[1] + e_dy), attrs])
+    for w in ws:
+        if w[0] == 118: w[1] = (1868.5 - IN_DX, 1348)                   # ExtImmE from E only
+        if w[0] == 85: w[1] = (158.5, TOP_Y - 3)
+    STAY = [((101.5, 957), (169.5, 957)), ((102.5, 957), (102.5, 1558)), ((72, 1030), (169.5, 1030)),
+            ((234.5, 998.5), (264.8, 998.5)), ((209.5, 933.4), (209.5, 636.5)), ((339.5, 901.5), (362, 901.5)),
+            ((362, 901.5), (398, 901.5)), ((433, 922.5), (462, 922.5))]
+    for key, a, b, attrs in wires:
+        if key in ('x', 'b') and any(abs(a[0] - p[0]) + abs(a[1] - p[1]) + abs(b[0] - q[0]) + abs(b[1] - q[1]) < 1 for p, q in STAY):
+            ws.append([key + 's%d' % len(ws), a, b, attrs])
+    n = [0]
+
+    def W(*pts, ctrl=False):
+        n[0] += 1
+        for k in range(len(pts) - 1):
+            ws.append(['n%d' % n[0], pts[k], pts[k + 1], CTRL_W if ctrl else WIRE_W])
+    add = []
+
+    def T(*a, **kw):
+        add.append(text(*a, **kw))
+
+    def R(*a, **kw):
+        add.append(rtext(*a, **kw))
+    PL_R = PL_X + 128
+    W((1051.5, PCS_Y), (PL_X, PCS_Y), ctrl=True)
+    T('PCSE', PL_X - 107, PCS_Y - 6, ctrl=True)
+    W((PL_R, PCS_Y), (PL_R + 27, PCS_Y), (PL_R + 27, TOP_Y), (156.5, TOP_Y), ctrl=True)
+    W((PL_X + 102.5, PL_Y + 197), (PL_X + 102.5, 1080))
+    R('ALUFlags', PL_X + 135, 1080)
+    # RD1FwdE comes from Execute's forwarding mux, off this drawing.
+    W((1900 - IN_DX, 1650), (72, 1650), (72, 1030))
+    T('RD1FwdE', 1000, 1639)
+    for w in ws:
+        w[1], w[2] = fin(w[1]), fin(w[2])
+    keep = [(k, shift_tag(t, IN_SHIFT) if x_min(t) >= IN_SPLIT else t) for k, t in keep]
+    add = [shift_tag(t, IN_SHIFT) if x_min(t) >= IN_SPLIT else t for t in add]
+    HZ_R = fin((PL_R + 27, 0))[0] + 40
+    for w in ws:
+        w[1], w[2] = drop_pt(w[1]), drop_pt(w[2])
+    keep = [(k, drop_tag(t)) for k, t in keep]
+    add = [drop_tag(t) for t in add]
+    ws0, add0 = len(ws), len(add)
+
+    BX0, BY0, BY1 = IN_BX0, 970, 1466
+    BX1 = BX0 + IN_BW
+
+    def u(x):
+        return BX0 + x
+    add.append(rounded(BX0, BY0, BX1, BY1, 14))
+    T('Branch Predictor', u(25), BY0 + 40, 34, ctrl=True, bold=True)
+    # Fetch's lanes: the prediction out, PCNextE in, Mispredict out.
+    T('PredPCF', 600, 1689); T('PCNextE', 600, 1739); T('Mispredict', 600, 1789, ctrl=True)
+
+    # The BHT: read at PCF for Fetch and at PCE for Execute's check; each
+    # column written at PCE when its half of the check fails.
+    BT, BB, BL, BR = 1052, 1258, u(310), u(850)
+    add.append('<rect x="%g" y="%g" width="%g" height="%g" stroke="#000000" stroke-width="8.02083" stroke-miterlimit="8" fill="none"/>' % (BL - OX, BT - OY, BR - BL, BB - BT))
+    W((u(460), BT - 41), (u(460), BT))
+    add.append(shape([(u(478.5), BT + 1), (u(460), BT + 25), (u(441.5), BT + 1)], attrs=' stroke="#000000" stroke-width="3.4375" stroke-miterlimit="8" fill="#FFFFFF"'))
+    T('CLK', u(428), BT - 48)
+    T('BHT', u(330), 1236, 46, bold=True)
+    tx0, tx1, ty0, cx = u(540), u(830), 1067, u(685)
+    add.append('<rect x="%g" y="%g" width="%g" height="%g" stroke="#000000" stroke-width="3.4375" fill="none"/>' % (tx0 - OX, ty0 - OY, tx1 - tx0, BB - ty0))
+    T('PrBTA', tx0 + 30, ty0 + 30, 28); T('PrPCSrc', cx + 20, ty0 + 30, 28)
+    add.append(shape([(cx, ty0), (cx, BB)], False, ' stroke="#000000" stroke-width="3" fill="none"'))
+    for y in range(ty0 + 38, BB - 40, 36):
+        add.append(shape([(tx0, y), (tx1, y)], False, ' stroke="#000000" stroke-width="3" fill="none"'))
+    W((u(30), 1551.5), (u(30), 1100), (BL, 1100))
+    R('PCE[k+1:2]', u(68), 1450, 32)
+    T('RA/WA', u(320), 1110, 28)
+    W((u(85), 1496.5), (u(85), 1160), (BL, 1160))
+    R('PCF[k+1:2]', u(123), 1450, 32)
+    T('RA', u(320), 1170, 28)
+
+    # Fetch's prediction: PCF + 4, or the predicted target.
+    BW = BLOCK_W.replace('#0070C0', '#000000')
+    AT = 1195
+    add.append(shape([(u(190), AT), (u(271), AT + 38.4), (u(271), AT + 201.6), (u(190), AT + 240)], attrs=BW))
+    add.append(shape([(u(190), AT + 98), (u(220), AT + 120), (u(190), AT + 142)], attrs=BW))
+    add.append(shape([(u(178), AT + 98), (u(208), AT + 120), (u(178), AT + 142)], attrs=' stroke="#FFFFFF" stroke-width="8.02083" stroke-miterlimit="8" fill="#FFFFFF"'))
+    T('+', u(228), AT + 132, 46, bold=True)
+    W((u(85), AT + 50), (u(190), AT + 50))
+    W((u(165), AT + 190), (u(190), AT + 190)); T('4', u(140), AT + 204, 40, bold=True)
+    MT = 1340
+    add.append(shape([(u(335), MT), (u(370), MT + 20), (u(370), MT + 95), (u(335), MT + 115)]))
+    T('1', u(340), MT + 47, 28); T('0', u(340), MT + 91, 28)
+    W((u(271), AT + 120), (u(290), AT + 120), (u(290), MT + 80), (u(335), MT + 80))
+    # Every port of a column leaves or enters at its foot: Fetch's read (RD),
+    # and the write data and enable.
+    W((u(565), BB), (u(565), 1295), (u(312), 1295), (u(312), MT + 36.5), (u(335), MT + 36.5))
+    T('PrBTAF', u(400), 1288, 24)
+    W((u(715), BB), (u(715), 1330), (u(352.5), 1330), (u(352.5), MT + 10), ctrl=True)
+    T('PrPCSrcF', u(400), 1323, 24, ctrl=True)
+    W((u(370), MT + 57.5), (u(390), MT + 57.5), (u(390), 1700), (380, 1700), (380, 945), (398, 945))
+
+    # Execute's check. PCSrcE is two bits; either set means E redirects.
+    G = 1035
+    W((u(910), TOP_Y), (u(910), G + 18), (u(972), G + 18), ctrl=True)
+    W((u(910), G - 18), (u(972), G - 18), ctrl=True)
+    T('PCSrcE', u(920), 650, ctrl=True)
+    T('[1]', u(918), G - 27, 30, ctrl=True); T('[0]', u(918), G + 53, 30, ctrl=True)
+    add.append(gate('or', u(965), G))
+    XY, CY = 1114, 1213                       # the XOR's and the comparator's centres
+    W((u(1039), G), (u(1055), G), (u(1055), 1360), (u(805), 1360), (u(805), BB), ctrl=True)
+    W((u(1055), XY - 18), (u(1074), XY - 18), ctrl=True)
+    W((u(1055), CY + 36), (u(1080), CY + 36), ctrl=True)
+    T('TakenE', u(815), 1353, 26, ctrl=True)
+    W((BR, XY + 18), (u(1074), XY + 18), ctrl=True)
+    T('PrPCSrcE', u(860), XY + 10, 28, ctrl=True)
+    add.append(gate('xor', u(1080), XY))
+    W((BR, CY - 18), (u(960), CY - 18))
+    T('PrBTAE', u(858), CY - 26, 26)
+    W((362, 901.5), (362, 1750), (u(615), 1750), (u(615), BB))
+    W((u(615), 1452), (u(930), 1452), (u(930), CY + 18), (u(960), CY + 18))
+    add.append(shape([(u(960), CY - 44), (u(1030), CY), (u(960), CY + 44)]))
+    T('≠', u(970), CY + 13, 38, bold=True)
+    W((u(1030), CY), (u(1080), CY))
+    add.append(gate('and', u(1080), CY + 18))
+    OY_ = (XY + CY + 18) // 2                 # the final OR's centre
+    W((u(1154), XY), (u(1200), XY), (u(1200), OY_ - 18), (u(1247), OY_ - 18), ctrl=True)
+    W((u(1154), CY + 18), (u(1220), CY + 18), (u(1220), OY_ + 18), (u(1247), OY_ + 18), ctrl=True)
+    add.append(gate('or', u(1240), OY_))
+    W((u(1180), XY), (u(1180), 1393), (u(760), 1393), (u(760), BB), ctrl=True)
+    T('Branch Mispredicted', u(945), 1386, 22, ctrl=True)
+    W((u(1200), CY + 18), (u(1200), 1426), (u(660), 1426), (u(660), BB), ctrl=True)
+    T('BTA Mispredicted', u(945), 1419, 22, ctrl=True)
+    # Each column's ports, under it.
+    for x, s in ((565, 'RD'), (615, 'WD'), (660, 'WE'), (715, 'RD'), (760, 'WE'), (805, 'WD')):
+        T(s, u(x) - 16, BB - 13, 24)
+    W((u(1314), OY_), (u(1350), OY_), (u(1350), 1800), (415.5, 1800), (415.5, 970), ctrl=True)
+    W((u(1350), 1800), (u(1350), 1949 + HZ_DY), ctrl=True)
+    R('Mispredict', u(1342), 1440, 37, ctrl=True)
+
+    keep.append((243, move(shift_tag(src_o[243], (136 + HZ_R) / 2 - (136 + 3381) / 2), 0, HZ_DY + IN_DROP)))
+    # The block and its lanes were laid out a drop higher: all of it comes
+    # down, but not where it meets Fetch's muxes.
+    for w in ws[ws0:]:
+        for i in (1, 2):
+            x, y = w[i]
+            if y >= IN_FLOOR:
+                w[i] = (x, y + IN_DROP)
+            elif x >= BX0 and y >= BY0:
+                w[i] = (x, y + IN_BOX_DY)
+    add[add0:] = [drop_tag(t) if t.startswith('<text') and text_pos(t)[1] >= IN_FLOOR else
+                  '<g transform="translate(0 %g)">%s</g>' % (IN_BOX_DY, t) for t in add[add0:]]
+    add.append(rounded(136, 1949 + HZ_DY + IN_DROP, HZ_R, 2036 + HZ_DY + IN_DROP, 14.5))
+    keep += [('in%d' % i, t) for i, t in enumerate(add)]
+    return ws, keep, HZ_R + 40
 
 REGS_LEC = {'D': (911, 965, 761, 1510), 'E': (1768, 1823, 123, 1512), 'M': (2488, 2542, 268, 1512), 'W': (3027, 3081, 267, 1510)}
 REGS = {k: (sx(a), sx(b) if a >= SHIFT_X else b, c, d) for k, (a, b, c, d) in REGS_LEC.items()}
@@ -424,8 +717,10 @@ BP_ROUTES = {
     'f_pc':       [(501.5 + X, 903.5), (622, 903.5)],
     'f_pcf_d':    [(501.5 + X, 903.5), (554.5, 903.5), (554.5, 1496.5), (911, 1496.5)],
     'f_pcin':     [(433, 922.5), (462, 922.5)],
-    'f_addB':     [(234.5, 968), (264.8, 968)],
-    'e_pcsrc_low': [(2561.5, 170.5), (2610.5, 170.5), (2610.5, 57.5), (158.5, 57.5), (158.5, 638.5), (209.5, 638.5), (209.5, 931)],
+    'f_addB':     [(234.5, 998.5), (264.8, 998.5)],
+    'e_pcsrc_low': [(2561.5, 170.5), (2610.5, 170.5), (2610.5, 57.5), (158.5, 57.5), (158.5, 638.5), (209.5, 638.5), (209.5, 933.4)],
+    'e_pce':      [(1823, 1496.5), (1837.5, 1496.5), (1837.5, 1551.5), (102.5, 1551.5), (102.5, 957), (169.5, 957)],
+    'e_rd1_pc':   [(2143.5, 946.5), (2155, 946.5), (2155, 1740), (72, 1740), (72, 1030), (169.5, 1030)],
     'e_nextpc':   [(339.5, 901.5), (398, 901.5)],
     'e_nextpc_bp': [(339.5, 901.5), (362, 901.5), (362, 1455), (640, 1455), (640, 1435)],
     'bp_pred':    [(575, 1305), (380, 1305), (380, 945), (398, 945)],
@@ -452,7 +747,7 @@ FULL_MUXES = {
     'aluSrcB': (119, {'x0': (2300.5, 1128.5), '01': (2300.5, 1175.5), '11': (2300.5, 1223.5)}, (2365.5, 1175.5)),
 }
 BP_MUXES = {
-    'pcLow':  ('muxPC', {'0': (169.5, 944), '1': (169.5, 992)}, (234.5, 968)),
+    'pcLow':  ('muxPC', {'0': (169.5, 957), '1': (169.5, 1030)}, (234.5, 998.5)),
     'pcM':    ('muxM', {'1': (398, 901.5), '0': (398, 945)}, (433, 922.5)),
 }
 BLOCKS = {'pc': 1, 'im': 0, 'rf': 4, 'decoder': 86, 'extend': 26, 'alu': 55, 'pcLogic': 82, 'dm': 7,
@@ -499,10 +794,15 @@ def tables(variant):
             'blocks': {k: str(v) for k, v in blocks.items()}}
 
 
-def export(variant, path):
+def drawing(variant):
     """The drawing for the slides: the original's structure and styles, each
-    wire one polyline again, and no runs through the stage registers."""
-    wires, others, width = build_bp() if variant == 'bp' else build_full()
+    wire one polyline again, and no runs through the stage registers. Returns
+    its width, height and the group holding it."""
+    global REGS
+    wires, others, width = {'bp': build_bp, 'full': build_full, 'inside': build_inside}[variant]()
+    saved = REGS
+    if variant == 'inside':
+        REGS = {k: (fin((ins_x(a), 0))[0], fin((ins_x(b), 0))[0], E_TOP if k == 'E' else c, d + IN_DROP) for k, (a, b, c, d) in REGS.items() if k in 'DE'}
     segs = []
     for key, a, b, attrs in wires:
         chain = [a] + sorted(register_cuts(a, b), key=lambda q: abs(q[0] - a[0])) + [b]
@@ -519,9 +819,20 @@ def export(variant, path):
     out = [t for _, t in others]
     for _, pts, attrs in polys:
         out.append('<path d="M%s"%s/>' % (' '.join('%g %g' % (round(x - OX, 2), round(y - OY, 2)) for x, y in pts), attrs))
-    head = re.sub(r'width="\d+"', 'width="%d"' % width, src[:src.index(OPEN)], count=1)
-    open(path, 'w').write(head + OPEN + ''.join(out) + '</g></svg>')
-    print('exported', os.path.relpath(path, ROOT), len(polys), 'wires', file=sys.stderr)
+    height, group = 2050, OPEN
+    if variant == 'inside':
+        height = 2036 + HZ_DY + IN_DROP + 20 - IN_TOP
+        group = '<g transform="translate(%g %g)">' % (OX, OY - IN_TOP)
+    REGS = saved
+    return width, height, group + ''.join(out) + '</g>'
+
+
+def export(variant, path):
+    width, height, body = drawing(variant)
+    head = re.sub(r'height="\d+"', 'height="%d"' % height,
+                  re.sub(r'width="\d+"', 'width="%d"' % width, src[:src.index(OPEN)], count=1), count=1)
+    open(path, 'w').write(head + body + '</svg>')
+    print('exported', os.path.relpath(path, ROOT), file=sys.stderr)
 
 
 SVG_IDS = {'full': ('dpPipeSvg', 'The 5-stage pipelined RISC-V datapath'),
@@ -541,6 +852,13 @@ def embed(built):
         else:
             end = page.index('</svg>', start) + 6
             page = page[:start] + el + page[end:]
+    # The Branch Predictor's dialog shows BranchPred.svg.
+    width, height, body = drawing('inside')
+    fig = ('<svg role="img" aria-label="Inside the Branch Predictor" viewBox="0 0 %d %d" xmlns="http://www.w3.org/2000/svg" '
+           'overflow="hidden"><rect width="100%%" height="100%%" fill="#FFFFFF"/>%s</svg>') % (width, height, body)
+    page, n = re.subn(r'<!-- BP_FIGURE -->.*?<!-- /BP_FIGURE -->', lambda m: '<!-- BP_FIGURE -->' + fig + '<!-- /BP_FIGURE -->',
+                      page, flags=re.S)
+    assert n == 1, 'BP_FIGURE markers not found'
     data = {v: {k: built[v][k] for k in ('width', 'routes', 'muxes', 'blocks')} for v in built}
     a = page.index('    const PDP_DRAW = ')
     b = page.index('\n', a)
@@ -558,5 +876,6 @@ if __name__ == '__main__':
     if '--export' in sys.argv:
         export('full', os.path.join(ROOT, 'Microarch_pipelined_full.svg'))
         export('bp', os.path.join(ROOT, 'Microarch_pipelined_bp.svg'))
+        export('inside', os.path.join(ROOT, 'BranchPred.svg'))
     if '--dump' in sys.argv:
         json.dump(built, open(sys.argv[sys.argv.index('--dump') + 1], 'w'))

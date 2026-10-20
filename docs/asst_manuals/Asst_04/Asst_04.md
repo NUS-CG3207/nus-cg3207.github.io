@@ -1,4 +1,4 @@
-# Assignment 4: (Near) Complete Processor + Pipelining + Bells + Whistles
+# Assignment 4: Pipelining + Bells + Whistles
 
 
 !!! info
@@ -10,9 +10,9 @@
 
 ## Compulsory Task: Pipelining our CPU [13 points]
 
-Implement pipelining. Pipelining should be done such that the processor supports all the requirements for Assignment 2, Assignment 3, and the additional instructions / features mentioned in Assignment 4 Compulsory Task in this section.
+Implement pipelining. Pipelining should be done such that the processor supports all the requirements for Assignment 2 and Assignment 3.
 
-The purpose of pipelining is to increase the clock frequency. You should try increasing the clock frequency, following the tip below. For the compulsory part, it is sufficient to test and report the max frequency via CLK_DIV_BITS - any attempt to optimize this will be an enhancement, not a basic requirement.
+The purpose of pipelining is to increase the clock frequency. You should try increasing the clock frequency, following the tip below. For the compulsory task, it is sufficient to test and report the max frequency via CLK_DIV_BITS. <span style="color: brown;">There will not be additional marks for the compulsory task based on the achieved clock frequency</span> - any attempt to increase/optimize this will be an open-ended enhancement.
 
 Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task. As long as your design works with an appropriate number of `nop`s, the requirements for this task can be met.
 
@@ -74,7 +74,7 @@ Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task.
 
 ## Open-ended Enhancement [12 points]
 
-This is the fun part - implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed.
+This is the fun part - implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed below. <span style="color: brown;"> The enhancement should be over and above the compulsory task - do not implement a separate design that does not have pipelining, but has enhancements. </span>
 
 ??? tip "Hazard Hardware"
 
