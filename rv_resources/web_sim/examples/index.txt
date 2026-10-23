@@ -1,0 +1,29 @@
+# Example Index
+
+The **Example:** dropdown, in row order, filtered by `Lang`. Add a program by
+adding a row and dropping the file in `asm/` or `c/`.
+
+`IROM` and `DMEM` are the `IROM_DEPTH_BITS` / `DMEM_DEPTH_BITS` the program
+needs, so its memory is `2**bits` bytes. Selecting an example sets the Linker
+segment sizes from them, and HDL mode refuses a program that does not fit the
+loaded `Wrapper.v`.
+
+`dip_led` and `dip_led_c` are also baked into `riscv_simulator.html`, so the
+page has a working example with no server. Change a row for either and update
+the baked copy to match.
+
+| Key | Lang | Label | File | IROM | DMEM | Description |
+|-----|------|-------|------|------|------|--------------|
+| dip_led | asm | DIP to LED (start here) | DIP_to_LED.asm | 9 | 9 | DIP to LED — the one example baked into the page, works with no server |
+| dip_led_c | c | DIP to LED (start here) | DIP_to_LED.c | 9 | 9 | DIP switches mirrored to LEDs — the one C example baked into the page, works with no server |
+| rars_syscalls | asm | RARS Syscalls | rars_syscalls.asm | 9 | 9 | RARS ecall syscalls demo |
+| fib | asm | Fibonacci | fibonacci.asm | 9 | 9 | Fibonacci sequence |
+| hello_world | asm | Hello World | HelloWorld.asm | 9 | 9 | Hello World |
+| hello_jal | asm | Hello Subroutine | HelloWorld_jal_jalr.asm | 9 | 9 | Hello World with a subroutine |
+| circle_accel | asm | Circle & Accel | Circle_delay_accel.asm | 10 | 9 | Circle and delay accel |
+| image_display_accel | asm | Image Display & Accel | ImageDisplay_autoadvance_accel.asm | 9 | 14 | Image display autoadvance and accel |
+| fibonacci_c | c | Fibonacci | fibonacci.c | 9 | 9 | Fibonacci sequence |
+| hello_world_c | c | Hello World | HelloWorld.c | 9 | 9 | UART command echo with a greeting |
+| hello_jal_c | c | Hello Subroutine | HelloWorld_jal_jalr.c | 9 | 9 | UART command echo, greeting printed by a function taking a parameter |
+| circle_accel_c | c | Circle & Accel | Circle_delay_accel.c | 11 | 9 | Circle and delay accel |
+| image_display_c | c | Image Display & Accel | ImageDisplay_autoadvance_accel.c | 10 | 14 | Image display autoadvance and accel |
