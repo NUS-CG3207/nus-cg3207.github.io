@@ -106,6 +106,7 @@ def shift_tag(t, dx, only_x_from=None):
 
 # ---------------------------------------------------------------- variants
 SHIFT_X, SHIFT = 2144, 140      # the gap opened in Execute for the ALUSrcA mux
+F3_X, F3_TOP, F3_V, F3_Y = 1188, 86.5, 1600, 240.5     # funct3's way over the Decoder into E
 ALIGN_B = 19                    # the ALUSrcB mux, in line with ALUSrcA's
 
 
@@ -194,6 +195,10 @@ def build_full():
     W((2281, 1175.5), (2300.5, 1175.5)); add_o.append(text('4', 2257, 1191, 40))
     # Which bits of PCSrcE each mux takes.
     add_o += [('idx0', text('[0]', 166, 715, 30, ctrl=True)), ('idx10', text('[1:0]', 145, 896, 30, ctrl=True))]
+    # funct3 picks the branch condition in PC Logic: off InstrD[14:12] over
+    # the Decoder, then through E between PCSE and RegWriteE.
+    W((F3_X, 238.5), (F3_X, F3_TOP), (F3_V, F3_TOP), (F3_V, F3_Y), (sx(2293), F3_Y))
+    add_o += [text('funct3D', F3_V + 12, F3_Y - 6), text('funct3E', 2062.9, F3_Y - 6)]
     wires += add_w
     others += [t if isinstance(t, tuple) else ('x%d' % k, t) for k, t in enumerate(add_o)]
     return wires, others, 3320 + SHIFT
@@ -247,7 +252,7 @@ def build_bp():
     W((362, 901.5), (362, 1455), (640, 1455), (640, 1435))
     add_o.append(rtext('PCNextE', 352, 1210, 32))
     W((575, 1305), (380, 1305), (380, 945), (398, 945))
-    add_o.append(text('PredPCF', 387, 1297, 28))
+    add_o.append(text('PrPCF', 387, 1297, 28))
     W((575, 1250), (415.5, 1250), (415.5, 970), ctrl=True)
     add_o.append(rtext('Mispredict', 444, 1238, 28, ctrl=True))
     # The predictor: PCF to predict, PCE, PCNextE and PCSrcE to check.
@@ -260,7 +265,7 @@ def build_bp():
     add_o.append(text('PCSrcE', 760, 1247, 28, ctrl=True))
     W((760, 1551.5), (760, 1435))
     add_o += [text('PCE', 743, 1427, 28), text('PCNextE', 600, 1427, 28)]
-    add_o += [text('Mispredict', 585, 1260, 28), text('PredPCF', 585, 1313, 28)]
+    add_o += [text('Mispredict', 585, 1260, 28), text('PrPCF', 585, 1313, 28)]
     add_o.append(('idx1', text('[1]', 217, 915, 30, ctrl=True)))
     wires += add_w
     others += [t if isinstance(t, tuple) else ('b%d' % k, t) for k, t in enumerate(add_o)]
@@ -286,7 +291,7 @@ KEEP_O = {0, 1, 16, 17, 18, 31, 33, 40, 41, 42, 43, 44, 47, 48, 49, 51, 61, 62, 
           'b5', 'b6', 'b8', 'idx0', 'idx1'}
 KEEP_W = {2, 3, 19, 20, 21, 32, 106, 107, 201, 207, 208, 209, 118, 28, 85, 226, 267}
 HALF_DX = {211, 212, 222}       # bus labels that keep to the closed-up gap's middle
-E_TOP, HZ_DY = 761, 0           # E's new top; the hazard unit's drop
+E_TOP, HZ_DY = 761, -90         # E's new top; the hazard unit's drop
 
 
 def ins_x(x):
@@ -384,13 +389,15 @@ def build_inside():
     keep.append((271, move(shift_tag(src_o[271], -IN_DX), 0, e_dy - 16)))
     # PC Logic, beside E: PCSE leaves E at y 800, and PCSrcE runs back to
     # Fetch above the registers at y 600.
-    PL_X, PL_Y, PCS_Y, TOP_Y = 1940 - IN_DX, 715, 800, 600
+    PL_X, PL_Y, PCS_Y, TOP_Y = 1990 - IN_DX, 715, 800, 600
     keep += [(k, move(src_o[k], PL_X - 2435, PL_Y - 86)) for k in (80, 81, 82)]
     keep.append((88, move(src_o[88], 1065 - 1463.8, PCS_Y - 170.5)))      # PCSD, where its wire starts
     keep.append((92, move(src_o[92], 0, TOP_Y - 57.5)))
     keep.append((228, move(src_o[228], 0, 790 - 702)))      # below the line it now meets
-    # The hazard unit's labels drop with it.
-    keep += [(k, move(shift_tag(src_o[k], -IN_DX) if k == 285 else src_o[k], 0, HZ_DY)) for k in (282, 283, 284, 285)]
+    # The hazard unit's labels drop with it. StallF lies flat, under the
+    # Fetch lanes, so the unit can come up close to them.
+    keep += [(k, move(shift_tag(src_o[k], -IN_DX) if k == 285 else src_o[k], 0, HZ_DY)) for k in (283, 284, 285)]
+    keep.append((282, text('StallF', 463.5 + PC_DX + 10, 1939 + HZ_DY, ctrl=True)))
 
     ws = []
     for key, a, b, attrs in wires:
@@ -424,7 +431,9 @@ def build_inside():
         add.append(rtext(*a, **kw))
     PL_R = PL_X + 128
     W((1051.5, PCS_Y), (PL_X, PCS_Y), ctrl=True)
-    T('PCSE', PL_X - 107, PCS_Y - 6, ctrl=True)
+    T('PCSE', PL_X - 150, PCS_Y - 6, ctrl=True)
+    W((1051.5, PCS_Y + 60), (PL_X, PCS_Y + 60))
+    T('funct3D', 1065, PCS_Y + 54); T('funct3E', PL_X - 150, PCS_Y + 54)
     W((PL_R, PCS_Y), (PL_R + 27, PCS_Y), (PL_R + 27, TOP_Y), (156.5, TOP_Y), ctrl=True)
     W((PL_X + 102.5, PL_Y + 197), (PL_X + 102.5, 1080))
     R('ALUFlags', PL_X + 135, 1080)
@@ -450,7 +459,7 @@ def build_inside():
     add.append(rounded(BX0, BY0, BX1, BY1, 14))
     T('Branch Predictor', u(25), BY0 + 40, 34, ctrl=True, bold=True)
     # Fetch's lanes: the prediction out, PCNextE in, Mispredict out.
-    T('PredPCF', 600, 1689); T('PCNextE', 600, 1739); T('Mispredict', 600, 1789, ctrl=True)
+    T('PrPCF', 600, 1689); T('PCNextE', 600, 1739); T('Mispredict', 600, 1789, ctrl=True)
 
     # The BHT: read at PCF for Fetch and at PCE for Execute's check; each
     # column written at PCE when its half of the check fails.
@@ -462,7 +471,7 @@ def build_inside():
     T('BHT', u(330), 1236, 46, bold=True)
     tx0, tx1, ty0, cx = u(540), u(830), 1067, u(685)
     add.append('<rect x="%g" y="%g" width="%g" height="%g" stroke="#000000" stroke-width="3.4375" fill="none"/>' % (tx0 - OX, ty0 - OY, tx1 - tx0, BB - ty0))
-    T('PrBTA', tx0 + 30, ty0 + 30, 28); T('PrPCSrc', cx + 20, ty0 + 30, 28)
+    T('PrBTA', tx0 + 30, ty0 + 30, 28); T('PrTaken', cx + 20, ty0 + 30, 28)
     add.append(shape([(cx, ty0), (cx, BB)], False, ' stroke="#000000" stroke-width="3" fill="none"'))
     for y in range(ty0 + 38, BB - 40, 36):
         add.append(shape([(tx0, y), (tx1, y)], False, ' stroke="#000000" stroke-width="3" fill="none"'))
@@ -470,7 +479,7 @@ def build_inside():
     R('PCE[k+1:2]', u(68), 1450, 32)
     T('RA/WA', u(320), 1110, 28)
     W((u(85), 1496.5), (u(85), 1160), (BL, 1160))
-    R('PCF[k+1:2]', u(123), 1450, 32)
+    T('PCF[k+1:2]', u(97), 1151, 28)          # only the index bits; the adder takes all of PCF
     T('RA', u(320), 1170, 28)
 
     # Fetch's prediction: PCF + 4, or the predicted target.
@@ -491,7 +500,7 @@ def build_inside():
     W((u(565), BB), (u(565), 1295), (u(312), 1295), (u(312), MT + 36.5), (u(335), MT + 36.5))
     T('PrBTAF', u(400), 1288, 24)
     W((u(715), BB), (u(715), 1330), (u(352.5), 1330), (u(352.5), MT + 10), ctrl=True)
-    T('PrPCSrcF', u(400), 1323, 24, ctrl=True)
+    T('PrTakenF', u(400), 1323, 24, ctrl=True)
     W((u(370), MT + 57.5), (u(390), MT + 57.5), (u(390), 1700), (380, 1700), (380, 945), (398, 945))
 
     # Execute's check. PCSrcE is two bits; either set means E redirects.
@@ -507,7 +516,7 @@ def build_inside():
     W((u(1055), CY + 36), (u(1080), CY + 36), ctrl=True)
     T('TakenE', u(815), 1353, 26, ctrl=True)
     W((BR, XY + 18), (u(1074), XY + 18), ctrl=True)
-    T('PrPCSrcE', u(860), XY + 10, 28, ctrl=True)
+    T('PrTakenE', u(860), XY + 10, 28, ctrl=True)
     add.append(gate('xor', u(1080), XY))
     W((BR, CY - 18), (u(960), CY - 18))
     T('PrBTAE', u(858), CY - 26, 26)
@@ -633,6 +642,7 @@ ROUTES = {
     'd_rd2_e':    [(1712.5, 1175.5), (1746.5, 1175.5), (1746.5, 1080.5), (1768, 1080.5)],
     'd_pcd':      [(965, 1496.5), (1768, 1496.5)],
     'd_pcs':      [(1451, 170.5), (1768, 170.5)],
+    'd_funct3_pc': [(965, 944.5), (1026, 944.5), (1026, 238.5), (F3_X, 238.5), (F3_X, F3_TOP), (F3_V, F3_TOP), (F3_V, F3_Y), (1768, F3_Y)],
     'd_regwrite': [(1451, 311.5), (1768, 311.5)],
     'd_memtoreg': [(1451, 372.5), (1768, 372.5)],
     'd_memwrite': [(1451, 435.5), (1768, 435.5)],
@@ -652,6 +662,7 @@ ROUTES = {
     'e_flags':    [(2368.5, 936.5), (2397.5, 936.5), (2397.5, 279.5)],
     'e_rd':       [(1823, 1447.5), (2488, 1447.5)],
     'e_pcs':      [(1823, 170.5), (2293, 170.5)],
+    'e_funct3':   [(1823, F3_Y), (2293, F3_Y)],
     'e_regwrite': [(1823, 311.5), (2488, 311.5)],
     'e_memtoreg': [(1823, 372.5), (2488, 372.5)],
     'e_memwrite': [(1823, 435.5), (2488, 435.5)],
