@@ -14422,7 +14422,9 @@ int main()
         if (paced) {
           const t = performance.now();
           if (totalCycles < due - hz / 4) { rt.wall = t; rt.cyc = totalCycles; }
-          if (t - rt.lastWall >= 500) {
+          // Measured over at least 50 cycles: on a slow clock a shorter window
+          // can end between two whole cycles and read as lag.
+          if (t - rt.lastWall >= Math.max(500, 50000 / hz)) {
             rtRatio = Math.min(1, (totalCycles - rt.lastCyc) / ((t - rt.lastWall) / 1000 * hz));
             rt.lastWall = t; rt.lastCyc = totalCycles;
           }
