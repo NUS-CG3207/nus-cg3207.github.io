@@ -15,6 +15,7 @@ the baked copy to match.
 | Key | Lang | Label | File | IROM | DMEM | Description |
 |-----|------|-------|------|------|------|--------------|
 | dip_led | asm | DIP to LED (start here) | DIP_to_LED.asm | 9 | 9 | DIP to LED — the one example baked into the page, works with no server |
+| week11sample | asm | Week 11 Sample | Week11Sample.asm | 9 | 9 | Week 11 Branch Prediction Example |
 | dip_led_c | c | DIP to LED (start here) | DIP_to_LED.c | 9 | 9 | DIP switches mirrored to LEDs — the one C example baked into the page, works with no server |
 | rars_syscalls | asm | RARS Syscalls | rars_syscalls.asm | 9 | 9 | RARS ecall syscalls demo |
 | fib | asm | Fibonacci | fibonacci.asm | 9 | 9 | Fibonacci sequence |
@@ -27,3 +28,4 @@ the baked copy to match.
 | hello_jal_c | c | Hello Subroutine | HelloWorld_jal_jalr.c | 9 | 9 | UART command echo, greeting printed by a function taking a parameter |
 | circle_accel_c | c | Circle & Accel | Circle_delay_accel.c | 11 | 9 | Circle and delay accel |
 | image_display_c | c | Image Display & Accel | ImageDisplay_autoadvance_accel.c | 10 | 14 | Image display autoadvance and accel |
+
