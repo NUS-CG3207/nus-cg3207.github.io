@@ -66,11 +66,15 @@ Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task.
     
     * Identify the bottleneck by looking at the timing report.
     * Use smaller memories.
-    * For larger memories, use block ram templates, and allow at least 2 clock edges, and maybe even 3 for a read. This, of course, is a major design change as the pipeline is no longer 5-stage.
+    * For larger memories, use block ram templates (see below), and allow at least 2 clock edges, and maybe even 3 for a read. This, of course, is a major design change as the pipeline is no longer 5-stage.
     * Use a hierarchy of memories.
     * If the bottleneck is the execute stage, try to make it shorter by moving the PC logic to the M stage.
 
     Now, how do we know what frequency it can run at? You set the clock frequency via CLK_DIV_BITS or Clocking Wizard, do synthesis and then implementation, and see the warnings. You'll get a critical warning after place and route that some timing constraints are not met if the frequency you set cannot be obtained. If you get this warning, the functionality is not reliable even if it runs on the board; frequency at which you do not get the warning is the maximum safe frequency.
+
+    To use FPGA block RAMs for instruction and data memories in pipelined version (Allows faster synthesis times and possibly clock rates for larger memory sizes):
+    (Disclaimer: Not tested fully). Change reads to be under always@(posedge clk) where relevant. Read the comments in templates for more info. 
+    If enabled, Instr, ReadData_in are delayed by 1 cycle. Therefore, what you get can be used as InstrD, ReadDataW directly. MMIO reads are also delayed. Register file outputs are RD1E and RD2E directly if it is done for the register file.
 
 ## Open-ended Enhancement [12 points]
 
@@ -149,7 +153,7 @@ This is the fun part - implementing performance enhancements of your choice. The
 
 ## Design Instructions
 
-* All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU or MCycle unit. *Exceptions*: `+` for calculating next `PC`, multiplication, division, enhancements such as branch prediction. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.
+* All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU or MCycle unit. *Exceptions*: `+` for calculating next `PC`, multiplication, division, enhancements such as branch prediction, <span style="color: brown;">a floating point unit that is distinct from ALU</span>, etc. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.
 * In the ALU, DO NOT use additional `+` signs -> this could infer additional adders. The existing addition framework should be good enough.
 * All operators are permitted on 32-bit values outside the RV module. For example, you will have to do 32-bit comparisons in the wrapper for address decoding.
 * Use of arithmetic operators:

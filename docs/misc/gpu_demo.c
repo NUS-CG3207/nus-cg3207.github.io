@@ -1,4 +1,4 @@
-#include <stdio.h>
+#   include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -28,7 +28,7 @@ const char *vecmul_kernel =
 "    C[i] = A[i] * B[i];\n"
 "}\n";
 
-void cpu_matmul(float *A, float *B, float *C, int N) {
+void cpu_matmul(float *A, float *B, float *C, int N) { // N = 1024
     for(int i = 0; i < N; i++) {
         for(int j = 0; j < N; j++) {
             float sum = 0.0f;
@@ -40,7 +40,7 @@ void cpu_matmul(float *A, float *B, float *C, int N) {
     }
 }
 
-void cpu_vecmul(float *A, float *B, float *C, int N) {
+void cpu_vecmul(float *A, float *B, float *C, int N) { // N = 10000000
     for(int i = 0; i < N; i++) {
         C[i] = A[i] * B[i];
     }
