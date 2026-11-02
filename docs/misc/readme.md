@@ -9,7 +9,8 @@ Small, self-contained programs showing **why memory access patterns, data layout
 3. [Other CPU memory-layout examples](#3-other-cpu-memory-layout-examples)
 4. [Parallel / GPU examples](#4-parallel--gpu-examples)
 5. [Verilog / Yosys examples](#5-verilog--yosys-examples)
-6. [Quick reference](#6-quick-reference)
+6. [Number representation demos](#6-number-representation-demos-number_formatsc)
+7. [Quick reference](#7-quick-reference)
 
 > **Build tip:** compile with `-O2` for meaningful timings. Files using `clock_gettime` may need `-lrt` on older glibc (harmless on newer).
 
@@ -171,7 +172,28 @@ yosys -p "read_verilog number_multiplier.v; synth -top transfer; stat"
 
 ---
 
-## 6. Quick reference
+## 6. Number representation demos (`number_formats.c`)
+
+Four "predict the output" demos in one program. Run one at a time: show the code, ask students for the output, then run it. The bugs in demos 1 and 3 are **intentional**.
+
+```bash
+gcc -Wall -o number_formats number_formats.c   # no -O2: demo 1 uses a deliberately aliasing-unsafe pointer cast
+./number_formats        # interactive menu (1-4, a = all, q = quit)
+./number_formats 3      # just demo 3
+./number_formats 1 4    # demos 1 and 4
+./number_formats all
+```
+
+| # | Demo | What it shows |
+|---|---|---|
+| 1 | IEEE-754 encoding of `-9.875f` | `printf("%X", -9.875f)` prints garbage (float passed where an int is expected); `*(int*)&a` gives `0xC11E0000`; sign / exponent / mantissa breakdown |
+| 2 | Q0.7 fixed point (`int8_t`, scale 128) | `0.1`, `0.2`, `0.3` truncate to 12, 25, 38, so `(a + b) - c` is `-1` instead of `0` |
+| 3 | Q8.8 fixed point (`int16_t`, scale 256) | `1.5 * 1.5` stored in `int16_t` overflows (prints `0.250`, not `2.250`); fix with a 32-bit intermediate, then `>> 8` |
+| 4 | Float associativity | `a = 1e30, b = -1e30, c = 1`: `(a + b) + c` is `1.0` but `a + (b + c)` is `0.0` |
+
+---
+
+## 7. Quick reference
 
 | File | Lang | Demonstrates | Build / deps |
 |---|---|---|---|
@@ -181,6 +203,7 @@ yosys -p "read_verilog number_multiplier.v; synth -top transfer; stat"
 | `matrix_transpose_optimization.c` | C | Transposing B for locality | `gcc -O2 -lrt` |
 | `matmul_comparison.c` | C | Transpose, blocking, OpenMP, NUMA/SMT | `gcc -O2 -fopenmp` |
 | `gpu_demo.c` | C | GPU compute-bound vs memory-bound | `-lOpenCL` + runtime |
+| `number_formats.c` | C | Float encoding, fixed-point error/overflow, non-associativity | `gcc` (no `-O2`) |
 | `dff_infer.v`, `dff_infer_keep.v` | Verilog | FF inference, merging, `(* keep *)` | Yosys |
 | `number_multiplier.v` | Verilog | Constant multiply → shift | Yosys |
 
