@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 366" width="300" height="366" role="img" aria-label="Levels of abstraction in a computing system, from application software down to physics">
+<title>Levels of abstraction in a computing system, from application software down to physics</title>
+<rect x="0" y="0" width="300" height="366" rx="6" fill="#ffffff" stroke="#d3dae1"/>
+<rect x="35.0" y="26" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="45.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Application Software</text>
+<rect x="35.0" y="60" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="79.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Operating Systems</text>
+<rect x="35.0" y="94" width="230" height="30" rx="3" fill="#dbe9f7" stroke="#43505c" stroke-width="1.6"/>
+<text x="150.0" y="113.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="bold" font-style="normal">Architecture</text>
+<rect x="35.0" y="128" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="147.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Microarchitecture</text>
+<rect x="35.0" y="162" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="181.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Logic</text>
+<rect x="35.0" y="196" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="215.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Digital Circuits</text>
+<rect x="35.0" y="230" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="249.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Analog Circuits</text>
+<rect x="35.0" y="264" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="283.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Devices</text>
+<rect x="35.0" y="298" width="230" height="30" rx="3" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
+<text x="150.0" y="317.5" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="middle" font-weight="600" font-style="normal">Physics</text>
+<text x="150.0" y="348.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="normal" font-style="italic">after Harris and Harris</text>
+</svg>

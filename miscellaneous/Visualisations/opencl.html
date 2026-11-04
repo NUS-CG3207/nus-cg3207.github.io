@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCL in Action</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --panel2: #eef0f4; --ink: #1d2230; --dim: #667085; --line: #d4d8e0;
+  --cell: #e7eaf0; --cellInk: #1d2230;
+  --read: #2f6fdf; --write: #e0701a; --pcie: #8a4fd8; --local: #1f9d6b; --ctrl: #c28a00; --global: #2f6fdf;
+  --cur: #fff1c2; --blocked: #ffe0d6; --accent: #2f6fdf; --ok: #1f9d6b; --wgL: 52%;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+    --cell: #2a3040; --cellInk: #e4e7ee;
+    --read: #6b9dff; --write: #ff9a4d; --pcie: #b78bff; --local: #3fcf95; --ctrl: #f0b82e; --global: #6b9dff;
+    --cur: #4a3f16; --blocked: #4d2a20; --accent: #6b9dff; --ok: #3fcf95; --wgL: 60%;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+  --cell: #2a3040; --cellInk: #e4e7ee;
+  --read: #6b9dff; --write: #ff9a4d; --pcie: #b78bff; --local: #3fcf95; --ctrl: #f0b82e; --global: #6b9dff;
+  --cur: #4a3f16; --blocked: #4d2a20; --accent: #6b9dff; --ok: #3fcf95; --wgL: 60%;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { font-size: clamp(13px, 1vw, 26px); }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 1rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select { font: inherit; color: inherit; }
+select, button {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.462rem; padding: 0.231rem 0.538rem; min-height: 2.154rem;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+/* ---------- header ---------- */
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.462rem 0.769rem; display: flex; flex-direction: column; gap: 0.462rem; flex: 0 0 auto; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.462rem 1.077rem; align-items: center; }
+.grp { display: flex; align-items: center; gap: 0.385rem; white-space: nowrap; flex: 0 0 auto; }
+.grp label { color: var(--dim); }
+h1 { font-size: 1.154rem; margin: 0; font-weight: 650; }
+#scrub { flex: 1 1 12.308rem; min-width: 9.231rem; accent-color: var(--accent); }
+.grow { display: flex; align-items: center; gap: 0.615rem; flex: 1 1 15.385rem; min-width: 12.308rem; }
+#stepNo { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 4.923rem; text-align: right; }
+#phases { display: flex; flex-wrap: wrap; gap: 0.231rem; flex: 0 1 auto; }
+#phases button { min-width: 2rem; min-height: 1.692rem; padding: 0 0.385rem; font-size: 0.846rem; border-radius: 0.846rem; color: var(--dim); }
+#phases button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+#phases button.seen { color: var(--ink); }
+#narr { display: flex; gap: 0.615rem; align-items: baseline; min-height: 2.923rem; }
+#narrTitle { font-weight: 650; }
+#narrDetail { color: var(--dim); }
+.badge { font-size: 0.846rem; padding: 1px 0.538rem; border-radius: 0.692rem; border: 1px solid currentColor; white-space: nowrap; flex: 0 0 auto; }
+.b-global { color: var(--global); } .b-local { color: var(--local); } .b-pcie { color: var(--pcie); }
+.b-ctrl { color: var(--ctrl); } .b-alu, .b-host { color: var(--dim); }
+#setupBtn, #tabs { display: none; }
+
+/* ---------- panels ---------- */
+main {
+  flex: 1 1 auto; min-height: 0; display: grid; gap: 0.615rem; padding: 0.615rem;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(26rem, 1.95fr) minmax(17rem, 0.85fr);
+}
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 0.615rem; min-height: 0; overflow: auto; }
+.panel h2 { font-size: 0.923rem; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); margin: 0; padding: 0.538rem 0.769rem 0.385rem; font-weight: 600; }
+#pCode { display: flex; flex-direction: column; overflow: hidden; }
+.code { margin: 0; overflow: auto; font-size: 0.885rem; line-height: 1.5; padding-bottom: 0.462rem; }
+#hostCode { flex: 1 1 60%; }
+#kernelCode { flex: 0 1 auto; max-height: 40%; border-top: 1px solid var(--line); }
+.ln { display: flex; white-space: pre; padding-right: 0.615rem; }
+.ln .no { color: var(--dim); opacity: .6; width: 2.308rem; text-align: right; padding-right: 0.615rem; flex: 0 0 auto; user-select: none; }
+.ln.cur { background: var(--cur); }
+.ln.blocked { background: var(--blocked); }
+.tk-k { color: #b0409a; } .tk-t { color: #1f7a8c; } .tk-c { color: var(--dim); font-style: italic; }
+.tk-n { color: #b35c00; } .tk-s { color: #2d8a3a; } .tk-f { color: var(--accent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tk-k { color: #e38ad3; } :root:not([data-theme="light"]) .tk-t { color: #5ec8d8; } :root:not([data-theme="light"]) .tk-n { color: #f0a45a; } :root:not([data-theme="light"]) .tk-s { color: #7fd48a; } }
+:root[data-theme="dark"] .tk-k { color: #e38ad3; } :root[data-theme="dark"] .tk-t { color: #5ec8d8; } :root[data-theme="dark"] .tk-n { color: #f0a45a; } :root[data-theme="dark"] .tk-s { color: #7fd48a; }
+.kstmt { color: var(--dim); padding: 2px 0.769rem 0; font-size: 0.846rem; min-height: 1.385rem; }
+
+#rightCol { display: flex; flex-direction: column; gap: 0.615rem; min-height: 0; }
+#pNd { flex: 0 1 auto; max-height: 68%; }
+#pInsp { flex: 1 1 auto; }
+
+/* ---------- diagram ---------- */
+#diagram { position: relative; padding: 0.769rem; display: flex; flex-direction: column; gap: 0; }
+#fx { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 5; }
+.box { border: 1.5px solid var(--line); border-radius: 0.615rem; padding: 0.615rem; background: var(--panel); position: relative; }
+.boxhead { font-weight: 650; display: flex; align-items: baseline; gap: 0.615rem; flex-wrap: wrap; }
+.sub { color: var(--dim); font-weight: 400; font-size: 0.885rem; }
+.memhead { color: var(--dim); font-size: 0.846rem; text-transform: uppercase; letter-spacing: .04em; margin: 0.615rem 0 0.231rem; }
+.cpu { margin-top: 0.385rem; padding: 0.308rem 0.615rem; border-radius: 0.462rem; background: var(--panel2); display: inline-flex; gap: 0.462rem; align-items: center; }
+.cpu.blocked { background: var(--blocked); }
+.arrs { display: flex; flex-wrap: wrap; gap: 0.615rem; }
+.arr { flex: 1 1 11rem; min-width: 7rem; }
+.arr.img { flex: 0 1 13.846rem; }
+.arr.scalar { flex: 0 0 6.923rem; min-width: 5.385rem; }
+.arrlab { font-size: 0.846rem; margin-bottom: 2px; display: flex; gap: 0.462rem; }
+.arrlab .sub { font-size: 0.808rem; }
+.arr canvas { display: block; width: 100%; }
+.link { align-self: center; width: 2px; height: 2.308rem; background: var(--pcie); position: relative; margin: 2px 0; }
+.link span { position: absolute; left: 0.769rem; top: 0.538rem; font-size: 0.846rem; color: var(--pcie); white-space: nowrap; }
+.link.off { background: var(--line); } .link.off span { color: var(--dim); }
+#ctxBox { border: 1.5px dashed transparent; border-radius: 0.769rem; padding: 0.462rem; position: relative; }
+#ctxBox.on { border-color: var(--accent); }
+#ctxBox .ctxlab { position: absolute; top: -9px; right: 0.923rem; background: var(--panel); padding: 0 0.385rem; font-size: 0.846rem; color: var(--accent); display: none; }
+#ctxBox.on .ctxlab { display: block; }
+#devBox.undiscovered { opacity: .35; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.308rem; align-items: center; min-height: 1.846rem; }
+.chip { font-size: 0.846rem; padding: 2px 0.538rem; border-radius: 0.769rem; background: var(--panel2); border: 1px solid var(--line); white-space: nowrap; }
+.chip.run { border-color: var(--ctrl); box-shadow: inset 0 0 0 1px var(--ctrl); }
+.chip.dim { opacity: .5; }
+.row { display: flex; gap: 0.615rem; align-items: center; margin-top: 0.462rem; flex-wrap: wrap; }
+.row > .lab { color: var(--dim); font-size: 0.846rem; text-transform: uppercase; letter-spacing: .04em; min-width: 5.231rem; }
+#queue .chip { border-color: var(--ctrl); }
+#sched .chip { padding: 1px 0.462rem; font-size: 0.808rem; }
+#cus { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.846rem, 1fr)); gap: 0.615rem; margin-top: 0.615rem; }
+.cu { border: 1.5px solid var(--line); border-radius: 0.538rem; padding: 0.462rem; background: var(--panel2); }
+.cu.busy { border-color: var(--cuc, var(--accent)); }
+.cuhead { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.923rem; }
+.cuhead .sub { font-size: 0.846rem; }
+.lmem { margin-top: 0.385rem; }
+.lmem .arrlab { color: var(--local); }
+.pes { display: grid; grid-template-columns: repeat(var(--pecols, 4), 1fr); gap: 0.231rem; margin-top: 0.385rem; }
+.pe { border: 1px solid var(--line); border-radius: 0.308rem; background: var(--panel); font-size: 0.769rem; line-height: 1.25; padding: 2px 0.231rem; min-height: 3.231rem; overflow: hidden; cursor: default; }
+.pe .pn { color: var(--dim); }
+.pe .pv { font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+.pe .pnote { white-space: normal; overflow-wrap: anywhere; color: var(--dim); }
+.pe.act { border-color: var(--pec, var(--accent)); box-shadow: inset 0 0 0 1.5px var(--pec, var(--accent)); cursor: pointer; }
+.pe.masked { background: repeating-linear-gradient(135deg, var(--panel2) 0 0.308rem, var(--panel) 0.308rem 0.615rem); }
+.pe.bar { border-color: var(--ctrl); box-shadow: inset 0 0 0 1.5px var(--ctrl); }
+.none { color: var(--dim); font-style: italic; font-size: 0.885rem; }
+.hidden { display: none !important; }
+
+/* ---------- ndrange / inspector ---------- */
+.pad { padding: 0 0.769rem 0.769rem; }
+#ndInfo { color: var(--dim); font-size: 0.885rem; margin-bottom: 0.462rem; }
+#ndCanvas { display: block; width: 100%; cursor: pointer; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.308rem 0.769rem; font-size: 0.846rem; color: var(--dim); margin-top: 0.462rem; }
+.legend i { display: inline-block; width: 0.846rem; height: 0.846rem; border-radius: 2px; vertical-align: -1px; margin-right: 0.231rem; border: 1px solid var(--line); }
+table.kv { border-collapse: collapse; width: 100%; font-size: 0.923rem; }
+table.kv td { padding: 2px 0.308rem; border-bottom: 1px solid var(--line); }
+table.kv td:first-child { color: var(--dim); }
+table.kv td:last-child { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.sect { margin: 0.769rem 0 0.308rem; font-size: 0.846rem; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.ok { color: var(--ok); font-weight: 600; }
+#tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 0.846rem; padding: 0.231rem 0.538rem; border-radius: 0.308rem; display: none; white-space: nowrap; }
+
+/* ---------- narrow layout: panels become tabs ---------- */
+@media (max-width: 860px) {
+  header { padding: 0.462rem 0.615rem; gap: 0.385rem; }
+  header > .bar:first-child { justify-content: space-between; }
+  #setupBtn { display: inline-block; }
+  #config { display: none; }
+  body.setup #config { display: flex; }
+  #tabs { display: flex; gap: 0.308rem; }
+  #tabs button { flex: 1 1 0; min-height: 2.308rem; }
+  #tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  main { display: block; padding: 0.462rem; overflow: hidden; }
+  #rightCol { display: contents; }
+  .panel, #pCode { display: none; height: 100%; }
+  .panel.on { display: block; }
+  #pCode.on { display: flex; }
+  #pNd { max-height: none; }
+  #narr { min-height: 0; flex-wrap: wrap; row-gap: 0; }
+  #narrDetail { font-size: 0.923rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="grp"><h1>OpenCL in action</h1></div>
+    <div class="grp"><button id="setupBtn" title="Show or hide kernel and device settings">Setup</button></div>
+    <div class="bar" id="config">
+    <div class="grp"><label for="selKernel">Kernel</label><select id="selKernel"></select></div>
+    <div class="grp"><label for="selGlobal">Global size</label><select id="selGlobal"></select></div>
+    <div class="grp"><label for="selLocal">Local size</label><select id="selLocal" title="Only sizes that divide the global size (and fit the device's maximum work-group size) are offered"></select></div>
+    <div class="grp"><label for="selCU">Compute units</label><select id="selCU"></select></div>
+    <div class="grp"><label for="selPE">PEs per CU</label><select id="selPE"></select></div>
+    </div>
+  </div>
+  <div class="bar" id="transport">
+    <div class="grp">
+      <button id="bReset" title="Back to the start (Home)">⏮</button>
+      <button id="bBack" title="Previous step (←)">◀</button>
+      <button id="bPlay" title="Play / pause (Space)" style="min-width:44px">▶</button>
+      <button id="bStep" title="Next step (→)">▶|</button>
+      <button id="bNext" title="Skip to the next host call or work-group round (Shift+→)">⏭</button>
+    </div>
+    <div class="grow"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Step"><span id="stepNo"></span></div>
+    <div class="grp"><label for="selSpeed">Speed</label><select id="selSpeed">
+      <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="10">10×</option>
+    </select></div>
+    <div id="phases" title="Host program steps (slide 15)"></div>
+  </div>
+  <div id="narr"><span id="narrBadge" class="badge"></span><span><span id="narrTitle"></span> <span id="narrDetail"></span></span></div>
+  <nav id="tabs">
+    <button data-tab="pCode">Code</button><button data-tab="pDevice" class="on">Platform</button><button data-tab="pNd">NDRange</button><button data-tab="pInsp">Inspect</button>
+  </nav>
+</header>
+
+<main>
+  <section class="panel" id="pCode">
+    <h2>Host program (main.c)</h2>
+    <div class="code" id="hostCode"></div>
+    <h2 style="border-top:1px solid var(--line)">Kernel (kernel.cl)</h2>
+    <div class="kstmt" id="kStmt"></div>
+    <div class="code" id="kernelCode"></div>
+  </section>
+
+  <section class="panel on" id="pDevice">
+    <div id="diagram">
+      <canvas id="fx"></canvas>
+      <div class="box" id="hostBox">
+        <div class="boxhead">Host <span class="sub">CPU running main.c</span></div>
+        <div class="cpu" id="cpu"><span>CPU</span><span id="hostStatus" class="sub"></span></div>
+        <div class="memhead">Host memory</div>
+        <div class="arrs" id="hostMem"></div>
+      </div>
+      <div class="link off" id="link"><span>PCIe</span></div>
+      <div id="ctxBox"><span class="ctxlab">context</span>
+        <div class="box undiscovered" id="devBox">
+          <div class="boxhead">OpenCL device <span class="sub" id="devSub"></span></div>
+          <div class="row"><span class="lab">Objects</span><div class="chips" id="objs"></div></div>
+          <div class="row"><span class="lab">Queue</span><div class="chips" id="queue"></div></div>
+          <div class="memhead">Global memory</div>
+          <div class="arrs" id="globalMem"></div>
+          <div class="row"><span class="lab">Scheduler</span><div class="chips" id="sched"></div></div>
+          <div id="cus"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="rightCol">
+    <section class="panel" id="pNd">
+      <h2>NDRange</h2>
+      <div class="pad">
+        <div id="ndInfo"></div>
+        <canvas id="ndCanvas"></canvas>
+        <div class="legend" id="ndLegend"></div>
+      </div>
+    </section>
+    <section class="panel" id="pInsp">
+      <h2>Work-item</h2>
+      <div class="pad" id="insp"></div>
+      <h2>Traffic so far</h2>
+      <div class="pad" id="counters"></div>
+    </section>
+  </div>
+</main>
+<div id="tip"></div>
+
+<script src="opencl_engine.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const DPR = () => window.devicePixelRatio || 1;
+// Canvas sizes follow the root font size, which grows with the viewport for projectors.
+const SC = () => parseFloat(getComputedStyle(document.documentElement).fontSize) / 13;
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LATENCY = { host: 0.6, alu: 0.7, ctrl: 0.9, local: 1.0, global: 1.9, pcie: 2.4 };
+const COST_BADGE = { host: 'host', alu: 'private', ctrl: 'control', local: 'local mem', global: 'global mem', pcie: 'PCIe transfer' };
+const BASE_MS = 650;
+
+const app = {
+  cfg: OCL.defaultConfig('vec_add', 4, 4),
+  trace: null, k: 0, state: null, playing: false, anim: null, sel: -1, tab: 'pDevice',
+  views: { host: {}, global: {}, local: [] },
+};
+
+/* ---------- colours ---------- */
+let C = {};
+function readColours() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['bg', 'panel', 'panel2', 'ink', 'dim', 'line', 'cell', 'cellInk', 'read', 'write', 'pcie', 'local', 'ctrl', 'global', 'accent', 'wgL'])
+    C[k] = cs.getPropertyValue('--' + k).trim();
+}
+function wgHue(g) { return (g * 137.508 + 200) % 360; }
+function wgColour(g, a = 1) { return `hsla(${wgHue(g)}, 62%, ${C.wgL}, ${a})`; }
+const KIND_COL = () => ({ pcie: C.pcie, global: C.global, local: C.local, ctrl: C.ctrl });
+
+/* ---------- config controls ---------- */
+function fillSelect(sel, opts, value) {
+  sel.innerHTML = '';
+  for (const o of opts) { const e = document.createElement('option'); e.value = o.key; e.textContent = o.label; sel.appendChild(e); }
+  sel.value = value;
+}
+function syncConfigUI() {
+  const cfg = app.cfg;
+  fillSelect($('selKernel'), Object.values(OCL.KERNELS).map(k => ({ key: k.id, label: k.title })), cfg.kernel);
+  const gopts = OCL.globalOptions(cfg.kernel);
+  fillSelect($('selGlobal'), gopts, gopts.find(o => o.gsz[0] === cfg.gsz[0] && o.gsz[1] === cfg.gsz[1]).key);
+  const lopts = OCL.localOptions(cfg.kernel, cfg.gsz);
+  fillSelect($('selLocal'), lopts, lopts.find(o => o.lsz[0] === cfg.lsz[0] && o.lsz[1] === cfg.lsz[1]).key);
+  fillSelect($('selCU'), [1, 2, 3, 4, 6, 8].map(v => ({ key: String(v), label: String(v) })), String(cfg.cus));
+  fillSelect($('selPE'), [1, 2, 4, 8, 16].map(v => ({ key: String(v), label: String(v) })), String(cfg.pes));
+}
+function nearestLocal(kid, gsz, want) {
+  const opts = OCL.localOptions(kid, gsz);
+  const exact = opts.find(o => o.lsz[0] === want[0] && o.lsz[1] === want[1]);
+  if (exact) return exact.lsz;
+  const size = want[0] * want[1];
+  return opts.reduce((best, o) => Math.abs(Math.log2(o.lsz[0] * o.lsz[1] / size)) < Math.abs(Math.log2(best.lsz[0] * best.lsz[1] / size)) ? o : best).lsz;
+}
+function onConfigChange(e) {
+  const cfg = app.cfg;
+  const id = e.target.id;
+  if (id === 'selKernel') {
+    const d = OCL.defaultConfig(e.target.value, cfg.cus, cfg.pes);
+    Object.assign(cfg, d);
+  } else if (id === 'selGlobal') {
+    cfg.gsz = OCL.globalOptions(cfg.kernel).find(o => o.key === e.target.value).gsz;
+    cfg.lsz = nearestLocal(cfg.kernel, cfg.gsz, cfg.lsz);
+  } else if (id === 'selLocal') {
+    cfg.lsz = OCL.localOptions(cfg.kernel, cfg.gsz).find(o => o.key === e.target.value).lsz;
+  } else if (id === 'selCU') cfg.cus = +e.target.value;
+  else if (id === 'selPE') cfg.pes = +e.target.value;
+  rebuild();
+}
+
+/* ---------- build / layout ---------- */
+function rebuild() {
+  stop();
+  app.trace = OCL.build(app.cfg);
+  app.k = 0;
+  app.sel = -1;
+  syncConfigUI();
+  buildCode();
+  buildDiagram();
+  buildPhases();
+  $('scrub').max = app.trace.steps.length - 1;
+  go(0);
+}
+
+function highlightC(text) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const re = /(\/\/.*$)|("(?:[^"\\]|\\.)*")|(#\w+)|\b(__kernel|__global|__local|const|void|int|float|uchar|unsigned|char|size_t|cl_\w+|for|if|return|sizeof)\b|\b(\d+)\b|\b(cl[A-Z]\w+|get_\w+|barrier|malloc|free|make_test_image)\b/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index));
+    const cls = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'k' : m[4] ? (/^(cl_|size_t|int|float|uchar|unsigned|char|void)/.test(m[4]) ? 't' : 'k') : m[5] ? 'n' : 'f';
+    out += `<span class="tk-${cls}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+function renderCode(el, lines) {
+  el.innerHTML = lines.map((l, i) => `<div class="ln"><span class="no">${i + 1}</span><span>${highlightC(l.text) || ' '}</span></div>`).join('');
+}
+function buildCode() {
+  renderCode($('hostCode'), app.trace.hostLines);
+  renderCode($('kernelCode'), app.trace.kernelLines);
+}
+
+function buildPhases() {
+  const box = $('phases');
+  box.innerHTML = '';
+  OCL.PHASES.forEach((name, i) => {
+    if (i === 0) return;
+    const b = document.createElement('button');
+    b.textContent = i; b.title = `${i}. ${name}`; b.dataset.phase = i;
+    b.onclick = () => { stop(); const k = app.trace.steps.findIndex(s => s.phase === i); if (k >= 0) go(k); };
+    box.appendChild(b);
+  });
+}
+
+function arrayLayout(n, pixelW) {
+  if (pixelW) return { cols: pixelW, cellMax: pixelW <= 16 ? 10 : 6 };
+  if (n === 1) return { cols: 1, cellMax: 40 };
+  return { cols: n <= 16 ? n : n <= 128 ? 16 : 32, cellMax: 26 };
+}
+function makeArrView(parent, name, sub, n, opts) {
+  const d = document.createElement('div');
+  d.className = 'arr' + (opts.pixel ? ' img' : '') + (n === 1 ? ' scalar' : '');
+  d.innerHTML = `<div class="arrlab"><span class="mono">${name}</span><span class="sub">${sub}</span></div><canvas></canvas>`;
+  parent.appendChild(d);
+  const v = { el: d, cv: d.querySelector('canvas'), n, name, ...arrayLayout(n, opts.pixel ? opts.pixelW : 0), pixel: !!opts.pixel, wgOf: opts.wgOf, geo: null };
+  attachArrTip(v, opts.tipName || name);
+  return v;
+}
+function buildDiagram() {
+  const t = app.trace, geo = t.geo, K = t.kernel;
+  const pix = K.pixel ? geo.gsz[0] : 0;
+  const wgOfFlat = i => t.workItemOf(i).g;
+  $('devSub').textContent = `${geo.C} compute unit${geo.C > 1 ? 's' : ''} × ${geo.P} PE${geo.P > 1 ? 's' : ''} · max work-group size ${OCL.DEVICE_MAX_WG}`;
+  const hm = $('hostMem'); hm.innerHTML = '';
+  app.views.host = {};
+  for (const a of t.hostArrays) {
+    const perGroup = t.buffers.some(b => b.host === a.name && b.perGroup);
+    const sub = `${K.elem}[${a.n}]`;
+    app.views.host[a.name] = makeArrView(hm, a.name, sub, a.n, {
+      pixel: K.pixel && a.n === geo.N, pixelW: pix, wgOf: a.name === 'sum' ? null : perGroup ? (i => i) : wgOfFlat, tipName: a.name });
+  }
+  const gm = $('globalMem'); gm.innerHTML = '';
+  app.views.global = {};
+  for (const b of t.buffers) {
+    app.views.global[b.name] = makeArrView(gm, b.name, `${K.elem}[${b.n}]`, b.n, {
+      pixel: K.pixel, pixelW: pix, wgOf: b.perGroup ? (i => i) : wgOfFlat, tipName: b.name });
+  }
+  const cus = $('cus'); cus.innerHTML = '';
+  app.views.local = []; app.views.pe = []; app.views.cu = [];
+  const pecols = geo.P <= 4 ? geo.P : geo.P <= 8 ? 4 : 4;
+  for (let c = 0; c < geo.C; c++) {
+    const d = document.createElement('div');
+    d.className = 'cu';
+    d.innerHTML = `<div class="cuhead"><span>CU ${c}</span><span class="sub cuwg"></span></div>` +
+      (K.usesLocal ? `<div class="lmem arr"><div class="arrlab"><span>local memory</span><span class="sub">scratch</span></div><canvas></canvas></div>` : '') +
+      `<div class="pes" style="--pecols:${pecols}"></div>`;
+    cus.appendChild(d);
+    app.views.cu[c] = d;
+    if (K.usesLocal) {
+      const v = { el: d.querySelector('.lmem'), cv: d.querySelector('.lmem canvas'), n: geo.L, name: 'scratch', ...arrayLayout(geo.L, 0), wgOf: null, cu: c };
+      v.cols = Math.min(geo.L, 16); v.cellMax = 22;
+      attachArrTip(v, `CU${c} scratch`);
+      app.views.local[c] = v;
+    }
+    const pes = d.querySelector('.pes');
+    app.views.pe[c] = [];
+    for (let p = 0; p < geo.P; p++) {
+      const e = document.createElement('div');
+      e.className = 'pe';
+      e.title = `PE ${p} of CU ${c}: shows the global id of the work-item it is running and what that work-item just did. Its private memory holds that work-item's variables.`;
+      e.innerHTML = `<div class="pn">PE${p}</div><div class="pv"></div><div class="pv pnote"></div>`;
+      e.onclick = () => { const wi = +e.dataset.wi; if (e.dataset.wi !== undefined && wi >= 0) select(wi); };
+      pes.appendChild(e);
+      app.views.pe[c][p] = e;
+    }
+  }
+  const leg = $('ndLegend');
+  leg.innerHTML = [
+    ['pending', wgColour(3, .28)], ['on a CU, waiting for its wave', wgColour(3, .62)], ['executing', wgColour(3, 1), C.ink],
+    ['masked off', null, null, true], ['at barrier', wgColour(3, .62), C.ctrl], ['done', wgColour(3, .9)],
+  ].filter(x => K.usesLocal || !/barrier|masked/.test(x[0]))
+    .map(([l, bg, bd, hatch]) => `<span><i style="background:${hatch ? `repeating-linear-gradient(135deg, ${C.panel2} 0 3px, ${C.dim} 3px 4px)` : bg};${bd ? `border:2px solid ${bd}` : ''}"></i>${l}</span>`).join('');
+}
+
+/* ---------- navigation ---------- */
+function go(k, animate) {
+  const t = app.trace;
+  k = Math.max(0, Math.min(t.steps.length - 1, k));
+  const prevState = animate && k === app.k + 1 ? app.state : null;
+  app.k = k;
+  app.state = t.stateAt(k);
+  if (prevState && !REDUCED) {
+    renderAll(prevState, t.steps[k], true);
+    runAnim(t.steps[k], () => renderAll(app.state, t.steps[k]));
+  } else {
+    cancelAnim();
+    renderAll(app.state, t.steps[k]);
+  }
+}
+function stepDuration(step) { return BASE_MS * (LATENCY[step.cost] || 1) / +$('selSpeed').value; }
+function play() {
+  if (app.k >= app.trace.steps.length - 1) go(0);
+  app.playing = true; $('bPlay').textContent = '⏸';
+  tick();
+}
+function tick() {
+  if (!app.playing) return;
+  if (app.k >= app.trace.steps.length - 1) { stop(); return; }
+  go(app.k + 1, true);
+  const d = REDUCED ? 350 / +$('selSpeed').value : stepDuration(app.trace.steps[app.k]) + 90 / +$('selSpeed').value;
+  app.timer = setTimeout(tick, d);
+}
+function stop() {
+  app.playing = false; clearTimeout(app.timer); $('bPlay').textContent = '▶';
+}
+function nextChapter() {
+  const s = app.trace.steps, ch = s[app.k].chapter;
+  let k = app.k + 1;
+  while (k < s.length - 1 && s[k].chapter === ch) k++;
+  go(k);
+}
+
+/* ---------- rendering ---------- */
+function renderAll(S, step, pre) {
+  const t = app.trace;
+  $('scrub').value = app.k;
+  $('stepNo').textContent = `${app.k + 1} / ${t.steps.length}`;
+  $('bBack').disabled = $('bReset').disabled = app.k === 0;
+  $('bStep').disabled = $('bNext').disabled = app.k === t.steps.length - 1;
+  for (const b of $('phases').children) {
+    b.classList.toggle('on', +b.dataset.phase === step.phase);
+    b.classList.toggle('seen', t.steps.slice(0, app.k + 1).some(s => s.phase === +b.dataset.phase));
+  }
+  const badge = $('narrBadge');
+  badge.textContent = COST_BADGE[step.cost]; badge.className = 'badge b-' + step.cost;
+  $('narrTitle').textContent = step.title;
+  $('narrDetail').textContent = step.detail;
+  renderCodeHL(step);
+  renderDiagram(S, step, pre);
+  renderNd(S, step);
+  renderInspector(S, step);
+}
+
+function setLineClasses(el, lines, tags, cls) {
+  let first = null;
+  [...el.children].forEach((row, i) => {
+    const hit = tags.length && lines[i].tags.some(tg => tags.includes(tg));
+    row.className = 'ln' + (hit ? ' ' + cls : '');
+    if (hit && first === null) first = row;
+  });
+  if (first) {
+    const top = first.offsetTop - el.offsetTop, h = el.clientHeight;
+    if (top < el.scrollTop + 8 || top > el.scrollTop + h - 40) el.scrollTop = Math.max(0, top - h / 3);
+  }
+}
+function renderCodeHL(step) {
+  const t = app.trace;
+  setLineClasses($('hostCode'), t.hostLines, step.host, step.hostMode === 'blocked' ? 'blocked' : 'cur');
+  setLineClasses($('kernelCode'), t.kernelLines, step.kern, 'cur');
+  $('kStmt').textContent = step.stmt ? (step.wave !== undefined && t.geo.waves > 1 ? `wave ${step.wave + 1}: ` : '') + step.stmt.label : '';
+}
+
+function hl(step) {
+  const r = { g: {}, h: {}, l: {} }, w = { g: {}, h: {}, l: {} };
+  const put = (m, a) => { const key = a.sp === 'g' ? a.buf : a.sp === 'h' ? a.arr : a.cu; (m[a.sp][key] = m[a.sp][key] || new Set()).add(a.idx); };
+  for (const a of step.reads) put(r, a);
+  for (const a of step.writes) put(w, a);
+  return { r, w };
+}
+
+function renderDiagram(S, step, pre) {
+  const t = app.trace, geo = t.geo, o = S.obj;
+  const H = hl(step);
+  $('cpu').classList.toggle('blocked', S.hostBlocked);
+  $('hostStatus').textContent = S.hostBlocked ? S.hostStatus : o.released ? 'finished with the device' : 'running';
+  $('devBox').classList.toggle('undiscovered', !o.device);
+  $('ctxBox').classList.toggle('on', !!o.context);
+  $('link').classList.toggle('off', !o.device);
+  // objects
+  const chips = [];
+  if (o.platform) chips.push('platform');
+  if (o.program) chips.push(o.program === 2 ? 'program (built)' : 'program (source)');
+  if (o.kernel) chips.push('kernel ' + t.kernelLines[0].text.match(/void (\w+)/)[1] + (S.args.length ? `(${S.args.filter(Boolean).join(', ')})` : ''));
+  if (o.released) chips.push('all released');
+  $('objs').innerHTML = chips.length ? chips.map(c => `<span class="chip">${c}</span>`).join('') : '<span class="none">none yet</span>';
+  $('queue').innerHTML = !o.queue ? `<span class="none">${o.released ? 'released' : 'not created'}</span>`
+    : S.q.length ? S.q.map(e => `<span class="chip ${e.state === 'running' ? 'run' : ''}">${e.label}${e.state === 'running' ? ' · running' : ''}</span>`).join('')
+    : '<span class="none">empty</span>';
+  // scheduler
+  const sched = $('sched');
+  if (o.nd < 2 || !o.queue) sched.innerHTML = `<span class="none">${o.released ? 'released' : 'no kernel launched'}</span>`;
+  else {
+    const pend = [];
+    for (let g = 0; g < geo.G; g++) if (S.wg[g] === OCL.WG.PENDING) pend.push(g);
+    const running = S.q[0] && S.q[0].label.startsWith('NDRange') && S.q[0].state === 'running';
+    const MAX = 48;
+    sched.innerHTML = !pend.length ? `<span class="none">${S.cnt.wgDone === geo.G ? `all ${geo.G} work-groups done` : 'no work-groups waiting'}</span>`
+      : (running ? '' : '<span class="none">queued: </span>') + pend.slice(0, MAX).map(g => `<span class="chip" data-g="${g}" style="background:${wgColour(g, .35)}">WG${g}</span>`).join('') +
+        (pend.length > MAX ? `<span class="none">+${pend.length - MAX}</span>` : '');
+  }
+  // memories: every visible host/global array of the same shape uses one cell size
+  for (const b of t.buffers) app.views.global[b.name].el.classList.toggle('hidden', !S.global[b.name]);
+  const shared = [...Object.values(app.views.host), ...t.buffers.filter(b => S.global[b.name]).map(b => app.views.global[b.name])]
+    .filter(v => v.n > 1 && !v.pixel && v.cols === 16);
+  const common = shared.length ? Math.min(...shared.map(fitCell)) : 0;
+  const cellFor = v => shared.includes(v) ? common : 0;
+  for (const a of t.hostArrays) {
+    const v = app.views.host[a.name];
+    const m = S.host[a.name];
+    v.el.style.opacity = m ? 1 : 0.35;
+    drawArray(v, m, H.r.h[a.name], H.w.h[a.name], S, cellFor(v));
+  }
+  for (const b of t.buffers) if (S.global[b.name]) drawArray(app.views.global[b.name], S.global[b.name], H.r.g[b.name], H.w.g[b.name], S, cellFor(app.views.global[b.name]));
+  if (!t.buffers.some(b => S.global[b.name])) {
+    if (!$('gmNone')) $('globalMem').insertAdjacentHTML('beforeend', '<span class="none" id="gmNone">no buffers</span>');
+  } else if ($('gmNone')) $('gmNone').remove();
+  // compute units
+  const lanesBy = {};
+  if (step.lanes) for (const l of step.lanes) lanesBy[l.cu + ':' + l.pe] = l;
+  for (let c = 0; c < geo.C; c++) {
+    const g = S.cuWG[c];
+    const cu = app.views.cu[c];
+    cu.classList.toggle('busy', g >= 0);
+    cu.style.setProperty('--cuc', g >= 0 ? wgColour(g) : '');
+    cu.querySelector('.cuwg').textContent = g >= 0 ? `WG ${g}` : 'idle';
+    const lv = app.views.local[c];
+    if (lv) {
+      lv.el.classList.toggle('hidden', !S.local[c]);
+      if (S.local[c]) drawArray(lv, S.local[c], H.r.l[c], H.w.l[c], S);
+    }
+    for (let p = 0; p < geo.P; p++) {
+      const e = app.views.pe[c][p], l = lanesBy[c + ':' + p];
+      const bar = l && l.note === 'barrier';
+      e.className = 'pe' + (l ? (bar ? ' bar' : l.active ? ' act' : ' masked') : '');
+      e.style.setProperty('--pec', l ? wgColour(g >= 0 ? g : 0) : '');
+      e.dataset.wi = l ? l.wi : -1;
+      const wi = l ? t.workItemOf(l.wi) : null;
+      e.querySelector('.pv').textContent = !l ? '' : geo.dims === 1 ? wi.gid[0] : wi.gid.join(',');
+      e.querySelector('.pnote').textContent = !l ? '' : bar ? 'barrier' : !l.active ? 'off' : pre ? '' : l.note;
+    }
+  }
+  sizeFx();
+}
+
+/* ---------- canvas arrays ---------- */
+function fitCell(v) { return Math.max(3, Math.min(Math.round(v.cellMax * SC()), Math.floor(Math.max(40, v.el.clientWidth) / v.cols))); }
+function drawArray(v, m, reads, writes, S, cellOverride) {
+  const cv = v.cv, dpr = DPR();
+  const cols = v.cols, rows = Math.ceil(v.n / cols);
+  const cell = cellOverride || fitCell(v);
+  v.cell = cell;
+  const w = cols * cell, h = rows * cell;
+  if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  const x = cv.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.clearRect(0, 0, w, h);
+  const showWG = v.wgOf && S.obj.nd >= 2;
+  const gap = cell >= 8 ? 1 : 0;
+  const text = !v.pixel && cell >= 15;
+  x.font = `${Math.min(Math.round(11 * SC()), Math.floor(cell * 0.6))}px ui-monospace, Menlo, Consolas, monospace`;
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (let i = 0; i < v.n; i++) {
+    const cx = (i % cols) * cell, cy = Math.floor(i / cols) * cell;
+    const init = m && m.init[i];
+    if (v.pixel) {
+      if (init) { const g = m.data[i]; x.fillStyle = `rgb(${g},${g},${g})`; }
+      else x.fillStyle = C.cell;
+      x.fillRect(cx, cy, cell, cell);
+      if (!init && cell >= 5) { x.fillStyle = C.dim; x.fillRect(cx + cell / 2 - .5, cy + cell / 2 - .5, 1, 1); }
+    } else {
+      x.fillStyle = C.cell;
+      x.fillRect(cx, cy, cell - gap, cell - gap);
+      if (showWG) { x.fillStyle = wgColour(v.wgOf(i), .9); x.fillRect(cx, cy + cell - gap - Math.max(2, cell / 7), cell - gap, Math.max(2, cell / 7)); }
+      if (init && text) { x.fillStyle = C.cellInk; x.fillText(OCL.fmt(m.data[i]), cx + (cell - gap) / 2, cy + (cell - gap) / 2 - (showWG ? 1 : 0)); }
+      else if (init) { x.fillStyle = C.dim; x.globalAlpha = .55; x.fillRect(cx + 1, cy + 1, cell - gap - 2, Math.max(1, cell - gap - 2 - (showWG ? Math.max(2, cell / 7) : 0))); x.globalAlpha = 1; }
+    }
+  }
+  if (v.pixel && showWG) {
+    const geo = app.trace.geo;
+    x.strokeStyle = C.accent; x.globalAlpha = .55; x.lineWidth = 1;
+    for (let gx = 1; gx < geo.ng[0]; gx++) { const px = gx * geo.lsz[0] * cell + .5; x.beginPath(); x.moveTo(px, 0); x.lineTo(px, h); x.stroke(); }
+    for (let gy = 1; gy < geo.ng[1]; gy++) { const py = gy * geo.lsz[1] * cell + .5; x.beginPath(); x.moveTo(0, py); x.lineTo(w, py); x.stroke(); }
+    x.globalAlpha = 1;
+  }
+  const mark = (set, col, lw) => {
+    if (!set) return;
+    x.strokeStyle = col; x.lineWidth = lw;
+    for (const i of set) {
+      const cx = (i % cols) * cell, cy = Math.floor(i / cols) * cell;
+      x.strokeRect(cx + lw / 2, cy + lw / 2, cell - gap - lw, cell - gap - lw);
+    }
+  };
+  const lw = cell >= 10 ? 2 : 1;
+  mark(reads, C.read, lw);
+  mark(writes, C.write, lw);
+}
+function cellCentre(v, i) {
+  const r = v.cv.getBoundingClientRect(), cell = v.cell || 8;
+  return { x: r.left + (i % v.cols) * cell + cell / 2, y: r.top + Math.floor(i / v.cols) * cell + cell / 2 };
+}
+function attachArrTip(v, label) {
+  v.cv.addEventListener('mousemove', e => {
+    const r = v.cv.getBoundingClientRect(), cell = v.cell || 8;
+    const i = Math.floor((e.clientY - r.top) / cell) * v.cols + Math.floor((e.clientX - r.left) / cell);
+    if (i < 0 || i >= v.n) return hideTip();
+    const m = v.cu !== undefined ? app.state.local[v.cu] : app.state.host[v.name] && app.views.host[v.name] === v ? app.state.host[v.name] : app.state.global[v.name];
+    const val = m && m.init[i] ? OCL.fmt(m.data[i]) : 'undefined';
+    const idx = v.pixel ? `[${i}] (x ${i % v.cols}, y ${Math.floor(i / v.cols)})` : `[${i}]`;
+    const wg = v.wgOf && app.state.obj.nd >= 2 ? ` · WG ${v.wgOf(i)}` : '';
+    showTip(e, `${label}${idx} = ${val}${wg}`);
+  });
+  v.cv.addEventListener('mouseleave', hideTip);
+}
+function showTip(e, s) { const t = $('tip'); t.textContent = s; t.style.display = 'block'; t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px'; }
+function hideTip() { $('tip').style.display = 'none'; }
+
+/* ---------- NDRange ---------- */
+function ndLayout() {
+  const geo = app.trace.geo;
+  const cols = geo.dims === 2 ? geo.gsz[0] : geo.N <= 16 ? geo.N : geo.N <= 128 ? 16 : 32;
+  return { cols, rows: Math.ceil(geo.N / cols) };
+}
+function renderNd(S, step) {
+  const t = app.trace, geo = t.geo, cv = $('ndCanvas'), dpr = DPR();
+  const info = $('ndInfo');
+  if (S.obj.nd === 0) {
+    info.textContent = 'Not configured yet: the host sets the global and local sizes in step 10.';
+    cv.style.display = 'none';
+    return;
+  }
+  cv.style.display = 'block';
+  const gtxt = geo.dims === 1 ? geo.N : `${geo.gsz[0]} × ${geo.gsz[1]}`;
+  info.textContent = S.obj.nd === 1
+    ? `${gtxt} work-items (global size). Not yet grouped.`
+    : `global ${gtxt} · local ${geo.dims === 1 ? geo.L : geo.lsz.join(' × ')} · ${geo.G} work-groups · ${geo.waves} wave${geo.waves > 1 ? 's' : ''} per group on ${geo.P} PE${geo.P > 1 ? 's' : ''}`;
+  const { cols, rows } = ndLayout();
+  const pcs = getComputedStyle(cv.parentElement);
+  const W = Math.max(60, cv.parentElement.clientWidth - parseFloat(pcs.paddingLeft) - parseFloat(pcs.paddingRight));
+  const cell = Math.max(4, Math.min(Math.round((geo.dims === 2 ? 16 : 24) * SC()), Math.floor(W / cols)));
+  const w = cols * cell, h = rows * cell;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  const x = cv.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.clearRect(0, 0, w, h);
+  const exec = new Map();
+  if (step.lanes) for (const l of step.lanes) exec.set(l.wi, l);
+  const gap = cell >= 8 ? 1 : 0;
+  for (let i = 0; i < geo.N; i++) {
+    const cx = (i % cols) * cell, cy = Math.floor(i / cols) * cell;
+    const wi = t.workItemOf(i), st = S.wi[i], l = exec.get(i);
+    if (S.obj.nd === 1) x.fillStyle = C.cell;
+    else if (l && !l.active) x.fillStyle = C.panel2;
+    else x.fillStyle = wgColour(wi.g, l ? 1 : st === OCL.WI.PENDING ? .28 : st === OCL.WI.DONE ? .9 : .62);
+    x.fillRect(cx, cy, cell - gap, cell - gap);
+    if (l && !l.active) {
+      x.strokeStyle = C.dim; x.lineWidth = 1; x.beginPath(); x.moveTo(cx + 1, cy + cell - gap - 1); x.lineTo(cx + cell - gap - 1, cy + 1); x.stroke();
+    }
+    if (st === OCL.WI.BARRIER || (l && l.note === 'barrier')) { x.strokeStyle = C.ctrl; x.lineWidth = 2; x.strokeRect(cx + 1, cy + 1, cell - gap - 2, cell - gap - 2); }
+    else if (l && l.active) { x.strokeStyle = C.ink; x.lineWidth = 2; x.strokeRect(cx + 1, cy + 1, cell - gap - 2, cell - gap - 2); }
+  }
+  if (geo.dims === 2 && S.obj.nd >= 2) {
+    x.strokeStyle = C.ink; x.globalAlpha = .5; x.lineWidth = 1;
+    for (let gx = 1; gx < geo.ng[0]; gx++) { const px = gx * geo.lsz[0] * cell - gap / 2; x.beginPath(); x.moveTo(px, 0); x.lineTo(px, h); x.stroke(); }
+    for (let gy = 1; gy < geo.ng[1]; gy++) { const py = gy * geo.lsz[1] * cell - gap / 2; x.beginPath(); x.moveTo(0, py); x.lineTo(w, py); x.stroke(); }
+    x.globalAlpha = 1;
+  }
+  if (app.sel >= 0) {
+    const cx = (app.sel % cols) * cell, cy = Math.floor(app.sel / cols) * cell;
+    x.strokeStyle = C.write; x.lineWidth = 2.5; x.strokeRect(cx - 1, cy - 1, cell - gap + 2, cell - gap + 2);
+  }
+  app.ndCell = cell; app.ndCols = cols;
+}
+function ndIndexAt(e) {
+  const cv = $('ndCanvas'), r = cv.getBoundingClientRect(), cell = app.ndCell;
+  const cx = Math.floor((e.clientX - r.left) / cell), cy = Math.floor((e.clientY - r.top) / cell);
+  const i = cy * app.ndCols + cx;
+  return cx >= 0 && cx < app.ndCols && i >= 0 && i < app.trace.geo.N ? i : -1;
+}
+function select(i) { app.sel = i; renderAll(app.state, app.trace.steps[app.k]); }
+
+/* ---------- inspector ---------- */
+function renderInspector(S, step) {
+  const t = app.trace, geo = t.geo, el = $('insp');
+  const tup = a => geo.dims === 1 ? String(a[0]) : `(${a[0]}, ${a[1]})`;
+  if (S.obj.nd < 2) {
+    el.innerHTML = '<span class="none">Work-items exist once the host has set the local size (step 10).</span>';
+  } else if (app.sel < 0) {
+    el.innerHTML = '<span class="none">Click a work-item in the NDRange, or a busy PE, to see its ids and private memory.</span>';
+  } else {
+    const w = t.workItemOf(app.sel);
+    const wgSt = S.wg[w.g];
+    const lane = step.lanes && step.lanes.find(l => l.wi === app.sel);
+    let where;
+    if (wgSt === OCL.WG.PENDING) where = 'not dispatched yet';
+    else where = `CU ${w.cu}, PE ${w.pe}, wave ${w.wave + 1}/${geo.waves}` + (wgSt === OCL.WG.DONE ? ' (done)' : lane ? (lane.active ? ' · executing now' : ' · masked off now') : '');
+    const rows = [
+      ['get_global_id', tup(w.gid)], ['get_local_id', tup(w.lid)], ['get_group_id', tup(w.grp)],
+      ['get_global_size', tup(geo.gsz)], ['get_local_size', tup(geo.lsz)], ['get_num_groups', tup(geo.ng)],
+      ['runs on', where],
+    ];
+    const V = t.varNames.length;
+    const priv = t.varNames.map((n, j) => [n, OCL.fmt(S.priv[app.sel * V + j])]);
+    el.innerHTML = `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` +
+      `<div class="sect">Private memory</div><table class="kv">${priv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+  }
+  const c = S.cnt, B = n => n >= 1024 ? (n / 1024).toFixed(n % 1024 ? 1 : 0) + ' KiB' : n + ' B';
+  const rows = [
+    ['PCIe host → device', B(c.pcieHD)], ['PCIe device → host', B(c.pcieDH)],
+    ['Global memory read', B(c.gR)], ['Global memory written', B(c.gW)],
+  ];
+  if (t.kernel.usesLocal) rows.push(['Local memory read', B(c.lR)], ['Local memory written', B(c.lW)]);
+  rows.push(['ALU operations', c.alu], ['Work-groups done', `${c.wgDone} / ${geo.G}`]);
+  let verdict = '';
+  const released = S.obj.released;
+  const expKeys = Object.keys(t.expected);
+  const complete = expKeys.every(k => S.host[k] && S.host[k].init.every(Boolean));
+  if (complete) {
+    const ok = expKeys.every(k => t.expected[k].every((v, i) => S.host[k].data[i] === v));
+    const summary = t.kernel.id === 'reduce' ? `sum = ${OCL.fmt(S.host.sum.data[0])}` : `${expKeys.join(', ')} in host memory`;
+    verdict = `<div class="sect">Result</div><div class="${ok ? 'ok' : ''}">${summary}: ${ok ? 'matches a sequential run on the host' : 'MISMATCH'}</div>`;
+  }
+  $('counters').innerHTML = `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` + verdict + (released ? '' : '');
+}
+
+/* ---------- particle animation ---------- */
+function sizeFx() {
+  const d = $('diagram'), fx = $('fx'), dpr = DPR();
+  const w = d.scrollWidth, h = d.scrollHeight;
+  if (fx.width !== w * dpr || fx.height !== h * dpr) { fx.width = w * dpr; fx.height = h * dpr; fx.style.width = w + 'px'; fx.style.height = h + 'px'; }
+}
+function endpoint(ep) {
+  const v = app.views;
+  const centre = el => { const r = el.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; };
+  switch (ep.k) {
+    case 'h': return v.host[ep.arr] ? cellCentre(v.host[ep.arr], ep.idx) : null;
+    case 'g': return v.global[ep.buf] ? cellCentre(v.global[ep.buf], ep.idx) : null;
+    case 'l': return v.local[ep.cu] ? cellCentre(v.local[ep.cu], ep.idx) : null;
+    case 'pe': return centre(v.pe[ep.cu][ep.pe]);
+    case 'cu': return centre(v.cu[ep.cu].querySelector('.cuhead'));
+    case 'cpu': return centre($('cpu'));
+    case 'queue': return centre($('queue'));
+    case 'link': return centre($('link'));
+    case 'sched': { const c = $('sched').querySelector(`[data-g="${ep.g}"]`); return c ? centre(c) : centre($('sched')); }
+  }
+  return null;
+}
+function cancelAnim() {
+  if (app.anim) { cancelAnimationFrame(app.anim.raf); const f = app.anim.done; app.anim = null; clearFx(); if (f) f(); }
+}
+function clearFx() { const fx = $('fx'); fx.getContext('2d').clearRect(0, 0, fx.width, fx.height); }
+function runAnim(step, done) {
+  cancelAnim();
+  const dur = stepDuration(step);
+  if (!step.flows.length || app.tab !== 'pDevice' && window.matchMedia('(max-width: 860px)').matches) {
+    app.anim = { raf: 0, done }; app.anim.raf = requestAnimationFrame(() => setTimeout(() => { if (app.anim) { app.anim = null; done(); } }, dur * 0.8));
+    return;
+  }
+  sizeFx();
+  const MAX = 120;
+  let flows = step.flows;
+  if (flows.length > MAX) { const s = flows.length / MAX; flows = Array.from({ length: MAX }, (_, i) => step.flows[Math.floor(i * s)]); }
+  const base = $('diagram').getBoundingClientRect();
+  const rel = p => p && { x: p.x - base.left, y: p.y - base.top };
+  const hasLegs = flows.some(f => f.leg === 1) && flows.some(f => f.leg === 0);
+  const via = rel(endpoint({ k: 'link' }));
+  const parts = flows.map((f, i) => {
+    const a = rel(endpoint(f.from)), b = rel(endpoint(f.to));
+    if (!a || !b) return null;
+    let t0 = 0, t1 = 1;
+    if (hasLegs) { if (f.leg === 0) t1 = 0.5; else t0 = 0.5; }
+    const spread = flows.length > 1 && f.kind === 'pcie' ? (i / flows.length) * 0.35 : 0;
+    return { a, b, via: f.via ? via : null, t0: t0 + spread * (t1 - t0), t1: Math.min(1, t1 - (0.35 - spread) * (t1 - t0) * (f.kind === 'pcie' && flows.length > 1 ? 1 : 0)), col: KIND_COL()[f.kind] };
+  }).filter(Boolean);
+  follow(parts);
+  const fx = $('fx'), x = fx.getContext('2d'), dpr = DPR();
+  const t0 = performance.now();
+  const at = (p, t) => {
+    if (!p.via) return { x: p.a.x + (p.b.x - p.a.x) * t, y: p.a.y + (p.b.y - p.a.y) * t };
+    const u = 1 - t;   // quadratic bezier through the link
+    return { x: u * u * p.a.x + 2 * u * t * p.via.x + t * t * p.b.x, y: u * u * p.a.y + 2 * u * t * p.via.y + t * t * p.b.y };
+  };
+  const frame = now => {
+    const T = Math.min(1, (now - t0) / (dur * 0.85));
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, fx.width, fx.height);
+    for (const p of parts) {
+      if (T < p.t0) continue;
+      const lt = Math.min(1, (T - p.t0) / Math.max(0.01, p.t1 - p.t0));
+      if (lt >= 1 && T > p.t1 + 0.08) continue;
+      const e = 1 - Math.pow(1 - lt, 2);
+      const q = at(p, e), q2 = at(p, Math.max(0, e - 0.08));
+      x.strokeStyle = p.col; x.globalAlpha = .35; x.lineWidth = 2;
+      x.beginPath(); x.moveTo(q2.x, q2.y); x.lineTo(q.x, q.y); x.stroke();
+      x.globalAlpha = 1; x.fillStyle = p.col;
+      x.beginPath(); x.arc(q.x, q.y, 3.2 * SC(), 0, Math.PI * 2); x.fill();
+    }
+    if (T < 1) app.anim.raf = requestAnimationFrame(frame);
+    else { app.anim = null; clearFx(); done(); }
+  };
+  app.anim = { raf: requestAnimationFrame(frame), done };
+}
+
+/* Keep an animated step's endpoints inside the scrolled Platform panel. When they
+   don't all fit, the destinations win: that is where the step's result lands. */
+function follow(parts) {
+  const panel = $('pDevice');
+  if (!parts.length || panel.scrollHeight <= panel.clientHeight) return;
+  const H = panel.clientHeight, top = panel.scrollTop;
+  const off = $('diagram').getBoundingClientRect().top - panel.getBoundingClientRect().top + top;
+  const span = ys => [Math.min(...ys) + off - 24, Math.max(...ys) + off + 24];
+  let [lo, hi] = span(parts.flatMap(p => [p.a.y, p.b.y]));
+  if (lo >= top && hi <= top + H) return;
+  if (hi - lo > H) [lo, hi] = span(parts.map(p => p.b.y));
+  const target = hi - lo > H ? lo : lo < top ? lo : hi - H;
+  panel.scrollTop = target;
+}
+
+/* ---------- tabs (narrow layout) ---------- */
+function setTab(id) {
+  app.tab = id;
+  for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.tab === id);
+  for (const p of document.querySelectorAll('.panel')) p.classList.toggle('on', p.id === id);
+  if (app.trace) renderAll(app.state, app.trace.steps[app.k]);
+}
+
+/* ---------- wiring ---------- */
+function init() {
+  readColours();
+  for (const id of ['selKernel', 'selGlobal', 'selLocal', 'selCU', 'selPE']) $(id).addEventListener('change', onConfigChange);
+  $('bReset').onclick = () => { stop(); go(0); };
+  $('bBack').onclick = () => { stop(); go(app.k - 1); };
+  $('bStep').onclick = () => { stop(); go(app.k + 1, true); };
+  $('bNext').onclick = () => { stop(); nextChapter(); };
+  $('bPlay').onclick = () => app.playing ? stop() : play();
+  $('scrub').oninput = e => { stop(); go(+e.target.value); };
+  $('setupBtn').onclick = () => document.body.classList.toggle('setup');
+  $('tabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); };
+  const nd = $('ndCanvas');
+  nd.addEventListener('click', e => { const i = ndIndexAt(e); if (i >= 0) { select(i); } });
+  nd.addEventListener('mousemove', e => {
+    const i = ndIndexAt(e); if (i < 0) return hideTip();
+    const w = app.trace.workItemOf(i), d = app.trace.geo.dims;
+    const tup = a => d === 1 ? a[0] : `(${a[0]},${a[1]})`;
+    showTip(e, `global ${tup(w.gid)} · local ${tup(w.lid)} · group ${tup(w.grp)}`);
+  });
+  nd.addEventListener('mouseleave', hideTip);
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+    if (e.key === ' ') { e.preventDefault(); app.playing ? stop() : play(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stop(); e.shiftKey ? nextChapter() : go(app.k + 1, true); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); stop(); go(app.k - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); stop(); go(0); }
+  });
+  let rz;
+  new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if (app.trace) renderAll(app.state, app.trace.steps[app.k]); }, 60); }).observe(document.querySelector('main'));
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColours(); buildDiagram(); renderAll(app.state, app.trace.steps[app.k]); });
+  rebuild();
+}
+init();
+</script>
+</body>
+</html>

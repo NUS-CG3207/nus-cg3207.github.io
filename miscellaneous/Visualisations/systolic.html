@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Systolic Array</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --panel2: #eef0f4; --ink: #1d2230; --dim: #667085; --line: #d4d8e0;
+  --av: #2f6fdf; --bv: #d9661a; --good: #1f9d6b; --accent: #2f6fdf; --onfill: #fff; --actbg: #e3edff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+    --av: #6b9dff; --bv: #f09040; --good: #3fcf95; --accent: #6b9dff; --onfill: #0d1117; --actbg: #243a66;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+  --av: #6b9dff; --bv: #f09040; --good: #3fcf95; --accent: #6b9dff; --onfill: #0d1117; --actbg: #243a66;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { font-size: clamp(13px, 1.1vw, 30px); }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 1rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+button, select, input { font: inherit; color: inherit; }
+select, button { background: var(--panel); border: 1px solid var(--line); border-radius: 0.462rem; padding: 0.231rem 0.538rem; min-height: 2.154rem; }
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.462rem 0.769rem; display: flex; flex-direction: column; gap: 0.462rem; flex: 0 0 auto; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.462rem 1.077rem; align-items: center; }
+.grp { display: flex; align-items: center; gap: 0.385rem; white-space: nowrap; flex: 0 0 auto; }
+.grp label { color: var(--dim); }
+h1 { font-size: 1.154rem; margin: 0; font-weight: 650; }
+#setupBtn { display: none; }
+#scrub { flex: 1 1 12.308rem; min-width: 9.231rem; accent-color: var(--accent); }
+.grow { display: flex; align-items: center; gap: 0.615rem; flex: 1 1 15.385rem; min-width: 12.308rem; }
+#stepNo { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 6rem; text-align: right; }
+#narr { display: flex; gap: 0.615rem; align-items: baseline; min-height: 2.6rem; background: var(--panel2); border-left: 0.3rem solid var(--accent); border-radius: 0.4rem; padding: 0.35rem 0.7rem; font-size: 1.1rem; }
+#narrTitle { font-weight: 650; flex: 0 0 auto; }
+#narrDetail { color: var(--dim); }
+
+main { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0.615rem; display: flex; flex-direction: column; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 38rem); gap: 0.615rem; align-items: stretch; flex: 1 1 0; min-height: 26rem; }
+.two > div { display: flex; flex-direction: column; min-width: 0; }
+.arrcard { display: flex; flex-direction: column; margin-bottom: 0; min-height: 24rem; flex: 1 1 auto; }
+.sysbox { flex: 1 1 0; min-height: 18rem; container-type: size; display: flex; align-items: center; justify-content: center; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 0.615rem; padding: 0.615rem 0.769rem; margin-bottom: 0.615rem; }
+.sect { margin: 0 0 0.308rem; font-size: 0.846rem; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.ok { color: var(--good); font-weight: 600; }
+.sub { color: var(--dim); }
+table.kv { border-collapse: collapse; width: 100%; font-size: 1rem; }
+table.kv td { padding: 2px 0.308rem; border-bottom: 1px solid var(--line); }
+table.kv td:first-child { color: var(--dim); }
+table.kv td:last-child { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.308rem 0.923rem; font-size: 0.846rem; color: var(--dim); margin-top: 0.615rem; }
+.legend i { display: inline-block; width: 0.846rem; height: 0.846rem; border-radius: 2px; vertical-align: -1px; margin-right: 0.231rem; border: 1px solid var(--line); }
+
+/* array */
+.sys { --qw: 7rem; --qh: 6.6rem; --pe: min(calc((100cqw - var(--qw) - 1.5rem) / var(--n)), calc((100cqh - var(--qh) - 1.5rem) / var(--n)), 14rem); display: grid; gap: 0.3rem; align-items: stretch; grid-template-columns: var(--qw) repeat(var(--n), var(--pe)); grid-template-rows: var(--qh) repeat(var(--n), var(--pe)); }
+.q { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(0.7rem, calc(var(--pe) * 0.17), 1.7rem); color: var(--dim); display: flex; gap: 0.308rem; align-items: center; justify-content: flex-end; }
+.q.col { flex-direction: column; justify-content: flex-end; gap: 1px; }
+.q.row { flex-wrap: nowrap; padding-right: 2px; }
+.q .z { opacity: .45; }
+.q.a .v { color: var(--av); font-weight: 600; }
+.q.b .v { color: var(--bv); font-weight: 600; }
+.q.w .v { color: var(--ink); font-weight: 600; }
+.pe { border: 1.5px solid var(--line); border-radius: 0.538rem; padding: calc(var(--pe) * 0.04) calc(var(--pe) * 0.07); min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; background: var(--panel); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(0.72rem, calc(var(--pe) * 0.15), 1.6rem); line-height: 1.25; min-width: 0; }
+.pe.act { border-color: var(--accent); background: var(--actbg); }
+.pe span { display: flex; justify-content: space-between; gap: 0.308rem; }
+.pe .lab { color: var(--dim); }
+.pe .a { color: var(--av); font-weight: 600; }
+.pe .b { color: var(--bv); font-weight: 600; }
+.pe .acc { font-weight: 700; }
+.pe .acc.final { color: var(--good); }
+.pe .w { font-weight: 700; }
+.corner { font-size: 0.769rem; color: var(--dim); text-align: right; align-self: end; }
+.mats { display: flex; flex-wrap: wrap; gap: 0.769rem 1.231rem; }
+.mats .m { overflow-x: auto; max-width: 100%; }
+table.mx { border-collapse: separate; border-spacing: 2px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; }
+table.mx td { min-width: 1.692rem; text-align: center; padding: 1px 0.231rem; background: var(--panel2); border-radius: 0.231rem; }
+table.mx.compact { font-size: 0.82rem; border-spacing: 1px; }
+table.mx.compact td { padding: 0 0.15rem; min-width: 1.4rem; }
+table.mx td.part { color: var(--dim); opacity: .6; }
+table.mx td.fin { background: var(--good); color: var(--onfill); }
+table.mx td.empty { background: transparent; border: 1px dashed var(--line); color: transparent; }
+
+@media (max-width: 860px) {
+  header { padding: 0.462rem 0.615rem; gap: 0.385rem; }
+  header > .bar:first-child { gap: 0.462rem 0.769rem; }
+  header > .bar:first-child > .grp:last-child { margin-left: auto; }
+  #setupBtn { display: inline-block; }
+  #config { display: none; }
+  body.setup #config { display: flex; }
+  #scrub { min-width: 5.385rem; flex-basis: 5.385rem; }
+  #stepNo { min-width: 4.308rem; }
+  .grow { min-width: 0; flex: 1 1 0; gap: 0.308rem; }
+  #transport { gap: 0.462rem 0.615rem; flex-wrap: nowrap; }
+  #transport .grp label { display: none; }
+  #transport .grp:first-child button { padding: 0.231rem 0.385rem; min-width: 2.308rem; }
+  #narr { min-height: 0; flex-wrap: wrap; row-gap: 0; }
+  #narrDetail { font-size: 0.923rem; }
+  main { padding: 0.462rem; }
+  .two { grid-template-columns: 1fr; }
+  .two { flex: none; }
+  .sysbox { flex: none; height: min(112vw, 30rem); min-height: 0; }
+  .sys { --qw: 4.6rem; --qh: 4.4rem; }
+  .arrcard { min-height: 0; }
+  #narr { font-size: 1rem; padding: 0.25rem 0.5rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="grp"><h1>Systolic array</h1></div>
+    <div class="grp"><button id="setupBtn" title="Show or hide the settings">Setup</button></div>
+    <div class="bar" id="config">
+      <div class="grp"><label for="selMode">Dataflow</label><select id="selMode" title="Output stationary: each PE accumulates one element of C (slide 53). Weight stationary: weights stay in the PEs and partial sums flow down (the TPU)."><option value="os">Output stationary</option><option value="ws">Weight stationary (TPU)</option></select></div>
+      <div class="grp"><label for="selN">Array</label><select id="selN" title="The array has n × n processing elements"></select></div>
+      <div class="grp"><label for="selLen" id="lenLab">Inner dimension K</label><select id="selLen"></select></div>
+      <div class="grp"><button id="bShuf" title="New random matrices">Reshuffle</button></div>
+    </div>
+  </div>
+  <div class="bar" id="transport">
+    <div class="grp">
+      <button id="bReset" title="Back to the start (Home)">⏮</button>
+      <button id="bBack" title="Previous cycle (←)">◀</button>
+      <button id="bPlay" title="Play / pause (Space)" style="min-width:44px">▶</button>
+      <button id="bStep" title="Next cycle (→)">▶|</button>
+    </div>
+    <div class="grow"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Cycle"><span id="stepNo"></span></div>
+    <div class="grp"><label for="selSpeed">Speed</label><select id="selSpeed">
+      <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option>
+    </select></div>
+  </div>
+  <div id="narr"><span id="narrTitle"></span><span id="narrDetail"></span></div>
+</header>
+<main id="main"></main>
+
+<script src="systolic_engine.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const pct = v => Math.round(v * 100) + '%';
+const range = n => Array.from({ length: n }, (_, i) => i);
+const MAXQ = 5;
+
+const app = { k: 0, model: null, seed: 1, playing: false, timer: null, speed: 1, go: k => goTo(k) };
+window.app = app;
+
+function fillSelects() {
+  $('selN').innerHTML = [2, 3, 4, 5, 6].map(v => `<option value="${v}"${v === 4 ? ' selected' : ''}>${v} × ${v}</option>`).join('');
+  $('selLen').innerHTML = [2, 3, 4, 6, 8, 12, 16].map(v => `<option value="${v}"${v === 4 ? ' selected' : ''}>${v}</option>`).join('');
+}
+
+function queue(vals, cls, vertical) {
+  const shown = vals.slice(0, MAXQ), more = vals.length > MAXQ;
+  // Nearest value sits next to the array: right of a row queue, below a column queue.
+  const items = shown.map(v => `<span class="${v === 0 ? 'z' : 'v'}">${v}</span>`);
+  if (more) items.push('<span class="z">…</span>');
+  items.reverse();
+  return `<div class="q ${vertical ? 'col' : 'row'} ${cls}">${items.join('')}</div>`;
+}
+
+function matrix(M, cellCls) {
+  return `<table class="mx${M.length > 8 || M[0].length > 8 ? ' compact' : ''}">${M.map((row, i) => `<tr>${row.map((v, j) => { const c = cellCls ? cellCls(i, j, v) : ''; return `<td class="${c}">${v === null ? '·' : v}</td>`; }).join('')}</tr>`).join('')}</table>`;
+}
+
+function view(m, k) {
+  const f = m.frames[k], n = m.n, os = m.mode === 'os';
+  const busy = f.pe.flat().filter(p => p.active).length;
+  const prev = k > 0 ? m.frames[k - 1].macs : 0;
+  // Array grid: top queues, left queues, PEs.
+  let g = `<div class="corner">${os ? '' : 'weights'}</div>`;
+  for (let j = 0; j < n; j++) g += queue(f.qT[j], os ? 'b' : 'w', true);
+  for (let i = 0; i < n; i++) {
+    g += queue(f.qL[i], 'a', false);
+    for (let j = 0; j < n; j++) {
+      const p = f.pe[i][j];
+      const num = v => (v === null || v === undefined ? '·' : v);
+      g += `<div class="pe${p.active ? ' act' : ''}" data-i="${i}" data-j="${j}">` + (os
+        ? `<span><span class="lab">a→</span><span class="a">${num(p.a)}</span></span><span><span class="lab">b↓</span><span class="b">${num(p.b)}</span></span><span><span class="lab">Σ</span><span class="acc${p.final ? ' final' : ''}">${p.acc}</span></span>`
+        : `<span><span class="lab">w</span><span class="w">${num(p.w)}</span></span><span><span class="lab">a→</span><span class="a">${num(p.a)}</span></span><span><span class="lab">s↓</span><span class="b">${num(p.ps)}</span></span>`) + '</div>';
+    }
+  }
+  const done = k === m.cycles;
+  const right = os
+    ? m.frames[k].pe.map(r => r.map(p => p.acc))
+    : f.out || Array.from({ length: m.len }, () => Array(n).fill(null));
+  const cCls = os ? (i, j) => (f.pe[i][j].final ? 'fin' : f.pe[i][j].acc ? 'part' : '') : (i, j, v) => (v === null ? 'empty' : 'fin');
+  const tsofar = Math.max(1, k);
+  const verdict = done && JSON.stringify(m.result) === JSON.stringify(m.expected) ? ' <span class="ok">✓ C matches A·' + (os ? 'B' : 'W') + '</span>' : '';
+  const html = `<div class="two"><div>
+    <div class="card arrcard"><div class="sect">${n} × ${n} processing elements${verdict}</div>
+      <div class="sysbox"><div class="sys" style="--n:${n}">${g}</div></div>
+      <div class="legend"><span><i style="background:var(--actbg);border-color:var(--accent)"></i>PE multiplying this cycle</span>${os ? '<span><span style="color:var(--av)">a→</span> passes right</span><span><span style="color:var(--bv)">b↓</span> passes down</span><span>Σ own sum</span>' : '<span>w stays put</span><span><span style="color:var(--av)">a→</span> passes right</span><span><span style="color:var(--bv)">s↓</span> partial sum passes down</span>'}<span>zeros are skew padding</span></div></div>
+  </div><div>
+    <div class="card"><table class="kv">
+      <tr><td>Cycle</td><td>${k} / ${m.cycles}</td></tr>
+      <tr><td>Multiply-accumulates done</td><td>${f.macs} / ${m.macs}</td></tr>
+      <tr><td>PEs busy this cycle</td><td>${busy} of ${n * n}</td></tr>
+      <tr><td>PEs busy so far</td><td>${k ? pct(f.macs / (n * n * tsofar)) : '–'} <span class="sub">(final ${pct(m.util)})</span></td></tr>
+      <tr><td>One MAC per cycle would need</td><td>${m.macs} cycles (${m.speedup.toFixed(1)}× slower)</td></tr>
+      <tr><td>Operand reads from the buffer</td><td>${m.reads} <span class="sub">(${m.naiveReads} without reuse)</span></td></tr></table></div>
+    <div class="card"><div class="mats">
+      <div class="m"><div class="sect">A</div>${matrix(m.A)}</div>
+      <div class="m"><div class="sect">${os ? 'B' : 'W'}</div>${matrix(os ? m.B : m.W)}</div>
+      <div class="m"><div class="sect">C</div>${matrix(right, cCls)}</div></div></div>
+  </div></div>`;
+
+  let title, detail;
+  if (k === 0) {
+    title = os ? 'Output stationary' : 'Weight stationary';
+    detail = os ? 'Each PE multiplies the a and b passing through it, adds the product to its own sum, and passes a right and b down. The skew makes matching elements meet.'
+      : 'Weights are loaded once and stay in the PEs. Rows of A pass right, partial sums pass down, and C leaves the bottom edge.';
+  } else if (f.phase === 'load') {
+    title = `Cycle ${k}`; detail = `Loading weights: row ${n - k} of W enters at the top and shifts down.`;
+  } else if (done) {
+    title = 'Done'; detail = `${m.macs} multiply-accumulates in ${m.cycles} cycles, ${pct(m.util)} of PE-cycles busy. Operands were read from the buffer ${m.reads} times, not ${m.naiveReads}.`;
+  } else {
+    title = `Cycle ${k}`;
+    const newOut = !os && f.out ? f.out.flat().filter(v => v !== null).length - (m.frames[k - 1].out ? m.frames[k - 1].out.flat().filter(v => v !== null).length : 0) : 0;
+    detail = `${busy} of ${n * n} PEs busy, ${f.macs - prev} multiply-accumulates.` + (newOut ? ` ${newOut} result${newOut > 1 ? 's' : ''} leave the bottom edge.` : '');
+  }
+  return { html, title, detail };
+}
+
+function render() {
+  const m = app.model, v = view(m, app.k);
+  $('main').innerHTML = v.html;
+  $('narrTitle').textContent = v.title;
+  $('narrDetail').textContent = v.detail;
+  $('scrub').value = app.k;
+  $('stepNo').textContent = `${app.k} / ${m.cycles}`;
+  $('bBack').disabled = $('bReset').disabled = app.k === 0;
+  $('bStep').disabled = app.k >= m.cycles;
+  $('bPlay').textContent = app.playing ? '⏸' : '▶';
+}
+
+function rebuild(resetK) {
+  const mode = $('selMode').value;
+  $('lenLab').textContent = mode === 'os' ? 'Inner dimension K' : 'Rows of A streamed';
+  app.model = SA.run({ mode, n: +$('selN').value, len: +$('selLen').value, seed: app.seed });
+  if (resetK) app.k = 0;
+  app.k = Math.min(app.k, app.model.cycles);
+  $('scrub').max = app.model.cycles;
+  stopPlay();
+  render();
+}
+function goTo(k) { app.k = Math.max(0, Math.min(app.model.cycles, k)); render(); }
+function stopPlay() { app.playing = false; clearInterval(app.timer); app.timer = null; }
+function startPlay() {
+  if (app.k >= app.model.cycles) app.k = 0;
+  app.playing = true;
+  clearInterval(app.timer);
+  app.timer = setInterval(() => { if (app.k >= app.model.cycles) { stopPlay(); render(); } else goTo(app.k + 1); }, 500 / app.speed);
+  render();
+}
+const togglePlay = () => (app.playing ? (stopPlay(), render()) : startPlay());
+
+fillSelects();
+for (const id of ['selMode', 'selN', 'selLen']) $(id).addEventListener('change', () => rebuild(true));
+$('bShuf').addEventListener('click', () => { app.seed++; rebuild(true); });
+$('bPlay').addEventListener('click', togglePlay);
+$('bStep').addEventListener('click', () => { stopPlay(); goTo(app.k + 1); });
+$('bBack').addEventListener('click', () => { stopPlay(); goTo(app.k - 1); });
+$('bReset').addEventListener('click', () => { stopPlay(); goTo(0); });
+$('scrub').addEventListener('input', e => { stopPlay(); goTo(+e.target.value); });
+$('selSpeed').addEventListener('change', e => { app.speed = +e.target.value; if (app.playing) startPlay(); });
+$('setupBtn').addEventListener('click', () => document.body.classList.toggle('setup'));
+document.addEventListener('keydown', e => {
+  if (e.target.matches('select, input, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'ArrowRight') { stopPlay(); goTo(app.k + 1); }
+  else if (e.key === 'ArrowLeft') { stopPlay(); goTo(app.k - 1); }
+  else if (e.key === 'Home') { stopPlay(); goTo(0); }
+});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+rebuild(true);
+</script>
+</body>
+</html>
