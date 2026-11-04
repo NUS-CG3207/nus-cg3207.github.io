@@ -8,9 +8,9 @@ Self-contained pages for the CEG5203 / CG3207 computer architecture lectures. Op
 | [dataparallel.html](Visualisations/dataparallel.html) | One loop on scalar, SIMD and SIMT hardware, plus warp divergence, latency hiding and memory coalescing. | [dataparallel.md](Visualisations/dataparallel.md) | [dataparallel_specs.md](Visualisations/dataparallel_specs.md) |
 | [systolic.html](Visualisations/systolic.html) | Matrix multiply on a systolic array, output stationary and weight stationary (the TPU). | [systolic.md](Visualisations/systolic.md) | [systolic_specs.md](Visualisations/systolic_specs.md) |
 | [multithread.html](Visualisations/multithread.html) | Two threads on one superscalar core: no multithreading, coarse-grained, barrel, fine-grained and SMT. | [multithread.md](Visualisations/multithread.md) | [multithread_specs.md](Visualisations/multithread_specs.md) |
-| [RISC-V Interrupt Simulator.html](Visualisations/RISC-V%20Interrupt%20Simulator.html) | Vectored against non-vectored interrupt handling. Click a peripheral to raise an IRQ, then step through the context switch, the ISR and the return. Vectored mode jumps through the vector table; non-vectored mode enters one handler that polls the interrupt status and branches. | none | none |
+| [RISC-V Interrupt Simulator.html](Visualisations/RISC-V%20Interrupt%20Simulator.html) | Vectored against non-vectored interrupt handling. Click a peripheral to raise an IRQ, then step through the context switch, the ISR and the return. Vectored mode jumps through the vector table; non-vectored mode enters one handler that polls the interrupt status and branches. | – | – |
 
-The guides say how to use each page. The specs describe the models behind them and keep each page's version history. The interrupt simulator has no guide, spec or tests; it is a saved copy of [the NUS CS2100DE animation](https://nus-cs2100de.github.io/animations/vectored_nonvectored.html).
+The guides say how to use each page. The specs describe the models behind them and keep each page's version history.
 
 ## Other files
 
