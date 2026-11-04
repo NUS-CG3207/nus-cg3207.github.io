@@ -1,14 +1,14 @@
 # Acceleration & Memory-Access Examples
 
-Small, self-contained programs showing **why memory access patterns, data layout and parallelism dominate performance**, plus two Verilog snippets showing what synthesis tools do to your RTL. All examples are AI-generated; absolute timings depend on your machine, but the *ratios* are what matter.
+Small, self-contained programs showing **why memory access patterns, data layout and parallelism dominate performance**, plus two Verilog snippets showing what synthesis tools do to your RTL. The source files are in [the `SamplePrograms` folder of the course repository](https://github.com/NUS-CG3207/nus-cg3207.github.io/tree/main/docs/miscellaneous/SamplePrograms). All examples are AI-generated; absolute timings depend on your machine, but the *ratios* are what matter.
 
 **Contents**
 
 1. [Background: caches and hardware prefetching](#1-background-caches-and-hardware-prefetching)
 2. [Prefetching experiment (`cache_access.c`)](#2-prefetching-experiment-cache_accessc)
 3. [Other CPU memory-layout examples](#3-other-cpu-memory-layout-examples)
-4. [Parallel / GPU examples](#4-parallel--gpu-examples)
-5. [Verilog / Yosys examples](#5-verilog--yosys-examples)
+4. [Parallel / GPU examples](#4-parallel-gpu-examples)
+5. [Verilog / Yosys examples](#5-verilog-yosys-examples)
 6. [Number representation demos](#6-number-representation-demos-number_formatsc)
 7. [Quick reference](#7-quick-reference)
 

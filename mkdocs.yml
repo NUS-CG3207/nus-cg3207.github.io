@@ -66,4 +66,5 @@ nav:
       - RISC-V Assembly Examples: rv_resources/isa_tutorial/assembly.md
       - ISA Designer's Dilemma: rv_resources/isa_tutorial/isa-design.md
   - Miscellaneous:
-    - Memory Access & Acceleration Examples: misc/readme.md
+    - Memory Access & Acceleration Examples: miscellaneous/SamplePrograms.md
+    - Interactive Visualisations: miscellaneous/Visualisations.md
