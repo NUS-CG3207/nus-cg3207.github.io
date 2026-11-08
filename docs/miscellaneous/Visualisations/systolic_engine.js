@@ -2,7 +2,7 @@
  * the node test suite both load this file. run() simulates a whole matrix multiply
  * on an n x n array up front and returns one frame per cycle (frames[t] is the
  * state after t cycles; frames[0] is the initial state).
- *   'os'  output stationary (slide 53): A flows right, B flows down, each PE
+ *   'os'  output stationary: A flows right, B flows down, each PE
  *         accumulates one element of C = A (n x len) . B (len x n).
  *   'ws'  weight stationary (TPU): weights W (n x n) are loaded first and stay put;
  *         rows of A (len x n) flow right and partial sums flow down, so C = A . W

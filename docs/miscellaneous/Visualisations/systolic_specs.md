@@ -20,7 +20,7 @@ A frame holds `pe[i][j]` (`a`, `b`, `ps`, `w`, `acc`, `active`, `final`, plus th
 - **Weight stationary:** `C = A (len × n) · W (n × n)`. Load phase of `n` cycles: row `n − 1 − l` of W enters the top on cycle `l` and shifts down, so W sits in place afterwards. Compute phase: A's column `i` enters row `i` `i` cycles late and moves right; PE `(i,j)` adds `a · W[i][j]` to the partial sum from above and passes it down. `C[r][j]` leaves the bottom of column `j` on compute cycle `r + j + n − 1`. Total `n + len + 2(n − 1)` cycles.
 - Utilisation is `n² · len / (n² · cycles)`, counting load cycles. Operand reads count each input once at its edge (`2·n·len`, or `n² + n·len` with the weights), against `2·n²·len` for a MAC unit that fetches both operands per multiply.
 
-The tests check the result against a direct matrix product, the busy window of every PE, that each multiply pairs matching `k` and each partial sum extends the same row, that weights never move during compute, and the slide 53 case (4 × 4, 10 cycles).
+The tests check the result against a direct matrix product, the busy window of every PE, that each multiply pairs matching `k` and each partial sum extends the same row, that weights never move during compute, and the classic 4 × 4 case (10 cycles).
 
 ## UI rules
 
@@ -32,5 +32,5 @@ The tests check the result against a direct matrix product, the busy window of e
 
 | Version | Date | Change |
 |---|---|---|
-| 0.1 | 2026-11-04 | First version. Output-stationary (slide 53) and weight-stationary (TPU) dataflows on an n × n array (n = 2 to 6), configurable stream length, utilisation and operand-read readouts. |
+| 0.1 | 2026-11-04 | First version. Output-stationary and weight-stationary (TPU) dataflows on an n × n array (n = 2 to 6), configurable stream length, utilisation and operand-read readouts. |
 | 0.2 | 2026-11-04 | Projector legibility. `px` to `rem`, the array centred and sized to its card (it was a fixed 96 px per PE, right-aligned), larger skew queues and matrices. Tests check PE size and no scrolling at 1080p. |

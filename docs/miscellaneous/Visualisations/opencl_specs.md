@@ -14,7 +14,7 @@
 
 `OCL.build(cfg)` simulates the whole host program up front and returns `steps[]`. `cfg` = `{ kernel, gsz:[x,y], lsz:[x,y], cus, pes }`. Each step carries:
 
-- `phase` (0 to 13, slide 15 numbering) and `chapter` (one host call or one work-group round, used by ⏭).
+- `phase` (0 to 13, the host program step numbering) and `chapter` (one host call or one work-group round, used by ⏭).
 - `host` / `kern`: line tags to highlight. Host code is generated per kernel with tags attached to lines, so highlighting never depends on line numbers.
 - `ops`: primitive state mutations (`halloc`, `copyHG`, `gset`, `lset`, `pset`, `wi`, `wg`, `qpush`, `cnt`, ...).
 - `flows`, `reads`, `writes`: what moved where, for particles and cell outlines. `leg` 0/1 splits a step into a read half and a write half.

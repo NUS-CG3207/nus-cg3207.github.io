@@ -1,6 +1,6 @@
 # OpenCL in action: user guide
 
-`opencl.html` steps through one complete OpenCL host program: platform and device discovery, buffer transfers, the kernel launch, work-groups running on compute units, and the read-back. It follows the 13 execution steps and the `main.c` example from the CEG5203 *Introduction to OpenCL* slides.
+`opencl.html` steps through one complete OpenCL host program: platform and device discovery, buffer transfers, the kernel launch, work-groups running on compute units, and the read-back. It follows the 13 execution steps of a typical OpenCL host program and a `main.c` example.
 
 Open `opencl.html` in a browser. It needs no server or install, but `opencl_engine.js` must sit in the same folder.
 
@@ -24,7 +24,7 @@ On a phone the panels are tabs, and the kernel/device settings sit behind **Setu
 | ◀ / ← | One step back |
 | ⏭ / Shift+→ | Skip to the next host call or work-group round |
 | ⏮ / Home | Start |
-| 1 to 13 | Jump to that step of the slide 15 list. Steps 5 and 6 come after 7 and 8, because `main.c` calls them in that order. |
+| 1 to 13 | Jump to that step of the list. Steps 5 and 6 come after 7 and 8, because `main.c` calls them in that order. |
 | Slider | Scrub to any step |
 
 Each step's badge shows which memory level it touches (private, local, global, PCIe). Steps that touch slower memory play for longer. The timing is relative, not cycle-accurate.
@@ -35,8 +35,8 @@ Particles show data moving: purple over PCIe, blue to or from global memory, gre
 
 | Kernel | Shows |
 |---|---|
-| `vec_add` | The slide example. One work-item per element: two global loads, an add in private memory, one global store. |
-| `invert` | A 2D NDRange over an image, `get_global_id(0)` and `(1)`. 32 × 32 with 8 × 8 local reproduces the slide 7 example. |
+| `vec_add` | The standard example. One work-item per element: two global loads, an add in private memory, one global store. |
+| `invert` | A 2D NDRange over an image, `get_global_id(0)` and `(1)`. 32 × 32 with 8 × 8 local shows the work-group tiling clearly. |
 | `reduce_sum` | Local memory and `barrier()`. Each work-group sums its slice in `__local` scratch, and the host adds the per-group results. |
 
 ## Settings

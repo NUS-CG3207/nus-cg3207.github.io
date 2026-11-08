@@ -122,7 +122,7 @@ table.mx td.empty { background: transparent; border: 1px dashed var(--line); col
     <div class="grp"><h1>Systolic array</h1></div>
     <div class="grp"><button id="setupBtn" title="Show or hide the settings">Setup</button></div>
     <div class="bar" id="config">
-      <div class="grp"><label for="selMode">Dataflow</label><select id="selMode" title="Output stationary: each PE accumulates one element of C (slide 53). Weight stationary: weights stay in the PEs and partial sums flow down (the TPU)."><option value="os">Output stationary</option><option value="ws">Weight stationary (TPU)</option></select></div>
+      <div class="grp"><label for="selMode">Dataflow</label><select id="selMode" title="Output stationary: each PE accumulates one element of C. Weight stationary: weights stay in the PEs and partial sums flow down (the TPU)."><option value="os">Output stationary</option><option value="ws">Weight stationary (TPU)</option></select></div>
       <div class="grp"><label for="selN">Array</label><select id="selN" title="The array has n × n processing elements"></select></div>
       <div class="grp"><label for="selLen" id="lenLab">Inner dimension K</label><select id="selLen"></select></div>
       <div class="grp"><button id="bShuf" title="New random matrices">Reshuffle</button></div>

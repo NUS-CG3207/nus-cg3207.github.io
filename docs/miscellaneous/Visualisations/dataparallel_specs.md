@@ -32,6 +32,6 @@ Each function simulates a demo up front and returns plain data; the page replays
 
 | Version | Date | Change |
 |---|---|---|
-| 0.1 | 2026-11-04 | First version. Four demos: scalar vs SIMD vs SIMT on one loop, warp divergence, latency hiding, memory coalescing. The slide 50 schedule is a test case. The scheduler was first written as lowest-index-ready, which starved the last warp when three warps already saturated the core; it is now round-robin after the current warp. |
+| 0.1 | 2026-11-04 | First version. Four demos: scalar vs SIMD vs SIMT on one loop, warp divergence, latency hiding, memory coalescing. The four-warp schedule that fully hides latency is a test case. The scheduler was first written as lowest-index-ready, which starved the last warp when three warps already saturated the core; it is now round-robin after the current warp. |
 | 0.2 | 2026-11-04 | Projector legibility. `px` to `rem`, settings moved into the title row, narration made prominent, divergence warps laid out two per row so four fit at 1080p. Tests check the 1080p scale and that the main views need no scrolling. |
 | 0.3 | 2026-11-04 | Controls that do not apply to the current setting are hidden, not greyed out (stride outside `a[s*i]`, reshuffle outside random access, the taken slider for alternating). Reshuffle in divergence is always available and redraws the data values. The stride label reads "Stride" (it was "Stride s"). |

@@ -1,6 +1,6 @@
 # Hardware multithreading: user guide
 
-`multithread.html` runs the same two instruction streams on one superscalar core under five policies, one cycle per step. It follows slides 34 and 35 of *The Processor (Advanced)*.
+`multithread.html` runs the same two instruction streams on one superscalar core under five policies, one cycle per step.
 
 Open the file in a browser. It needs no server, but `multithread_engine.js` must sit in the same folder.
 
@@ -49,7 +49,7 @@ Changing a setting rewinds. **Reshuffle** draws new instruction streams. On a ph
 - SMT's lead over fine-grained is biggest when one thread cannot fill the width. At width 4 with ILP 1 or 2 it is about 2.5 cycles on average; at width 2 with ILP 2 or more a single thread nearly fills the core and the lead shrinks to under one.
 - Raise the switch cost from 0 to 3 with many stalls and a miss latency of 8. Coarse-grained slows from about 47 to 59 cycles, while fine-grained stays at 45. Switching is cheap per stall only if the stall is long.
 - Compare "A done" across rows. Thread A finishes at cycle 20 on its own, 22 under fine-grained and 24 under coarse-grained. Each thread gets slower; the pair finishes sooner.
-- Raise the miss latency to 12. Even fine-grained and SMT lose many whole cycles, because two threads cannot cover a miss that long. GPUs keep many warps resident for this reason (slide 50).
+- Raise the miss latency to 12. Even fine-grained and SMT lose many whole cycles, because two threads cannot cover a miss that long. GPUs keep many warps resident for this reason.
 
 ## Simplifications
 

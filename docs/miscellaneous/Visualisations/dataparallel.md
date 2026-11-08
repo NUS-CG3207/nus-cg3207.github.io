@@ -1,6 +1,6 @@
 # Data parallelism: user guide
 
-`dataparallel.html` shows the same data-parallel work on different hardware, one cycle per step. It follows slides 46 to 50 of *The Processor (Advanced)*: SIMD/vector versus SIMT, warp divergence and latency hiding, plus memory coalescing as the next question on GPUs.
+`dataparallel.html` shows the same data-parallel work on different hardware, one cycle per step. It covers SIMD/vector versus SIMT, warp divergence and latency hiding, plus memory coalescing as the next question on GPUs.
 
 Open the file in a browser. It needs no server, but `dataparallel_engine.js` must sit in the same folder.
 
@@ -37,7 +37,7 @@ One or more warps run `if (x[i] > 0) A else B`. Every lane evaluates the conditi
 
 Warps share one core. Each issues a burst of instructions ending in a load, then waits. The core keeps issuing from a warp while it can, otherwise switches to the next ready warp.
 
-- With the defaults (4 warps, bursts of 2, latency 6) the core never idles, which is slide 50.
+- With the defaults (4 warps, bursts of 2, latency 6) the core never idles, so latency is fully hidden.
 - Reduce **Resident warps** until idle cycles appear. Warps needed is ⌈(burst + latency) / burst⌉.
 - Warp 0 finishes no earlier than it would alone. Only the total time improves.
 
