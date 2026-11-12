@@ -11,7 +11,7 @@ In the following lines, 'read's and 'write's are from the perspective of the RIS
 * Successive writes to the UART (`sw` / `STR` followed by `sw` / `STR`, i.e., consecutive `sw`s / `STR`s in your assembly language program) are not supported. Similarly, successive reads (consecutive `lw`s / `LDR`s) are not supported.
 * Allow sufficient time for the program to read a character before sending the next character from RealTerm. Any character received while one character is waiting to be read would be ignored. This shouldn't be a problem if your processor runs at high speed (CLK\_DIV\_BITS is low).
   * There is one holding register and no FIFO. `uart.vhd` does not buffer, and the single byte is held in `TOP_Nexys.vhd`. A character arriving while one is unread is discarded, and the earlier one is kept. No status bit records this.
-  * At 115200 baud a character takes 10 bit-times, i.e., 8640 clocks of the 100 MHz clock (86.4 us). With `CLK_DIV_BITS` = 5 the processor runs at 1.5625 MHz, so a character is 135 instructions. Your polling loop has to read within that.
+  * At 115200 baud a character takes 10 bit-times, i.e., 8640 clocks of the 100 MHz clock (86.4 us). With `CLK_DIV_BITS` = 5 the processor runs at 3.125 MHz, so a character is 270 instructions. Your polling loop has to read within that.
   * Reading UART_RX when UART_RX_VALID is 0 returns 0 and does not consume anything.
 
 * A 32-bit number can be sent as hexadecimal in ASCII format (8 characters), which will require some processing in your program before it can be used as a 32-bit operand (note : '0' is 0x30 and 'A' is 0x41 in ASCII). It is a good idea to echo characters so that you can check whether UART has received it correctly. Also, note that backspace doesn't work to 'delete' the sent characters unless you implement such a functionality explicitly in your assembly language program.
@@ -67,7 +67,7 @@ OLED_CTRL[3] : Present the frame.
 * The exchange happens at a frame boundary, not immediately. That is what removes the tearing.
 * After the exchange, the controller copies the newly displayed page into the page you write to. Partial updates therefore continue to work, and you do not have to repaint all 6144 pixels each frame.
 * OLED_STATUS[0] is set from the write until the exchange and the copy are done. Do not write pixels while it is set. Before the exchange, the page you would write into is the one about to be displayed, so the pixels appear in the frame being presented and the copy then carries them forward. During the copy, the write is discarded outright: the copy engine owns the RAM port for its duration.
-* That window is up to 15.73 ms for the frame boundary plus 123 us for the copy, which is 24,576 and 192 instructions at CLK_DIV_BITS = 5. Neither the leak nor the discard raises a flag, so the poll is the only thing that prevents them.
+* That window is up to 15.73 ms for the frame boundary plus 123 us for the copy, which is 49,152 and 384 instructions at CLK_DIV_BITS = 5. Neither the leak nor the discard raises a flag, so the poll is the only thing that prevents them.
 
 ```c
 #define OLED_SWAP 0x08
@@ -81,7 +81,7 @@ while (1) {
 ```
 
 * The wait costs half a frame on average, so a program presenting every frame runs at about half the refresh rate.
-* With `CLK_DIV_BITS` = 5 a full repaint already takes longer than a frame, so the poll rarely blocks. Reduce `CLK_DIV_BITS` and the processor will outrun the display, and without the poll most of what is drawn lands in the wrong page. A program that presents without waiting does not fail visibly, it just loses part of what it drew.
+* With `CLK_DIV_BITS` = 5 a frame is 8 instructions per pixel, so a full repaint by a typical drawing loop takes longer than a frame and the poll rarely blocks. Reduce `CLK_DIV_BITS` and the processor will outrun the display, and without the poll most of what is drawn lands in the wrong page. A program that presents without waiting does not fail visibly, it just loses part of what it drew.
 
 
 OLED_CTRL[7:4] : Colour format.

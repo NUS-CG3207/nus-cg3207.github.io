@@ -685,7 +685,7 @@ setTimeout(async () => {
         win.hdlLoadTrace(runA, 400);
         const nSteps = win.hdlParseTrace(runA).steps.length;
         win.setRunPace('real');
-        win.setClkDivBits(16);                   // 763 Hz: 400 cycles in about 0.52 s
+        win.setClkDivBits(17);                   // 763 Hz: 400 cycles in about 0.52 s
         win.hdlSeek(0);
         let played = false;
         win.hdlPlayTo(nSteps, () => { played = true; });
@@ -697,7 +697,7 @@ setTimeout(async () => {
         win.hdlStopPlay();
         await sleep(150);
         check('paused, it stays put', win.eval('hdlIdx') === mid && !played);
-        win.setClkDivBits(12);                   // 12.2 kHz: the rest in a few ms
+        win.setClkDivBits(13);                   // 12.2 kHz: the rest in a few ms
         win.hdlPlayTo(nSteps, () => { played = true; });
         await sleep(250);
         check('resumed, it reaches the end and reports done', played && win.eval('hdlIdx') === nSteps);

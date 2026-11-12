@@ -4060,12 +4060,12 @@
             <div class="sim-card">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-weight:600;color:#cba6f7;font-size:13px;"
-                  title="The CPU clock on the board: TOP_Nexys.vhd divides 100 MHz by 2^(CLK_DIV_BITS+1), or not at all when it is 0. The same setting for both engines.">Clock</span>
+                  title="The CPU clock on the board: TOP_Nexys.vhd divides 100 MHz by 2^CLK_DIV_BITS. The same setting for both engines.">Clock</span>
                 <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a6adc8;">
                   CLK_DIV_BITS
                   <input type="number" data-clk="div" min="0" max="26" step="1" value="5" class="pipe-select" style="width:52px;"
-                    title="As in TOP_Nexys.vhd: 0 is 100 MHz, 5 is 1.56 MHz, 26 is about 0.75 Hz">
-                  <span data-clk="hz" style="min-width:62px;color:#cdd6f4;">1.56 MHz</span>
+                    title="As in TOP_Nexys.vhd: 0 is 100 MHz, 1 is 50 MHz, 5 is 3.13 MHz, 26 is about 1.5 Hz">
+                  <span data-clk="hz" style="min-width:62px;color:#cdd6f4;">3.13 MHz</span>
                   <select data-clk="pace" class="pipe-select"
                     title="Max speed runs as fast as the browser can. Real time runs at the clock above, so delay loops take as long as on the board; if the browser cannot keep up, the toolbar shows the fraction of real time it reaches. In HDL mode a run is recorded first and then played back at the clock.">
                     <option value="max">Max speed</option>
@@ -4294,7 +4294,7 @@
           <button onclick="closeCreditsModal()" title="Close">&times;</button>
         </div>
         <div class="c-body">
-          <p>Part of <a href="https://nus-cg3207.github.io/labs" target="_blank" rel="noopener noreferrer">CG3207</a>,
+          <p>Part of <a href="https://nus-cg3207.github.io/" target="_blank" rel="noopener noreferrer">CG3207</a>,
             NUS. Written by <a href="https://blog.nus.edu.sg/rajesh/" target="_blank"
               rel="noopener noreferrer">Rajesh Panicker</a>.</p>
           <p>The MMIO layout and <code>ecall</code> system call services follow the conventions of
@@ -4602,10 +4602,10 @@
                     <option value="forgiving">Forgiving (never drops)</option>
                   </select>
                   <span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">
-                    <input type="number" id="uartCharInstr" value="135" min="1" max="999999"
+                    <input type="number" id="uartCharInstr" value="270" min="1" max="999999"
                       style="width:56px;height:24px;padding:2px 4px;font-size:11px;box-sizing:border-box;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;text-align:center;flex:0 0 auto;"
                       onchange="setUartCharInstr(this.value)"
-                      title="Clock cycles between characters. In Paste mode it is one character at 115200 baud at the clock set in Settings (135 at CLK_DIV_BITS 5); in Typed mode, set it here.">
+                      title="Clock cycles between characters. In Paste mode it is one character at 115200 baud at the clock set in Settings (270 at CLK_DIV_BITS 5); in Typed mode, set it here.">
                     <span style="color:#a6adc8;" id="uartCharUnit"
                       title="Clock cycles between characters">cycles/char</span>
                   </span>
@@ -5345,18 +5345,17 @@
 
     // Delivery pacing. One character on the wire is 10 bit-times; at 115200
     // baud that is 86.4 us, and at the default CLK_DIV_BITS the CPU runs at
-    // 1.5625 MHz, so a character is 135 single-cycle instructions. That is both
+    // 3.125 MHz, so a character is 270 single-cycle instructions. That is both
     // the gap a terminal produces when it dumps a line and the budget a polling
     // loop has to read one before the next arrives. Settable, because it moves
     // with the clock divider.
-    const UART_CHAR_INSTR_DEFAULT = 135;
+    const UART_CHAR_INSTR_DEFAULT = 270;
 
-    // The board's CPU clock. TOP_Nexys.vhd divides 100 MHz by
-    // 2^(CLK_DIV_BITS+1), or not at all when CLK_DIV_BITS is 0.
+    // The board's CPU clock. TOP_Nexys.vhd divides 100 MHz by 2^CLK_DIV_BITS.
     let clkDivBits = 5;
     let runPace = 'max';             // 'max' | 'real'
     let rtRatio = 1;                 // real time reached while pacing, 0..1
-    function clkDivider() { return clkDivBits === 0 ? 1 : 2 ** (clkDivBits + 1); }
+    function clkDivider() { return 2 ** clkDivBits; }
     function cpuHz() { return 100e6 / clkDivider(); }
     function fmtHz(f) {
       return f >= 1e6 ? +(f / 1e6).toPrecision(3) + ' MHz' : f >= 1e3 ? +(f / 1e3).toPrecision(3) + ' kHz'
@@ -7009,8 +7008,10 @@
       oledRaceWarned = true;
       log('OLED: pixels were written after a present, with no read of OLED_STATUS ' +
           'in between. That works here, where a present lands at once. On the board ' +
-          'it waits up to a frame for the scanout boundary - 24,576 instructions at ' +
-          'the default clock divider - and then 192 more to copy the page back. ' +
+          'it waits up to a frame (15.73 ms) for the scanout boundary - ' +
+          Math.round(cpuHz() * 0.01572864).toLocaleString('en-US') + ' cycles at the ' +
+          'current clock - and then ' + Math.round(cpuHz() * 122.88e-6).toLocaleString('en-US') +
+          ' more to copy the page back. ' +
           'Pixels written before the boundary appear in the frame being presented, ' +
           'and pixels written during the copy are lost. Poll OLED_STATUS until bit 0 ' +
           'clears before drawing again.', 'warning');

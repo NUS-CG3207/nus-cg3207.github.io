@@ -82,7 +82,7 @@ architecture arch_TOP of TOP is
 ----------------------------------------------------------------
 -- TOP Constants
 ----------------------------------------------------------------
-constant CLK_DIV_BITS : integer := 5; 	-- Set this to 26 for a ~1Hz clock. 0 for a 100MHz clock. Should not exceed 26. 
+constant CLK_DIV_BITS : integer := 5; 	-- CLK is 100MHz / 2^CLK_DIV_BITS: 0 for 100MHz, 1 for 50MHz, 26 for ~1.5Hz. Should not exceed 26. 
 										-- There is no need to change it for simulation, as this entity/module should not be simulated
 										-- If this is set to less than 17, you might need a software delay loop between successive reads / writes to/from UART.
 
@@ -215,7 +215,10 @@ component PmodOLEDrgb_bitmap is
           pix_row      : in  STD_LOGIC_VECTOR(    5 downto 0);
           pix_data_in  : in  STD_LOGIC_VECTOR(BPP-1 downto 0);
           pix_data_out : out STD_LOGIC_VECTOR(BPP-1 downto 0);
-          
+
+          swap_req     : in  STD_LOGIC;
+          swap_pending : out STD_LOGIC;
+
           PMOD_CS      : out STD_LOGIC;
           PMOD_MOSI    : out STD_LOGIC;
           PMOD_SCK     : out STD_LOGIC;
@@ -229,6 +232,8 @@ end component PmodOLEDrgb_bitmap;
 -- OLED signals
 ----------------------------------------------------------------------------
 signal pix_data			: STD_LOGIC_VECTOR(23 downto 0);
+signal pix_swap			: STD_LOGIC;	-- present the drawn page
+signal pix_swap_pending	: STD_LOGIC;	-- high until the swap and its copy are done
 
 
 ----------------------------------------------------------------
@@ -327,6 +332,8 @@ port map (
 		OLED_Col     		=> 		pix_col     	,
 		OLED_Row     		=> 		pix_row     	,
 		OLED_Data	 		=> 		pix_data	 	,
+		OLED_Swap			=> 		pix_swap		,
+		OLED_SwapPending	=> 		pix_swap_pending,
 		ACCEL_Data			=> 		ACCEL_Data		,
 		ACCEL_DReady		=> 		ACCEL_DReady	,
 		RESET			 	=>     	RESET_EFF		,
@@ -350,6 +357,8 @@ port map (
         pix_row     	=> 	pix_row     	,
         pix_data_in 	=> 	pix_data_in 	,
         pix_data_out	=> 	pix_data_out	,
+        swap_req    	=> 	pix_swap    	,
+        swap_pending	=> 	pix_swap_pending,
         PMOD_CS     	=> 	PMOD_CS     	,
         PMOD_MOSI   	=> 	PMOD_MOSI   	,
         PMOD_SCK    	=> 	PMOD_SCK    	,
@@ -504,12 +513,12 @@ CLK_DIVIDER_OFF_SET: if CLK_DIV_BITS = 0 generate
 end generate;
 CLK_DIVIDER_ON_SET: if CLK_DIV_BITS > 0 generate
 CLK_DIV_PROCESS : process(CLK_undiv)						-- Clock division
-variable clk_counter : std_logic_vector(CLK_DIV_BITS downto 0) := (others => '0');
+variable clk_counter : std_logic_vector(CLK_DIV_BITS-1 downto 0) := (others => '0');
 begin
 	if CLK_undiv'event and CLK_undiv = '1' then
 		if PAUSE = '0' then
 			clk_counter := clk_counter+1;
-			CLK <= clk_counter(CLK_DIV_BITS);
+			CLK <= clk_counter(CLK_DIV_BITS-1);
 		end if;
 	end if;
 end process;

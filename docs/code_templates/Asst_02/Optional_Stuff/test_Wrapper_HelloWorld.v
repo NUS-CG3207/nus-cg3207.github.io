@@ -36,13 +36,26 @@ module test_Wrapper #(
 	wire [6:0] OLED_Col;
 	wire [5:0] OLED_Row;
 	wire [23:0] OLED_Data;
+	wire OLED_Swap;			// present request from the Wrapper
+	wire OLED_SwapPending = 1'b0;	// tied low: the OLED controller that would hold this across a scanout is not in this bench, so a polling program never blocks
 	reg [31:0] ACCEL_Data;
 	wire ACCEL_DReady;			
 	reg  RESET = 0;	
 	reg  CLK = 0;				
 	
 	// Instantiate UUT
-    Wrapper dut(DIP, PB, LED_OUT, LED_PC, SEVENSEGHEX, UART_TX, UART_TX_ready, UART_TX_valid, UART_RX, UART_RX_valid, UART_RX_ack, OLED_Write, OLED_Col, OLED_Row, OLED_Data, ACCEL_Data, ACCEL_DReady, RESET, CLK) ;
+    // Named association, so a change to the Wrapper's port order does not
+    // silently rebind the whole testbench.
+    Wrapper dut(
+    	.DIP(DIP), .PB(PB), .LED_OUT(LED_OUT), .LED_PC(LED_PC),
+    	.SEVENSEGHEX(SEVENSEGHEX),
+    	.UART_TX(UART_TX), .UART_TX_ready(UART_TX_ready), .UART_TX_valid(UART_TX_valid),
+    	.UART_RX(UART_RX), .UART_RX_valid(UART_RX_valid), .UART_RX_ack(UART_RX_ack),
+    	.OLED_Write(OLED_Write), .OLED_Col(OLED_Col), .OLED_Row(OLED_Row),
+    	.OLED_Data(OLED_Data),
+    	.OLED_Swap(OLED_Swap), .OLED_SwapPending(OLED_SwapPending),
+    	.ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
+    	.RESET(RESET), .CLK(CLK));
 
 	
 	// Note: This testbench is for the Hello World program. Other assembly programs require appropriate modifications.

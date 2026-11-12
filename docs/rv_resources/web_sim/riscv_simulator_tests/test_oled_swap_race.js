@@ -121,7 +121,7 @@ setTimeout(async () => {
     check('and warns once, not once per pixel',
       (unpolled.match(new RegExp(WARN.source, 'g')) || []).length === 1);
     check('the warning names OLED_STATUS as the fix', /Poll OLED_STATUS/.test(unpolled));
-    check('and gives the hardware delay in instructions', /24,576 instructions/.test(unpolled));
+    check('and gives the hardware delay in cycles at the current clock', /49,152 cycles at the current clock/.test(unpolled));
     check('the program really did paint after the present', painted());
 
     console.log('\n[2] The same program with the poll a board needs');

@@ -1,4 +1,4 @@
-# Acceleration & Memory-Access Examples
+    # Acceleration & Memory-Access Examples
 
 Small, self-contained programs showing **why memory access patterns, data layout and parallelism dominate performance**, plus two Verilog snippets showing what synthesis tools do to your RTL. The source files are in [the `SamplePrograms` folder of the course repository](https://github.com/NUS-CG3207/nus-cg3207.github.io/tree/main/docs/miscellaneous/SamplePrograms). All examples are AI-generated; absolute timings depend on your machine, but the *ratios* are what matter.
 

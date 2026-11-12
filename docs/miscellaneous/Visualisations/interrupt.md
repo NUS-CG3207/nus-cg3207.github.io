@@ -2,7 +2,7 @@
 
 `interrupt.html` compares vectored and non-vectored interrupt handling on a RISC-V core, one step at a time. A main loop runs until you raise an interrupt from one of two peripherals; you then step through the context switch, the interrupt service routine (ISR) and the return.
 
-Open the file in a browser. It is a single self-contained file (CSS and JS inline) and needs no server. It is a saved copy of [the NUS CS2100DE animation](https://nus-cs2100de.github.io/animations/vectored_nonvectored.html).
+Open the file in a browser. It is a single self-contained file (CSS and JS inline) and needs no server.
 
 ## Controls
 

@@ -60,6 +60,13 @@ entity PmodOLEDrgb_bitmap is
           pix_row      : in  STD_LOGIC_VECTOR(    5 downto 0);
           pix_data_in  : in  STD_LOGIC_VECTOR(BPP-1 downto 0);
           pix_data_out : out STD_LOGIC_VECTOR(BPP-1 downto 0);
+
+          -- Double buffering. Raise swap_req to present the page just drawn;
+          -- swap_pending stays high until the exchange has happened at a frame
+          -- boundary and the newly displayed page has been copied back, so the
+          -- caller may keep updating only the pixels it cares about.
+          swap_req     : in  STD_LOGIC := '0';
+          swap_pending : out STD_LOGIC;
           
           PMOD_CS      : out STD_LOGIC;
           PMOD_MOSI    : out STD_LOGIC;
@@ -138,10 +145,34 @@ architecture Behavioral of PmodOLEDrgb_bitmap is
    --------------------------------------------------------------------------
    -- signals to manage the bitmap
    --------------------------------------------------------------------------
-   type t_bitmap is array(0 to 6143) of std_logic_vector(BPP-1 downto 0);
+   -- Two pages of 6144 pixels. front is scanned out, back is drawn into. They
+   -- are the same page until the first swap, so a caller that never swaps sees
+   -- a single buffer. The page bit is concatenated onto the 13-bit pixel
+   -- address rather than added to it, which keeps adders out of the RAM address
+   -- path, so a page occupies a full 8192-entry slot and the array is sized for
+   -- the address width rather than for the pixels in use.
+   type t_bitmap is array(0 to 16383) of std_logic_vector(BPP-1 downto 0);
    signal bitmap        : t_bitmap;                      -- the RAM that actually contains the bitmap
+   -- Offering the array more than the two addresses a true dual-port block RAM
+   -- has drops it into LUT RAM, replicated, at a cost of thousands of SLICEMs
+   -- and the routing to reach them. Say what it has to be so the fallback is
+   -- a warning rather than a silent timing failure.
+   attribute ram_style : string;
+   attribute ram_style of bitmap : signal is "block";
    signal read_addr     : integer range 0 to 6143;       -- the read address to send data to the Pmod
    signal user_addr     : std_logic_vector(12 downto 0); -- the user address computed from row/column
+   signal front_page    : std_logic := '0';              -- page being scanned out
+   signal back_page     : std_logic := '0';              -- page being drawn into
+   signal swap_armed    : std_logic := '0';              -- a swap has been asked for, waiting for the frame boundary
+   signal swap_req_dly  : std_logic := '0';              -- swap_req is a level from a slower clock; this finds its edge
+   signal copying       : std_logic := '0';              -- front -> back copy in progress
+   signal copy_addr     : integer range 0 to 6143 := 0;
+   signal copy_phase    : std_logic := '0';              -- '0' reads front, '1' writes back
+   signal porta_addr    : std_logic_vector(13 downto 0); -- port A: the caller's, and the copy engine's while it runs
+   signal porta_din     : std_logic_vector(BPP-1 downto 0);
+   signal porta_dout    : std_logic_vector(BPP-1 downto 0);
+   signal porta_we      : std_logic;
+   signal portb_addr    : std_logic_vector(13 downto 0); -- port B: the scanout read
    signal buff_next_pix : std_logic_vector(BPP-1 downto 0); -- the next pixel to send
    signal next_16bpix   : std_logic_vector(15 downto 0); -- the next pixel to send coded 16bpp
    signal write_dly     : std_logic;                     -- a cycle delay for write to wait for user_addr to be ready
@@ -393,17 +424,89 @@ begin
       end if;
    end process;
 
+   -- Port A is the caller's (and, between swaps, the copy engine's); port B is
+   -- the scanout read. Both are prefixed with a page bit. Each port gets one
+   -- address and one read per cycle, which is the whole of what a true dual-port
+   -- block RAM offers: the copy alternates its read and its write, and it shares
+   -- port A with the caller rather than asking for an address of its own.
+   porta_addr <= front_page & std_logic_vector(to_unsigned(copy_addr, 13)) when copying = '1' and copy_phase = '0' else
+                 back_page  & std_logic_vector(to_unsigned(copy_addr, 13)) when copying = '1' else
+                 back_page  & user_addr;
+   porta_we   <= (copying and copy_phase) or ((not copying) and write_dly);
+   -- On the write half of the copy, porta_dout still holds what the read half
+   -- fetched a cycle ago.
+   porta_din  <= porta_dout when copying = '1' else datin_dly;
+   portb_addr <= front_page & std_logic_vector(to_unsigned(read_addr, 13));
+
+   -- Port A belongs to the copy while it runs, so this is stale until the copy
+   -- ends. The caller is waiting on swap_pending until then.
+   pix_data_out <= porta_dout;
+
    process(clk)
    begin
       if rising_edge(clk) then
          write_dly     <= pix_write;
          user_addr     <= (pix_col(6) and not pix_col(5)) & pix_col(5 downto 0) & pix_row;
-         pix_data_out  <= bitmap(to_integer(unsigned(user_addr)));
          datin_dly     <= pix_data_in;
-         if write_dly = '1' then
-            bitmap(to_integer(unsigned(user_addr))) <= datin_dly;
+
+         if porta_we = '1' then
+            bitmap(to_integer(unsigned(porta_addr))) <= porta_din;
          end if;
-         buff_next_pix <= bitmap(read_addr);
+         porta_dout    <= bitmap(to_integer(unsigned(porta_addr)));
+         buff_next_pix <= bitmap(to_integer(unsigned(portb_addr)));
+      end if;
+   end process;
+
+   --------------------------------------------------------------------------
+   -- Page swapping.
+   --   swap_req is driven on CLK, which is derived from this clock, so it
+   --   arrives as a level and only its rising edge counts. The exchange waits
+   --   for the scanout to wrap past the last pixel, the only frame boundary
+   --   this module has. The copy that follows lets the caller go on doing
+   --   partial updates.
+   --------------------------------------------------------------------------
+   swap_pending <= swap_armed or copying;
+
+   process(clk)
+   begin
+      if rising_edge(clk) then
+         swap_req_dly <= swap_req;
+
+         if reset = '1' then
+            front_page <= '0';
+            back_page  <= '0';
+            swap_armed <= '0';
+            copying    <= '0';
+            copy_phase <= '0';
+         else
+            if swap_req = '1' and swap_req_dly = '0' then
+               swap_armed <= '1';
+            end if;
+
+            if copying = '1' then
+               copy_phase <= not copy_phase;
+               if copy_phase = '1' then         -- the write half just went out
+                  if copy_addr = 6143 then
+                     copying <= '0';
+                  else
+                     copy_addr <= copy_addr + 1;
+                  end if;
+               end if;
+            elsif swap_armed = '1' and read_addr = 6143 and OLED_FSM = refreshing then
+               -- Frame boundary. The very first swap splits the pages, leaving
+               -- the drawn frame on screen; later ones exchange.
+               if front_page = back_page then
+                  back_page <= not front_page;
+               else
+                  front_page <= back_page;
+                  back_page  <= front_page;
+               end if;
+               swap_armed <= '0';
+               copying    <= '1';
+               copy_addr  <= 0;
+               copy_phase <= '0';
+            end if;
+         end if;
       end if;
    end process;
 

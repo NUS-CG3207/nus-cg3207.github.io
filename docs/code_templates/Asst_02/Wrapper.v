@@ -61,6 +61,8 @@ module Wrapper
 	output reg [6:0] OLED_Col = 7'd0,
 	output reg [5:0] OLED_Row = 6'd0,
 	output reg [23:0] OLED_Data,		// 24-bit pixel so as to see easily on the display. <5R, 6G, 8B>, each extended to 8 bits left aligned.
+	output reg OLED_Swap = 1'b0,		// Present the drawn page. A one-cycle pulse; the OLED controller runs on the undivided clock and edge-detects it.
+	input  OLED_SwapPending,		// High from the request until the page exchange and its copy have completed. Software reads this at OLED_STATUS.
 	input [31:0] ACCEL_Data,		// Packed <Temp, X, Y, Z> from MSB to LSB. X, Y, Z are in +/-2g range, 8-bit signed.
 	input ACCEL_DReady,			// Accelerometer data ready signal. Mostly not necessary unless you are reading at a very high rate.
 	input  RESET,				// Active high. Implemented in TOP as not(BTND) or Internal_reset.
@@ -75,7 +77,7 @@ localparam MMIO_BASE = 32'hFFFF_0000;
 localparam PC_INIT = IROM_BASE;			// PC initialization value - same as IROM_BASE
 
 localparam IROM_DEPTH_BITS = 9;		//9 for 128 words. Change if your program is larger.
-localparam DMEM_DEPTH_BITS = 9;		//9 for 128 words. Change if your data (const+variable) is larger, and in C/Assembly to set STACK_INIT appropriately.
+localparam DMEM_DEPTH_BITS = 9;	//9 for 128 words. Change if your data (const+variable) is larger, and in C/Assembly to set STACK_INIT appropriately.
 localparam MMIO_DEPTH_BITS = 8;
 
 // Memory-mapped peripheral register offsets
@@ -87,6 +89,7 @@ localparam OLED_COL_OFF 		= 8'h20; //WO
 localparam OLED_ROW_OFF 		= 8'h24; //WO
 localparam OLED_DATA_OFF 		= 8'h28; //WO
 localparam OLED_CTRL_OFF 		= 8'h2C; //WO
+localparam OLED_STATUS_OFF 		= 8'h30; //RO
 localparam ACCEL_DATA_OFF 		= 8'h40; //RO
 localparam ACCEL_DREADY_OFF 	= 8'h44; //RO, status bit
 localparam LED_OFF 				= 8'h60; //WO
@@ -126,6 +129,7 @@ dec_OLED_COL				,
 dec_OLED_ROW				,
 dec_OLED_DATA				,
 dec_OLED_CTRL				,
+dec_OLED_STATUS				,
 dec_ACCEL_DATA				,
 dec_ACCEL_DREADY			,
 dec_LED						,
@@ -180,6 +184,7 @@ always@(*) begin
 	dec_OLED_ROW			<= 1'b0;
 	dec_OLED_DATA			<= 1'b0;
 	dec_OLED_CTRL			<= 1'b0;
+	dec_OLED_STATUS			<= 1'b0;
 	dec_ACCEL_DATA			<= 1'b0;
 	dec_ACCEL_DREADY		<= 1'b0;
 	dec_LED					<= 1'b0;
@@ -200,6 +205,7 @@ always@(*) begin
 			OLED_ROW_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_ROW <= 1'b1;
 			OLED_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_DATA <= 1'b1;
 			OLED_CTRL_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_CTRL <= 1'b1;
+			OLED_STATUS_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_STATUS <= 1'b1;
 			ACCEL_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DATA <= 1'b1;
 			ACCEL_DREADY_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DREADY <= 1'b1;
 			LED_OFF[MMIO_DEPTH_BITS-1:2]: dec_LED <= 1'b1;
@@ -214,7 +220,7 @@ always@(*) begin
 		bad_MEM_addr <= 1'b1;
 end
 
-assign dec_MMIO_read = MemRead || dec_DIP || dec_PB || dec_UART_RX_VALID || dec_UART_RX || dec_UART_TX_READY || dec_UART_TX || dec_CYCLECOUNT || dec_ACCEL_DATA || dec_ACCEL_DREADY ;
+assign dec_MMIO_read = MemRead || dec_DIP || dec_PB || dec_UART_RX_VALID || dec_UART_RX || dec_UART_TX_READY || dec_UART_TX || dec_CYCLECOUNT || dec_ACCEL_DATA || dec_ACCEL_DREADY || dec_OLED_STATUS ;
 assign MemWrite = MemWrite_out[3] || MemWrite_out[2] || MemWrite_out[1] || MemWrite_out[0];
 
 //----------------------------------------------------------------
@@ -285,8 +291,8 @@ if (dec_DIP)
 	ReadData_MMIO <= { {31-N_DIPs+1{1'b0}}, DIP } ; 
 else if (dec_PB)
 	ReadData_MMIO <= { {31-N_PBs+1{1'b0}}, PB } ; 
-else if (dec_UART_RX && UART_RX_valid)
-	ReadData_MMIO <= {24'd0, UART_RX};
+else if (dec_UART_RX)			// A read with no byte waiting returns 0 rather than falling through to whatever the next arm holds.
+	ReadData_MMIO <= UART_RX_valid ? {24'd0, UART_RX} : 32'd0;
 else if (dec_UART_RX_VALID)
 	ReadData_MMIO <= {31'd0, UART_RX_valid};	
 else if (dec_UART_TX_READY)
@@ -295,6 +301,9 @@ else if (dec_CYCLECOUNT)
 	ReadData_MMIO <= cycle_count;
 else if (dec_ACCEL_DATA)
 	ReadData_MMIO <= ACCEL_Data;	
+else if (dec_OLED_STATUS)		// OLED status. Bit 0 is set while a requested page swap has not completed.
+	ReadData_MMIO <= {31'd0, OLED_SwapPending};
+
 else	// dec_ACCEL_DREADY // the default else to avoid the statement from being incomplete
 	ReadData_MMIO <= {31'd0, ACCEL_DReady};
 end
@@ -345,6 +354,7 @@ reg autoadvance_row = 1'b0; // good idea to initialize it as the assignment insi
 reg autoadvance_col = 1'b0;
 always@(posedge CLK) begin
 	OLED_Write <=  1'b0;
+	OLED_Swap  <=  1'b0;	// A one-cycle pulse. CLK is derived from CLK_undiv, so the pulse is never shorter than the one CLK_undiv cycle the controller's edge detector needs.
 	case (OLED_ctrl_reg[3:0]) // mapping OLED_Write direclty to TOP will write at the fast clock rate. Not an issue, but unnecessary writes
 		4'b0001: 		//vary_col_mode (x)
 			if(MemWrite_out[0] && dec_OLED_COL) begin
@@ -416,8 +426,12 @@ always@(posedge CLK) begin
 				OLED_Data <= { WriteData_out[7:5], 5'd0, WriteData_out[4:2], 5'd0, WriteData_out[1:0], 6'd0}; 
 	endcase 
 	
+	// Bit 3 makes the write a present; the remaining bits are ignored, so
+	// software need not know the mode it set to present a frame. Bit 3 is
+	// therefore never stored, which is why the mode decode above reads [3:0].
 	if( MemWrite_out[0] && dec_OLED_CTRL )
-        OLED_ctrl_reg <= WriteData_out[7:0] ;
+		if( WriteData_out[3] ) OLED_Swap <= 1'b1 ;
+		else OLED_ctrl_reg <= WriteData_out[7:0] ;
 	if( MemWrite_out[0] && dec_OLED_ROW ) 
         OLED_Row <= WriteData_out[5:0] ;
 	if( MemWrite_out[0] && dec_OLED_COL )
@@ -437,7 +451,13 @@ always @(posedge CLK) begin
 		UART_TX <= WriteData_out[7:0];
 		UART_TX_valid <= 1'b1;
 	end
-	if (MemRead && dec_UART_RX && UART_RX_valid)
+	// Never assert ack two cycles running. MemRead is a level, so back-to-back
+	// loads would otherwise hold ack high across both and TOP, edge-detecting it
+	// on the faster clock, would count one - leaving the second load's result
+	// dependent on when TOP got round to clearing UART_RX_valid. With the gap,
+	// each load that sees valid gets its own edge: the first takes the byte, the
+	// second reads 0.
+	if (MemRead && dec_UART_RX && UART_RX_valid && !UART_RX_ack)
 		UART_RX_ack <= 1'b1;
 end
 

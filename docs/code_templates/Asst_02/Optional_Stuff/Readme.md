@@ -2,6 +2,10 @@
 
 * All programs here are non-essential.
 
-* Choose the correct test_Wrapper_variant depending on the .asm/C programme you are using.
+The example .asm/C programs are embedded into the online simulator.
 
-* TOP_Circle_delay_accel_Nexys4*.bit is a prebuilt bitstream corresponding to the Circle_delay_accel program.
+* Choose the correct test_Wrapper_variant depending on the .asm/C example you are using.
+
+* TOP_<program_name>_Nexys4*.bit is a prebuilt bitstream corresponding to <program_name>.
+
+test_Wrapper_HelloWorld works for both non-subroutine and subroutine versions.

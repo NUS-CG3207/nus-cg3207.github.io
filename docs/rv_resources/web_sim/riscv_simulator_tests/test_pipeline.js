@@ -698,18 +698,18 @@ setTimeout(async () => {
     // [8] The clock: CLK_DIV_BITS as on the board, and Run paced to it.
     console.log('\n[8] The clock, and real time');
     const hzOf = n => { win.setClkDivBits(n); return ev('cpuHz()'); };
-    check('CLK_DIV_BITS divides 100 MHz by 2^(N+1), or not at all at 0',
-      hzOf(0) === 100e6 && hzOf(5) === 1562500 && Math.abs(hzOf(26) - 0.745) < 0.001);
-    win.setClkDivBits(3);
+    check('CLK_DIV_BITS divides 100 MHz by 2^N, so 1 is 50 MHz',
+      hzOf(0) === 100e6 && hzOf(1) === 50e6 && hzOf(5) === 3125000 && Math.abs(hzOf(26) - 1.490) < 0.001);
+    win.setClkDivBits(4);
     const uartBox = doc.getElementById('uartCharInstr');
     check('the UART\'s character time follows the clock (540 cycles at 6.25 MHz)',
       ev('uartGapInstr()') === 540 && uartBox.value === '540' && uartBox.disabled);
     win.setClkDivBits(5);
-    check('and is 135 at the default divider', ev('uartGapInstr()') === 135);
+    check('and is 270 at the default divider', ev('uartGapInstr()') === 270);
     check('the stats bar shows the time those cycles take, then the cycles, then the instructions', /^\s*[\d.]+ (µs|ms|s)\s*\|\s*Cycles: \d+ \w+\s*\|\s*Instr/.test(doc.getElementById('statsBar').textContent),
       doc.getElementById('statsBar').textContent);
     assembleSrc('.text\nmain: addi t0, x0, 0\nloop: addi t0, t0, 1\n    jal x0, loop\n');
-    win.setClkDivBits(17);                       // 381 Hz
+    win.setClkDivBits(18);                       // 381 Hz
     win.setRunPace('real');
     ev('resetAll()');
     win.runProgram();
