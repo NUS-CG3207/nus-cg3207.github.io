@@ -1,0 +1,84 @@
+================================================================================
+col_row_maj_cache - row-major vs column-major traversal (cache locality demo)
+================================================================================
+
+Source   : col_row_maj_cache.c   (top executable: col_row_maj_cache)
+Switches : -r/--row/--row-major      row-major traversal only
+           -c/--col/--col-major      column-major traversal only
+           -b/--both                 both traversals (default, no switch)
+           -n/--size N (or bare N)   matrix dimension (default N = 3000)
+           -h/--help                 usage
+Timing   : each traversal is timed REPS = 100 times (compile-time constant in
+           col_row_maj_cache.c) and only the average time is printed
+           (runtime with N = 3000: ~1 s row-major, ~7 s column-major)
+
+--------------------------------------------------------------------------------
+1. COMPILE
+--------------------------------------------------------------------------------
+gcc -o col_row_maj_cache col_row_maj_cache.c -lrt
+
+# recommended: optimized build, needed for meaningful timings
+gcc -O2 -o col_row_maj_cache col_row_maj_cache.c -lrt
+
+--------------------------------------------------------------------------------
+2. RUN
+--------------------------------------------------------------------------------
+# both traversals (original behaviour, default N = 3000)
+./col_row_maj_cache
+
+# row-major only / column-major only (one access pattern per run)
+./col_row_maj_cache -r
+./col_row_maj_cache -c
+
+# other matrix sizes (default N = 3000)
+./col_row_maj_cache -n 5000
+./col_row_maj_cache -c 5000
+
+# usage / help
+./col_row_maj_cache -h
+
+--------------------------------------------------------------------------------
+3. MEASURE CACHE MISSES WITH PERF (run each pattern separately)
+--------------------------------------------------------------------------------
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses ./col_row_maj_cache -r
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses ./col_row_maj_cache -c
+
+# if perf reports "No supported events found" (perf_event_paranoid too high):
+#   sudo sysctl kernel.perf_event_paranoid=1      (or run perf itself with sudo)
+
+# more stable counts over several passes
+perf stat --repeat 5 -e cache-misses,cache-references ./col_row_maj_cache -c
+
+# note: process-wide counters include the malloc/init phase, which is identical
+# in both modes, so the row vs column difference comes from the traversal only.
+
+--------------------------------------------------------------------------------
+4. SAMPLE OUTPUT (gcc -O2, N = 3000 - absolute times vary per machine)
+--------------------------------------------------------------------------------
+$ ./col_row_maj_cache -r
+Row-major average time: 0.012 sec
+
+$ ./col_row_maj_cache -c
+Column-major average time: 0.070 sec
+
+$ ./col_row_maj_cache
+Row-major average time: 0.012 sec
+Column-major average time: 0.070 sec
+
+# only the averaged time is printed (REPS = 100 timed runs per traversal).
+# The summation the loops perform is kept - it is stored into the volatile
+# "sink" variable so a -O2 build cannot optimize the traversal away - but the
+# sum itself is no longer printed.
+#
+# absolute times depend on the CPU (frequency, thermal state, background load),
+# so they differ between machines and runs; the stable part is the ratio
+# column-major / row-major, which is ~5-6x here.
+#
+# with REPS = 100 and N = 3000 the whole run takes a few seconds (~1 s
+# row-major, ~7 s column-major).
+
+# both traversals read the same data, so the sums must match exactly:
+# sum = N * N * (N - 1)  ->  N=3000: 26991000000.00   N=1000: 999000000.00
+# column-major strides by N elements, so it is several times slower and shows
+# many more cache misses than the sequential row-major traversal.
+
