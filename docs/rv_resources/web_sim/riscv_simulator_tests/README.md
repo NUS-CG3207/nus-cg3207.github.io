@@ -234,7 +234,7 @@ Every suite in this directory is wired into `npm test`. There is no build step:
 ## 🌐 examples/ and the Godbolt cache
 
 Every example but `dip_led` / `dip_led_c` lives outside `riscv_simulator.html` entirely, in
-[`../examples/`](../examples/) (`asm/*.asm`, `c/*.c`) — the page `fetch()`es one when it is
+[`../examples/`](../examples/index.txt) (`asm/*.asm`, `c/*.c`) — the page `fetch()`es one when it is
 selected. The **menu itself** is data too: `index.txt` holds one markdown-style table
 (`| key | lang | label | file | irom | dmem | description |`), fetched and parsed at page load
 into the dropdown, the file each key maps to, and the two memory depths that key needs —

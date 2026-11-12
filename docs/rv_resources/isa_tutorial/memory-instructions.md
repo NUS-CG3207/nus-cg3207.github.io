@@ -13,6 +13,8 @@
 | `sh`  | Store Half    | S   | `0100011` | `0x1`  | `M[rs1+imm][15:0] = rs2[15:0]`     | `op rs2, imm(rs1)` |
 | `sw`  | Store Word    | S   | `0100011` | `0x2`  | `M[rs1+imm][31:0] = rs2[31:0]`     | `op rs2, imm(rs1)` |
 
+*Table adapted from the RISC-V reference card by James Zhu, with modifications and corrections.*
+
 - `lw` and `sw` behave the same way as offset mode
   <span class="arm">LDR</span>/<span class="arm">STR</span> in ARM.
 - Note that `lw` and `sw` **do not have the same format**.
@@ -74,12 +76,12 @@ where `imm1` and `imm2` are chosen by the assembler such that
 
 ## Memory instruction example
 
-Assuming `s1`/`x9` = `0x4321DCBA`; `s2`/`x18` = `0x00002408`.
+Assuming `s1`/`x9` = `0x4321DCBA`; `s2`/`x18` = `0x10010004`.
 
 | Pseudoinstruction / Assembler Directive | Actual Instruction   | Operation                                                                                                                     | Actual Memory Location Content (Instruction in Hex) |
 | --------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `sw s1, -4(s2)`                         | `sw x9, 0xffc(x18)`  | `M[x18+0xfffffffc = 0x00002408+0xfffffffc = 0x00002404] = x9 = 0x4321DCBA`                                                     | `0xfe992e23`                                        |
-| `lb s4, -4(s2)`                         | `lb x20, 0xffc(x18)` | `x20[7:0] = M[x18+0xfffffffc = 0x00002408+0xfffffffc = 0x00002404]`<br>`x20[31:8] = x20[7]`<br>`x20 = 0xFFFFFFBA` (`0x000000BA` if `lbu`) | `0xffc90a03`<br>(`0xffc94a03` if `lbu`)  |
+| `sw s1, -4(s2)`                         | `sw x9, 0xffc(x18)`  | `M[x18+0xfffffffc = 0x10010004+0xfffffffc = 0x10010000] = x9 = 0x4321DCBA`                                                     | `0xfe992e23`                                        |
+| `lb s4, -4(s2)`                         | `lb x20, 0xffc(x18)` | `x20[7:0] = M[x18+0xfffffffc = 0x10010004+0xfffffffc = 0x10010000]`<br>`x20[31:8] = x20[7]`<br>`x20 = 0xFFFFFFBA` (`0x000000BA` if `lbu`) | `0xffc90a03`<br>(`0xffc94a03` if `lbu`)  |
 
 <figure markdown="1">
 <div class="wide-figure" markdown="1">

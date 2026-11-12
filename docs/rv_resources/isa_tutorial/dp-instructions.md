@@ -26,6 +26,8 @@
 | `lui`   | Load Upper Imm          | U   | `0110111` |        |                   | `rd = imm << 12`         | `lui rd, imm`      |
 | `auipc` | Add Upper Imm to PC     | U   | `0010111` |        |                   | `rd = PC + (imm << 12)`  | `auipc rd, imm`    |
 
+*Table adapted from the RISC-V reference card by James Zhu, with modifications and corrections.*
+
 - Differences with ARM: <span class="arm">EOR</span> ⇒ `xor`,
   <span class="arm">ORR</span> ⇒ `or`, <span class="arm">LSL</span> ⇒ `sll`,
   <span class="arm">LSR</span> ⇒ `srl`, <span class="arm">ASR</span> ⇒ `sra`.
@@ -91,6 +93,10 @@
     `0xfffff` is -1, which is why the immediate for `lui` is `0x0004321e` to
     compensate.
 
+[^la]: `LABEL - PC = 0x10010000 - 0x00400010 = 0x0fc0fff0`. Its lower 12 bits,
+    `0xff0`, are -16 once MSB-extended, so the assembler adds 1 to the upper 20
+    bits (`0x0fc0f` + 1 = `0x0fc10`) to compensate, as in the `li` example above.
+
 ## DP pseudoinstruction — `la`
 
 - 32-bit PC-relative addresses (`la`) are generated using `auipc` (facilitating
@@ -99,23 +105,23 @@
 
 | Memory Address | Pseudoinstruction / Assembler Directive | Actual Instruction   | Operation                                                                   | Actual Memory Location Content (Instruction in Hex) |
 | -------------- | --------------------------------------- | -------------------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
-| `0x00000010`   | `la s1, LABEL`                          | `auipc x9, 2`        | `x9 = PC + imm<<12 = 0x00000010 + 2<<12 = 0x00002010`                        | `0x00002497`                                        |
-| `0x00000014`   |                                         | `addi x9, x9, 0x3f4` | `x9 = x9 + MSB-extend(0x3f4)` ⇒ `x9 = x9 + 0x000003f4` (since imm is positive) `= 0x00002404` | `0x3f448493`               |
-| `0x00002404`   | `LABEL: .word 0xABCD1234`               | N.A.                 | N.A.                                                                        | `0xABCD1234`                                        |
+| `0x00400010`   | `la s1, LABEL`                          | `auipc x9, 0xfc10`   | `x9 = PC + imm<<12 = 0x00400010 + 0x0fc10000 = 0x10010010`                   | `0x0fc10497`                                        |
+| `0x00400014`   |                                         | `addi x9, x9, 0xff0` | `x9 = x9 + MSB-extend(0xff0)` ⇒ `x9 = x9 + 0xfffffff0` (since imm is negative, i.e. -16)[^la] `= 0x10010000` | `0xff048493`               |
+| `0x10010000`   | `LABEL: .word 0xABCD1234`               | N.A.                 | N.A.                                                                        | `0xABCD1234`                                        |
 
 <figure markdown="1">
 <div class="wide-figure" markdown="1">
-![U-type encoding of auipc x9, 2 and I-type encoding of addi x9, x9, 0x3f4 with all bit fields shown](assets/enc-auipc-addi.svg)
+![U-type encoding of auipc x9, 0xfc10 and I-type encoding of addi x9, x9, 0xff0 with all bit fields shown](assets/enc-auipc-addi.svg)
 </div>
-<figcaption>Encodings of <code>auipc x9, 2</code> (U-type) and <code>addi x9, x9, 0x3f4</code> (I-type).</figcaption>
+<figcaption>Encodings of <code>auipc x9, 0xfc10</code> (U-type) and <code>addi x9, x9, 0xff0</code> (I-type).</figcaption>
 </figure>
 
 Laid out in memory (least significant byte in the lowest memory address —
 little-endian scheme):
 
-| Memory Address                | `0x00000010` | `0x00000011` | `0x00000012` | `0x00000013` | `0x00000014` | `0x00000015` | `0x00000016` | `0x00000017` |
+| Memory Address                | `0x00400010` | `0x00400011` | `0x00400012` | `0x00400013` | `0x00400014` | `0x00400015` | `0x00400016` | `0x00400017` |
 | ----------------------------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
-| Actual Memory Location Content | `0x97`       | `0x24`       | `0x00`       | `0x00`       | `0x93`       | `0x84`       | `0x44`       | `0x3f`       |
+| Actual Memory Location Content | `0x97`       | `0x04`       | `0xc1`       | `0x0f`       | `0x93`       | `0x84`       | `0x04`       | `0xff`       |
 
 ## Multiply and divide
 
@@ -132,6 +138,8 @@ available as an optional standard extension (**M**).
 | `divu`   | DIV (U)           | R   | `0110011` | `0x5`  | `0x01` | `rd = rs1 / rs2`             | `op rd, rs1, rs2` |
 | `rem`    | Remainder         | R   | `0110011` | `0x6`  | `0x01` | `rd = rs1 % rs2`             | `op rd, rs1, rs2` |
 | `remu`   | Remainder (U)     | R   | `0110011` | `0x7`  | `0x01` | `rd = rs1 % rs2`             | `op rd, rs1, rs2` |
+
+*Table adapted from the RISC-V reference card by James Zhu, with modifications and corrections.*
 
 - There are no instructions like <span class="arm">SMULL</span>,
   <span class="arm">UMULL</span> of ARM which update two registers, as only one

@@ -1,26 +1,40 @@
 ----------------------------------------------------------------------------------
--- Company: NUS
--- Engineer: (c) Rajesh Panicker
--- 
--- Create Date:   21:06:18 06/09/2020
--- Design Name: 	TOP
--- Target Devices: Nexys 4 (Artix 7 100T)
--- Description: Top level module for Synthesis. Not meant to be simulated
--- Dependencies: 
+-- Description: Top level module for Synthesis. Not meant to be simulated.
+--              See the notes below. The interface (entity) as well as implementation (architecture) can be modified.
+-- Target Devices: Nexys 4 / Nexys 4 DDR / Nexys A7
+-- Dependencies:
+-- Wrapper.v, which instantiates RV.v, which in turn uses ALU.v, Shifter.v, Decoder.v,
+--   Extend.v, PC_Logic.v, ProgramCounter.v and RegFile.v
 -- uart.vhd by (c) Peter A Bennett, https://github.com/pabennett/uart
--- PMOD OLED RGB controller by (c) Yannick Bornat, https://yannick-bornat.enseirb-matmeca.fr/wiki/doku.php/en202:pmodoledrgb
--- ADXL362Ctrl and SPI controllers by (c) Digilent, https://github.com/Digilent/Nexys-4-DDR-OOB
--- Revision 0.04
--- Additional Comments: See the notes below. The interface (entity) as well as implementation (architecture) can be modified
+-- pmodoledrgb_bitmap.vhd (PMOD OLED RGB controller) by (c) Yannick Bornat, https://yannick-bornat.enseirb-matmeca.fr/wiki/doku.php/en202:pmodoledrgb
+-- ADXL362Ctrl.vhd and SPI_If.vhd (accelerometer and SPI controllers) by (c) Digilent, https://github.com/Digilent/Nexys-4-DDR-OOB
 ----------------------------------------------------------------------------------
---	License terms :
---	You are free to use this code as long as you
---		(i) DO NOT post it on any public repository;
---		(ii) use it only for educational purposes;
---		(iii) accept the responsibility to ensure that your implementation does not violate anyone's intellectual property.
---		(iv) accept that the program is provided "as is" without warranty of any kind or assurance regarding its suitability for any particular purpose;
---		(v) send an email to rajesh<dot>panicker<at>ieee.org briefly mentioning its use (except when used for the course CG3207 at the National University of Singapore);
---		(vi) retain this notice in this file as well as any files derived from this.
+
+----------------------------------------------------------------------------------
+--	MIT License
+--
+--	Copyright (c) 2020 Rajesh Panicker
+--
+--	Permission is hereby granted, free of charge, to any person obtaining a copy
+--	of this software and associated documentation files (the "Software"), to deal
+--	in the Software without restriction, including without limitation the rights
+--	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+--	copies of the Software, and to permit persons to whom the Software is
+--	furnished to do so, subject to the following conditions:
+--
+--	The above copyright notice and this permission notice shall be included in all
+--	copies or substantial portions of the Software.
+--
+--	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+--	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+--	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+--	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+--	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+--	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+--	SOFTWARE.
+--
+--	Not a condition of the license, but if you find this code useful, an email to
+--	rajesh.panicker <at> u.nus.edu briefly mentioning its use would be appreciated.
 ----------------------------------------------------------------------------------
 
 -->>>>>>>>>>>>>>>>>>>>>>>>>>> ******* FOR SYNTHESIS ONLY. DO NOT SIMULATE THIS ******* <<<<<<<<<<<<<<<<<<<<<<<<<<<

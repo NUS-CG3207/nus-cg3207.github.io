@@ -30,7 +30,7 @@ To make the most of the labs, we recommend doing some reading before you come fo
 
 3. Make sure you read [Getting to know your Nexys 4](getting_started/nexys4.md) and [install Vivado](getting_started/vivado_install_guide.md) on your personal computer as soon as possible. If you do not have access to a Windows or Linux (preferred) PC, you should try your best to get/borrow one for this course. Vivado does work in Parallels Desktop on a Mac, but this is an expensive piece of software, and not entirely a supported configuration.
 
-4. Finally, choose an architecture that you want to work with for the labs. You may choose between RISC-V (recommended), or ARM (deprecated, not well-supported by teaching team). This might also be a good time to form teams of two to three people for labs 2, 3, and 4. Note that Lab 1 will be an individual exercise, and you will not be assessed as a team - though, of course, we encourage you to work together (academically honestly, of course - no copying or direct sharing of work, please).
+4. Finally, this might be a good time to form teams of two to three people for labs 2, 3, and 4. Note that Lab 1 will be an individual exercise, and you will not be assessed as a team - though, of course, we encourage you to work together (academically honestly, of course - no copying or direct sharing of work, please).
 
 ## Lab outline
 

@@ -36,6 +36,8 @@ for each register.
 | `x18`–`x27` | `s2`–`s11`  | Saved registers       | Callee |
 | `x28`–`x31` | `t3`–`t6`   | Temporaries           | Caller |
 
+*Table adapted from the RISC-V reference card by James Zhu, with modifications and corrections.*
+
 ## `x0` and the PC
 
 - Register `x0` is **hardwired to 0**. Writes to `x0` are ignored.

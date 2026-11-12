@@ -2,15 +2,33 @@
 
 ## Recap: architecture vs microarchitecture
 
-**Architecture (ISA): the programmer's view of a computer.**
+The **architecture**, or **instruction set architecture (ISA)**, is the contract
+between hardware and software. It tells a programmer (or a compiler) everything
+needed to write a correct program, and says nothing about how the hardware
+achieves it. It specifies:
 
-- Defined by instructions & operand locations.
-- *Assembly language*: human-readable format of instructions.
-- *Machine language*: computer-readable format (1's and 0's).
-- Assembly language → machine language conversion is done by the **assembler**.
-    - One-to-one correspondence (except for pseudo-instructions).
+- the instructions and what each one does;
+- where operands can come from: registers, memory, or constants (immediates)
+  embedded in the instruction;
+- how each instruction is encoded as a pattern of bits.
 
-**Microarchitecture: how to implement an architecture in hardware.**
+A program can be written in two equivalent forms:
+
+- *Machine code*: the binary encoding that the processor fetches and executes.
+- *Assembly language*: a textual notation for the same instructions, using
+  mnemonics such as `add` and register names such as `x5`.
+
+An **assembler** translates assembly language into machine code. Each assembly
+instruction normally becomes exactly one machine instruction. The exceptions are
+*pseudo-instructions*, shorthands that the assembler expands into one or more
+real instructions. For example, `li` (load immediate) with a large constant
+becomes a `lui` followed by an `addi`.
+
+The **microarchitecture** is a particular hardware design that implements an ISA:
+its datapath, control unit, pipeline, caches and so on. One ISA can have many
+microarchitectures. A small single-cycle core and a high-performance
+out-of-order core can run the same RISC-V binary and produce the same results.
+They differ only in speed, area and power.
 
 <figure markdown="1">
 ![Levels of abstraction from application software down to physics, with Architecture highlighted](assets/abstraction-layers.svg){ width="300" }
@@ -20,8 +38,8 @@
 ## RISC-V history
 
 - Began in **2010** at the University of California, Berkeley as a short project.
-- Goal: to make a practical ISA that was open-sourced, usable academically, and
-  deployable in any hardware or software design without royalties.
+- The aim was an ISA that anyone could use freely, whether for teaching,
+  research or commercial products, with no licence fees or royalties.
 - Introduced in **Aug 2014**.
 - Transferred to the RISC-V Foundation in **2015**, and then on to RISC-V
   International, a Swiss non-profit entity, in **November 2019**.
@@ -51,10 +69,11 @@
 - Interesting design choices to simplify hardware implementation.
     - Especially the encoding of immediates.
 - **Modular design** — the instruction set is designed for a wide range of uses.
-- The base instruction set has a fixed length of 32-bit naturally aligned
-  instructions (different base variants such as RV32I, RV32E, RV64I, … exist).
-- The ISA supports variable length extensions where each instruction can be any
-  number of 16-bit parcels in length.
+- Every instruction in the base set is 32 bits long and stored at an address
+  that is a multiple of 4. There are a few base variants, such as RV32I, RV32E
+  and RV64I.
+- Extensions may add instructions of other lengths, as long as each length is a
+  multiple of 16 bits.
 - Extensions include multiplication (**M**), floating point (**F**, **D**,
   **Q**), atomics (**A**), compressed instructions (**C** — 16-bit long
   instructions for high code density like ARM Thumb), …

@@ -67,7 +67,7 @@ The visualisation should correspond to the **actual enhancement implemented for 
 
 Provide the complete history of prompts used to create the visualisation, together with any skills files or other relevant Markdown files used.
 
-<span style="color: brown;">You are expected to understand the algorithm, but not the HTML/CSS/JavaScript code.</span>
+You are expected to understand the algorithm, but not the HTML/CSS/JavaScript code.
 
 
 ## Design Instructions

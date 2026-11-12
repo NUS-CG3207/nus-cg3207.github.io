@@ -25,46 +25,30 @@ This task is not graded, but necessary to be able to complete the assignments me
 
 ### Task overview
 
-The goal of this task is to get familiar with the [RISC-V assembler/simulator](../../rv_resources/rv_programming.md) or [ARM assembler/simulator](../../ARM/arm_programming.md) by simulating a sample program. We will simulate a system with memory-mapped input/output (MMIO).
+The goal of this task is to get familiar with the [RISC-V assembler/simulator](../../rv_resources/rv_programming.md) by simulating a sample program. We will simulate a system with memory-mapped input/output (MMIO).
 
-We assume that the LEDs on this system are mapped to address [`0xFFFF0060`]("`0xC00` for ARM"). This means that when we write to this memory address using [`sw`]("`STR` for ARM"), the least significant 16 bits of whatever data we write to this address is shown on the LEDs. For example, if we write `0xF0F0`, the first four LEDs from the left will be lit, then the next four will be unlit, the next four lit, and the last four unlit.
+We assume that the LEDs on this system are mapped to address `0xFFFF0060`. This means that when we write to this memory address using `sw`, the least significant 16 bits of whatever data we write to this address is shown on the LEDs. For example, if we write `0xF0F0`, the first four LEDs from the left will be lit, then the next four will be unlit, the next four lit, and the last four unlit.
 
-Similarly, we assume that the DIP switches are mapped to address [`0xFFFF0064`]("`0xC04` for ARM"). This means that when we read data from this memory address using [`lw`]("`LDR` for ARM"), the least significant 16 bits of data read will correspond to the state of the switches. For example, if the switches are alternating between on (up) and off (down), with the first switch from the left being on, the data read will be `0xAAAA`.
+Similarly, we assume that the DIP switches are mapped to address `0xFFFF0064`. This means that when we read data from this memory address using `lw`, the least significant 16 bits of data read will correspond to the state of the switches. For example, if the switches are alternating between on (up) and off (down), with the first switch from the left being on, the data read will be `0xAAAA`.
 
 ### Task instructions
 
-In this task, we will simulate the user providing some input to the switches, and observe the provided assembly program display said input on the LEDs. The first step, of course, is to download the [RISC-V assembly sample](../../code_templates/Asst_01/DIP_to_LED.asm) program or the [ARM assembly sample](../../code_templates/Asst_01/arm_assembly_sample.s) program. Then, we can open our sample file in RARS or Keil MDK and start simulating.
+In this task, we will simulate the user providing some input to the switches, and observe the provided assembly program display said input on the LEDs. The first step, of course, is to download the [RISC-V assembly sample](../../code_templates/Asst_01/DIP_to_LED.asm) program. Then, we can open our sample file in RARS and start simulating.
 
-=== "RISC-V (RARS)"
+Refer to [Lab 4 from CS2100DE](https://nus-cs2100de.github.io/labs/manuals/04/lab_04#getting-started-with-rars) for some help on how to open a RISC-V assembly file in RARS. The guide is written for a different sample program, but the steps to open, assemble and run the code are identical.
 
-    Refer to [Lab 4 from CS2100DE](https://nus-cs2100de.github.io/labs/manuals/04/lab_04#getting-started-with-rars) for some help on how to open a RISC-V assembly file in RARS. The guide is written for a different sample program, but the steps to open, assemble and run the code are identical.
+!!! warning
+    Remember to set the memory configuration correctly - from "Settings" -> "Memory Configuration", choose "Default". Setting this correctly is **very important** - our simulation for this assignment depends on this memory configuration being selected, and our CPU design later will also assume this memory configuration.
 
-    !!! warning
-        Remember to set the memory configuration correctly - from "Settings" -> "Memory Configuration", choose "Default". Setting this correctly is **very important** - our simulation for this assignment depends on this memory configuration being selected, and our CPU design later will also assume this memory configuration.
-    
-    Once you have assembled and begun to run the RISC-V code line-by-line, before executing line 48, simulate changing the input on the switches by modifying the memory at the address mapped to the DIP switches (`0xFFFF0064`). Then, continue running the code, including lines 48 and 49, one line at a time, until the memory at the address for the LEDs (`0xFFFF0060`) changes to reflect the new data. 
+Once you have assembled and begun to run the RISC-V code line-by-line, before executing line 63, simulate changing the input on the switches by modifying the memory at the address mapped to the DIP switches (`0xFFFF0064`). Then, continue running the code, including lines 63 and 64, one line at a time, until the memory at the address for the LEDs (`0xFFFF0060`) changes to reflect the new data. 
 
-    ![Screenshot of addresses in RARS](rars_address_ss.png)
+![Screenshot of addresses in RARS](rars_address_ss.png)
 
-    /// caption
-    
-    Screenshot of addresses in RARS
+/// caption
 
-    ///
+Screenshot of addresses in RARS
 
-=== "ARM (Keil MDK)"
-
-    Refer to [the ARM Programming Guide](../../ARM/arm_programming.md) for instructions on how to set up and use Keil MDK. 
-
-    Once you have assembled and begun to run the ARM code line by line, before executing line 23, simulate changing the input on the switches by modifying the memory at the address mapped to the DIP switches (`0xC04`). Then continue running the code, including lines 23 and 24, one line at a time, until the memory at the address for the LEDs (`0xC00`) changes to reflect the new data.
-
-    ![Screenshot of addresses in Keil MDK](keil_address_ss.png)
-
-    /// caption
-
-    Screenshot of addresses in Keil MDK
-
-    ///
+///
 
 For the assessment, you must be able to demonstrate everything you just did in front of your assessor. You must also understand every line of the sample assembly program, as you may be quizzed on what a particular line (or set of lines) does.
 
@@ -75,9 +59,9 @@ Finally, dump the instruction and data memories. Click the "Dump Memory" button 
 Simulate a 'Hello World' Program.
 There are 2 versions provided -
 
-* [HelloWorld](../../code_templates/Asst_01/HelloWorld.asm) that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
+* [HelloWorld](../../rv_resources/web_sim/examples/asm/HelloWorld.asm) that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
 and
-* [HelloWorld_jal_jalr](../../code_templates/Asst_01/HelloWorld_jal_jalr.asm) that uses subroutines and requires full `jal` and `jalr` support.
+* [HelloWorld_jal_jalr](../../rv_resources/web_sim/examples/asm/HelloWorld_jal_jalr.asm) that uses subroutines and requires full `jal` and `jalr` support.
 
 Since we are using a simulator now and isn't worried about processor capabilities, you can simulate either or both.
 Read the UART peripheral details to understand the 4 registers involved.

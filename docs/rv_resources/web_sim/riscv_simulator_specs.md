@@ -8,7 +8,7 @@
 | File | What it is |
 |---|---|
 | [`riscv_simulator.html`](riscv_simulator.html) | The simulator. Single file, no build step. Assembling, simulating and the HDL engine all run in the browser with nothing fetched; **DIP to LED** (both languages) is baked in for the same reason. Every other example, and C compilation, need the page served over `http://` — see below. |
-| [`examples/`](examples/) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
+| [`examples/`](examples/index.txt) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
 | [`vendor/`](vendor/README.md) | Local copies of the three external engines (CodeMirror, Icarus Verilog, Yosys), used only when the CDN cannot be reached. |
 
 **Live:** <https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/> · Vibe coded by Rajesh Panicker.
@@ -1189,7 +1189,7 @@ No `0x` prefix on Content (Hex) — the header already says it's hex; Memory's A
 
 ## 12. Automated test suite
 
-A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests). Every
+A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests/README.md). Every
 suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file
 rather than a copy of its logic. `npm test` runs all **18** of them — every `test_*.js`
 file in the directory is one of the 18, there is no build step and nothing else to run.

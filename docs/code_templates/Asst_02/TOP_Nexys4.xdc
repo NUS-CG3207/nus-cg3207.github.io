@@ -1,3 +1,5 @@
+## Based on the master .xdc file for this board by (c) Digilent, https://github.com/Digilent/digilent-xdc
+## Modified for CG3207.
 ## This file is a general .xdc for the Nexys4 rev B board
 ## To use it in a project:
 ## - uncomment the lines corresponding to used pins

@@ -15,6 +15,8 @@
 
 \* Specify the BTA as a LABEL and the assembler will encode the immediate.
 
+*Table adapted from the RISC-V reference card by James Zhu, with modifications and corrections.*
+
 - `ltu` (less than unsigned) = <span class="arm">LO</span> (lower); `geu`
   (greater or equal unsigned) = <span class="arm">HS</span> (higher or same).
     - Other conditions such as `gt` (<span class="arm">GT</span>), `le`
@@ -57,11 +59,11 @@
 
 | Memory Address | Pseudoinstruction / Assembler Directive | Actual Instruction | Operation | Actual Memory Location Content (Instruction in Hex) |
 | -------------- | --------------------------------------- | ------------------ | --------- | --------------------------------------------------- |
-| `0x00000000` | `J_BTA: li s1, 1`   | `addi x9, x0, 1`      | `x9 = x0 + 1 = 1`                                        | `0x00100493` |
-| `0x00000004` | `SB_BTA: li s2, -2` | `addi x18, x0, 0xffe` | `x18 = x0 + 0xfffffffe = 0xfffffffe`                     | `0xffe00913` |
-| `0x00000008` | `slt s4, s1, s2`    | `slt x20, x9, x18`    | `x20 = x9 < x18? 1:0` (signed comparison)<br>`x20 = 1 < -2? 1:0 = 0` | `0x0124aa33` |
-| `0x0000000C` | `bne s4, zero, SB_BTA` | `bne x20, x0, 0xfffffff8` | `PC = (x20!=x0)? PC+0xfffffff8 : PC+4`<br>`PC = (0!=0)?(0x0000000C + 0xfffffff8) : (0x0000000C + 4) = 0x00000010`<br>Branch won't be taken in this example | `0xfe0a1ce3` |
-| `0x00000010` | `jal J_BTA` | `jal x1, 0xfffffff0` | `PC = PC+0xfffffff0 = (0x00000010 + 0xfffffff0) = 0x00000000`<br>`x1 = PC+4 = 0x00000014` | `0xff1ff0ef` |
+| `0x00400000` | `J_BTA: li s1, 1`   | `addi x9, x0, 1`      | `x9 = x0 + 1 = 1`                                        | `0x00100493` |
+| `0x00400004` | `SB_BTA: li s2, -2` | `addi x18, x0, 0xffe` | `x18 = x0 + 0xfffffffe = 0xfffffffe`                     | `0xffe00913` |
+| `0x00400008` | `slt s4, s1, s2`    | `slt x20, x9, x18`    | `x20 = x9 < x18? 1:0` (signed comparison)<br>`x20 = 1 < -2? 1:0 = 0` | `0x0124aa33` |
+| `0x0040000C` | `bne s4, zero, SB_BTA` | `bne x20, x0, 0xfffffff8` | `PC = (x20!=x0)? PC+0xfffffff8 : PC+4`<br>`PC = (0!=0)?(0x0040000C + 0xfffffff8) : (0x0040000C + 4) = 0x00400010`<br>Branch won't be taken in this example | `0xfe0a1ce3` |
+| `0x00400010` | `jal J_BTA` | `jal x1, 0xfffffff0` | `PC = PC+0xfffffff0 = (0x00400010 + 0xfffffff0) = 0x00400000`<br>`x1 = PC+4 = 0x00400014` | `0xff1ff0ef` |
 
 !!! note "On specifying the target"
 

@@ -117,7 +117,7 @@ When simulating, the `test_Wrapper` -> `Wrapper` -> `RV` relationship is analogo
 
 There are 5 files we must populate/modify:
 
-1. `ALU.v`: we must modify the ALU to incorporate shifts, <span style="color: brown;">`xor`, etc</span>. <span style="color: brown;">ALUFlags need to be modified to support blt, bltu, bge, bgeu</span>.
+1. `ALU.v`: we must modify the ALU to incorporate shifts, `xor`, etc. ALUFlags need to be modified to support blt, bltu, bge, bgeu.
 2. `Decoder.v`
 3. `PC_Logic.v`
 4. `RV.v`
@@ -126,7 +126,7 @@ There are 5 files we must populate/modify:
 
 You are expected to know the functionality of all components of the RISC-V processor (RV module and its sub-modules*), irrespective of who wrote it - you or your teammate or provided as a part of the templates or assisted by AI (in which case you should declare the prompts used as a comment, and also verbally to the evaluator). You need not understand `TOP`. A fair understanding of `Wrapper` is essential; a deeper understanding is recommended though not mandatory.
 
-*For assignment #2, a deeper understanding of the shifter component <span style="color: brown;"> or ALUFlags generation</span> is not essential. For future assignments, it is.
+*For assignment #2, a deeper understanding of the shifter component or ALUFlags generation is not essential. For future assignments, it is.
 
 !!! tip
     Read the comments (especially about the input and output ports / interfaces) in the `Wrapper.v` carefully.
@@ -189,7 +189,7 @@ The provided assembly language programs are neither meant to be comprehensive pr
 
 Use your own, well-crafted programs for a convincing demo (to demonstrate that all the required instructions and variants work). **One single program demonstrating all the features is desirable**. Conversely, make sure that your program only uses the features that you have already implemented; notably, we cannot use any multiplication operations, byte/half-word load and store, etc. If you were unable to implement some required instructions, make sure your assembly program doesn't use those; otherwise, the demo will be quite disappointing.
 
-By 'convincing demo', what we mean is having an assembly language program that tests all the features of all instructions of a particular type. For example, if you demonstrate `addi`, you don't really have to show `andi`, `ori`, as it can be expected to work, as the datapath activated is the same, and the control signals are derived in a manner that is unlikely to be wrong for one if it is correct for the other (this isn't the case, for example, for `srl` and `sra`). Instructions such as conditional branches should be used, such that both possibilities - i.e., branch taken and branch not taken should be demonstrated. In other words, it should provide an exhaustive 'coverage' of your HDL code <span style="color: brown;">and assembly code</span>. Your program should be crafted such that if one instruction misbehaves, the overall behavior of the program should be different - this is the case for most programs, as long as you use the result from every instruction in a subsequent instruction. Some points to watch out for:
+By 'convincing demo', what we mean is having an assembly language program that tests all the features of all instructions of a particular type. For example, if you demonstrate `addi`, you don't really have to show `andi`, `ori`, as it can be expected to work, as the datapath activated is the same, and the control signals are derived in a manner that is unlikely to be wrong for one if it is correct for the other (this isn't the case, for example, for `srl` and `sra`). Instructions such as conditional branches should be used, such that both possibilities - i.e., branch taken and branch not taken should be demonstrated. In other words, it should provide an exhaustive 'coverage' of your HDL code and assembly code. Your program should be crafted such that if one instruction misbehaves, the overall behavior of the program should be different - this is the case for most programs, as long as you use the result from every instruction in a subsequent instruction. Some points to watch out for:
 
 * There should be no 'dead code', i.e, code that is never reached. This can happen when there is code beyond the dead-end `halt j halt`, or code that is executed conditionally, but the condition is never reached.
 * Do not have pairs/groups of instructions that cancel each others' effect (e.g., addition and subtraction by the same amount - which could have correct results even if both instructions misbehave).

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 954.0 173.2" width="954.0" height="173.2" role="img" aria-label="Encoding of auipc x9, 2 and addi x9, x9, 0x3f4">
-<title>Encoding of auipc x9, 2 and addi x9, x9, 0x3f4</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 954.0 173.2" width="954.0" height="173.2" role="img" aria-label="Encoding of auipc x9, 0xfc10 and addi x9, x9, 0xff0">
+<title>Encoding of auipc x9, 0xfc10 and addi x9, x9, 0xff0</title>
 <rect x="0" y="0" width="954.0" height="173.2" rx="6" fill="#ffffff" stroke="#d3dae1"/>
 <text x="48.0" y="20.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="9.5" fill="#5b6570" text-anchor="start" font-weight="normal" font-style="normal">31</text>
 <text x="564.0" y="20.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="9.5" fill="#5b6570" text-anchor="end" font-weight="normal" font-style="normal">12</text>
@@ -11,7 +11,7 @@
 <rect x="46.0" y="26.0" width="520.0" height="30.0" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
 <text x="306.0" y="45.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13.5" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">imm[31:12]</text>
 <rect x="46.0" y="56.0" width="520.0" height="21.6" fill="#eef2f6" stroke="#43505c" stroke-width="1"/>
-<text x="306.0" y="70.3" font-family="'SFMono-Regular', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">0000 0000 0000 0000 0010  (0x00002)</text>
+<text x="306.0" y="70.3" font-family="'SFMono-Regular', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">0000 1111 1100 0001 0000  (0x0fc10)</text>
 <rect x="566.0" y="26.0" width="130.0" height="30.0" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
 <text x="631.0" y="45.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13.5" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">rd</text>
 <rect x="566.0" y="56.0" width="130.0" height="21.6" fill="#eef2f6" stroke="#43505c" stroke-width="1"/>
@@ -35,7 +35,7 @@
 <rect x="46.0" y="107.6" width="312.0" height="30.0" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
 <text x="202.0" y="126.6" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13.5" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">imm[11:0]</text>
 <rect x="46.0" y="137.6" width="312.0" height="21.6" fill="#eef2f6" stroke="#43505c" stroke-width="1"/>
-<text x="202.0" y="151.9" font-family="'SFMono-Regular', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">0011 1111 0100  (0x3f4)</text>
+<text x="202.0" y="151.9" font-family="'SFMono-Regular', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">1111 1111 0000  (0xff0)</text>
 <rect x="358.0" y="107.6" width="130.0" height="30.0" fill="#ffffff" stroke="#43505c" stroke-width="1"/>
 <text x="423.0" y="126.6" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13.5" fill="#1c1c1c" text-anchor="middle" font-weight="500" font-style="normal">rs1</text>
 <rect x="358.0" y="137.6" width="130.0" height="21.6" fill="#eef2f6" stroke="#43505c" stroke-width="1"/>

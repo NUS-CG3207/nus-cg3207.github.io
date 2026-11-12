@@ -12,7 +12,7 @@
 
 Implement pipelining. Pipelining should be done such that the processor supports all the requirements for Assignment 2 and Assignment 3.
 
-The purpose of pipelining is to increase the clock frequency. You should try increasing the clock frequency, following the tip below. For the compulsory task, it is sufficient to test and report the max frequency via CLK_DIV_BITS. <span style="color: brown;">There will not be additional marks for the compulsory task based on the achieved clock frequency</span> - any attempt to increase/optimize this will be an open-ended enhancement.
+The purpose of pipelining is to increase the clock frequency. You should try increasing the clock frequency, following the tip below. For the compulsory task, it is sufficient to test and report the max frequency via CLK_DIV_BITS. There will not be additional marks for the compulsory task based on the achieved clock frequency - any attempt to increase/optimize this will be an open-ended enhancement.
 
 Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task. As long as your design works with an appropriate number of `nop`s, the requirements for this task can be met.
 
@@ -78,7 +78,7 @@ Hazard hardware (forwarding, stalling, flushing, etc.) is not a compulsory task.
 
 ## Open-ended Enhancement [12 points]
 
-This is the fun part - implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed below. <span style="color: brown;"> The enhancement should be over and above the compulsory task - do not implement a separate design that does not have pipelining, but has enhancements. </span>
+This is the fun part - implementing performance enhancements of your choice. There is no fixed requirement to get these points, and while we suggest some enhancements below, it doesn't mean you need to implement all (or any!) of these. Just one significant performance enhancement will suffice, and this need not be limited to the ones we have listed below. The enhancement should be over and above the compulsory task - do not implement a separate design that does not have pipelining, but has enhancements.
 
 ??? tip "Hazard Hardware"
 
@@ -153,7 +153,7 @@ This is the fun part - implementing performance enhancements of your choice. The
 
 ## Design Instructions
 
-* All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU or MCycle unit. *Exceptions*: `+` for calculating next `PC`, multiplication, division, enhancements such as branch prediction, <span style="color: brown;">a floating point unit that is distinct from ALU</span>, etc. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.
+* All 32-bit combinational arithmetic and logical operations have to be performed inside the ALU or MCycle unit. *Exceptions*: `+` for calculating next `PC`, multiplication, division, enhancements such as branch prediction, a floating point unit that is distinct from ALU, etc. Pipeline hazard detection will require comparisons (for equality only) too, but they are on 5-bit values.
 * In the ALU, DO NOT use additional `+` signs -> this could infer additional adders. The existing addition framework should be good enough.
 * All operators are permitted on 32-bit values outside the RV module. For example, you will have to do 32-bit comparisons in the wrapper for address decoding.
 * Use of arithmetic operators:

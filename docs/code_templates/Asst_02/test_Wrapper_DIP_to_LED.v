@@ -1,15 +1,30 @@
 `timescale 1ns / 1ps
 /*
 ----------------------------------------------------------------------------------
---	(c) Rajesh Panicker
---	License terms :
---	You are free to use this code as long as you
---		(i) DO NOT post it on any public repository;
---		(ii) use it only for educational purposes;
---		(iii) accept the responsibility to ensure that your implementation does not violate any intellectual property of ARM Holdings or other entities.
---		(iv) accept that the program is provided "as is" without warranty of any kind or assurance regarding its suitability for any particular purpose;
---		(v) send an email to rajesh.panicker@ieee.org briefly mentioning its use (except when used for the course CG3207 at the National University of Singapore);
---		(vi) retain this notice in this file or any files derived from this.
+--	MIT License
+--
+--	Copyright (c) 2020 Rajesh Panicker
+--
+--	Permission is hereby granted, free of charge, to any person obtaining a copy
+--	of this software and associated documentation files (the "Software"), to deal
+--	in the Software without restriction, including without limitation the rights
+--	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+--	copies of the Software, and to permit persons to whom the Software is
+--	furnished to do so, subject to the following conditions:
+--
+--	The above copyright notice and this permission notice shall be included in all
+--	copies or substantial portions of the Software.
+--
+--	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+--	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+--	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+--	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+--	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+--	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+--	SOFTWARE.
+--
+--	Not a condition of the license, but if you find this code useful, an email to
+--	rajesh.panicker <at> u.nus.edu briefly mentioning its use would be appreciated.
 ----------------------------------------------------------------------------------
 */
 module test_Wrapper #(
