@@ -76,12 +76,12 @@ where `imm1` and `imm2` are chosen by the assembler such that
 
 ## Memory instruction example
 
-Assuming `s1`/`x9` = `0x4321DCBA`; `s2`/`x18` = `0x10010004`.
+Assuming `s1`/`x9` = `0x4321DCBA`; `s2`/`x18` = `0x10010008`.
 
 | Pseudoinstruction / Assembler Directive | Actual Instruction   | Operation                                                                                                                     | Actual Memory Location Content (Instruction in Hex) |
 | --------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `sw s1, -4(s2)`                         | `sw x9, 0xffc(x18)`  | `M[x18+0xfffffffc = 0x10010004+0xfffffffc = 0x10010000] = x9 = 0x4321DCBA`                                                     | `0xfe992e23`                                        |
-| `lb s4, -4(s2)`                         | `lb x20, 0xffc(x18)` | `x20[7:0] = M[x18+0xfffffffc = 0x10010004+0xfffffffc = 0x10010000]`<br>`x20[31:8] = x20[7]`<br>`x20 = 0xFFFFFFBA` (`0x000000BA` if `lbu`) | `0xffc90a03`<br>(`0xffc94a03` if `lbu`)  |
+| `sw s1, -4(s2)`                         | `sw x9, 0xffc(x18)`  | `M[x18+0xfffffffc = 0x10010008+0xfffffffc = 0x10010004] = x9 = 0x4321DCBA`                                                     | `0xfe992e23`                                        |
+| `lb s4, -4(s2)`                         | `lb x20, 0xffc(x18)` | `x20[7:0] = M[x18+0xfffffffc = 0x10010008+0xfffffffc = 0x10010004]`<br>`x20[31:8] = x20[7]`<br>`x20 = 0xFFFFFFBA` (`0x000000BA` if `lbu`) | `0xffc90a03`<br>(`0xffc94a03` if `lbu`)  |
 
 <figure markdown="1">
 <div class="wide-figure" markdown="1">

@@ -93,8 +93,8 @@
     `0xfffff` is -1, which is why the immediate for `lui` is `0x0004321e` to
     compensate.
 
-[^la]: `LABEL - PC = 0x10010000 - 0x00400010 = 0x0fc0fff0`. Its lower 12 bits,
-    `0xff0`, are -16 once MSB-extended, so the assembler adds 1 to the upper 20
+[^la]: `LABEL - PC = 0x10010004 - 0x00400010 = 0x0fc0fff4`. Its lower 12 bits,
+    `0xff4`, are -12 once MSB-extended, so the assembler adds 1 to the upper 20
     bits (`0x0fc0f` + 1 = `0x0fc10`) to compensate, as in the `li` example above.
 
 ## DP pseudoinstruction — `la`
@@ -106,14 +106,14 @@
 | Memory Address | Pseudoinstruction / Assembler Directive | Actual Instruction   | Operation                                                                   | Actual Memory Location Content (Instruction in Hex) |
 | -------------- | --------------------------------------- | -------------------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
 | `0x00400010`   | `la s1, LABEL`                          | `auipc x9, 0xfc10`   | `x9 = PC + imm<<12 = 0x00400010 + 0x0fc10000 = 0x10010010`                   | `0x0fc10497`                                        |
-| `0x00400014`   |                                         | `addi x9, x9, 0xff0` | `x9 = x9 + MSB-extend(0xff0)` ⇒ `x9 = x9 + 0xfffffff0` (since imm is negative, i.e. -16)[^la] `= 0x10010000` | `0xff048493`               |
-| `0x10010000`   | `LABEL: .word 0xABCD1234`               | N.A.                 | N.A.                                                                        | `0xABCD1234`                                        |
+| `0x00400014`   |                                         | `addi x9, x9, 0xff4` | `x9 = x9 + MSB-extend(0xff4)` ⇒ `x9 = x9 + 0xfffffff4` (since imm is negative, i.e. -12)[^la] `= 0x10010004` | `0xff448493`               |
+| `0x10010004`   | `LABEL: .word 0xABCD1234`               | N.A.                 | N.A.                                                                        | `0xABCD1234`                                        |
 
 <figure markdown="1">
 <div class="wide-figure" markdown="1">
-![U-type encoding of auipc x9, 0xfc10 and I-type encoding of addi x9, x9, 0xff0 with all bit fields shown](assets/enc-auipc-addi.svg)
+![U-type encoding of auipc x9, 0xfc10 and I-type encoding of addi x9, x9, 0xff4 with all bit fields shown](assets/enc-auipc-addi.svg)
 </div>
-<figcaption>Encodings of <code>auipc x9, 0xfc10</code> (U-type) and <code>addi x9, x9, 0xff0</code> (I-type).</figcaption>
+<figcaption>Encodings of <code>auipc x9, 0xfc10</code> (U-type) and <code>addi x9, x9, 0xff4</code> (I-type).</figcaption>
 </figure>
 
 Laid out in memory (least significant byte in the lowest memory address —
@@ -121,7 +121,7 @@ little-endian scheme):
 
 | Memory Address                | `0x00400010` | `0x00400011` | `0x00400012` | `0x00400013` | `0x00400014` | `0x00400015` | `0x00400016` | `0x00400017` |
 | ----------------------------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
-| Actual Memory Location Content | `0x97`       | `0x04`       | `0xc1`       | `0x0f`       | `0x93`       | `0x84`       | `0x04`       | `0xff`       |
+| Actual Memory Location Content | `0x97`       | `0x04`       | `0xc1`       | `0x0f`       | `0x93`       | `0x84`       | `0x44`       | `0xff`       |
 
 ## Multiply and divide
 
