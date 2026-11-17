@@ -1,0 +1,191 @@
+`timescale 1ns / 1ps
+/*
+----------------------------------------------------------------------------------
+-- Description: RISC-V Processor Module.
+--              The interface SHOULD NOT be modified (except making output reg) unless you modify Wrapper.v/vhd too.
+--              The implementation can be modified.
+----------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------
+--	MIT License
+--
+--	Copyright (c) 2020 Rajesh Panicker
+--
+--	Permission is hereby granted, free of charge, to any person obtaining a copy
+--	of this software and associated documentation files (the "Software"), to deal
+--	in the Software without restriction, including without limitation the rights
+--	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+--	copies of the Software, and to permit persons to whom the Software is
+--	furnished to do so, subject to the following conditions:
+--
+--	The above copyright notice and this permission notice shall be included in all
+--	copies or substantial portions of the Software.
+--
+--	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+--	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+--	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+--	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+--	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+--	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+--	SOFTWARE.
+--
+--	Not a condition of the license, but if you find this code useful, an email to
+--	rajesh.panicker <at> u.nus.edu briefly mentioning its use would be appreciated.
+----------------------------------------------------------------------------------
+*/
+
+// Change wire to reg if assigned inside a procedural (always) block. However, where it is easy enough, use assign instead of always.
+// A 2-1 multiplexing can be done easily using an assign with a ternary operator
+// For multiplexing with number of inputs > 2, a case construct within an always block is a natural fit. DO NOT to use nested ternary assignment operator as it hampers the readability of your code.
+
+
+module RV #(
+    parameter PC_INIT = 32'h00400000
+)(
+    input CLK,
+    input RESET,
+    //input Interrupt,      // for optional future use.
+    input [31:0] Instr,
+    input [31:0] ReadData_in,       // Name mangled to support lb/lbu/lh/lhu
+    output MemRead,
+    output [3:0] MemWrite_out,		// Column-wise write enable to support sb/sw. Each column is a byte.
+    output [31:0] PC,
+    output [31:0] ALUResult,
+    output [31:0] WriteData_out		// Name mangled to support sb/sw
+);
+    
+    // Please read Lab 4 Enhancement: Implementing additional instructions on how to support lb/lbu/lh/lhu/sb/sh
+        
+    //RV Signals
+    wire [2:0] SizeSel;     //to support lb/lbu/lh/lhu/sb/sh
+    wire [31:0] ReadData;
+    wire [31:0] WriteData;
+    wire MemWrite;
+
+    // The signals that are commented out (except CLK) will need to be uncommented and attached a stage suffix for pipelining,
+    //  except if the connection is within the same stage.
+
+    // RegFile signals
+    //wire CLK ;
+    wire WE ;
+    wire [4:0] rs1 ;
+    wire [4:0] rs2 ;
+    wire [4:0] rd ;
+    wire [31:0] WD ;
+    wire [31:0] R15 ;
+    wire [31:0] RD1 ;
+    wire [31:0] RD2 ;
+    
+    // Extend Module signals
+    wire [2:0] ImmSrc ;
+    wire [24:0] InstrImm ;
+    wire [31:0] ExtImm ;
+    
+    // Decoder signals
+    wire [6:0] Opcode ;
+    wire [2:0] Funct3 ;
+    wire [6:0] Funct7 ;
+    wire [1:0] PCS ;
+    wire RegWrite ;
+    //wire MemWrite ;
+    wire MemtoReg ;
+    //wire [1:0] ALUSrcA ;
+    wire ALUSrcB ;
+    //wire [2:0] ImmSrc ;
+    wire [3:0] ALUControl ;
+
+    // PC_Logic signals
+    //wire [1:0] PCS
+    //wire [2:0] Funct3;
+    //wire [2:0] ALUFlags;
+    wire PCSrc;
+      
+    // ALU signals
+    wire [31:0] Src_A ;
+    wire [31:0] Src_B ;
+    //wire [3:0] ALUControl ;
+    //wire [31:0] ALUResult ;
+    wire [2:0] ALUFlags ;
+    
+    // ProgramCounter signals
+    //wire CLK ;
+    //wire RESET ;
+    wire WE_PC ;    
+    wire [31:0] PC_IN ;
+    //wire [31:0] PC ; 
+        
+    // Other internal signals here
+    wire [31:0] PC_Offset ;
+    wire [31:0] Result ;
+    
+    assign MemRead = MemtoReg; // This is needed for the proper functionality of some devices such as UART CONSOLE
+    assign WE_PC = 1 ;  // Will need to control it for multi-cycle operations (Multiplication, Division) and/or Pipelining with hazard hardware.
+
+    assign ReadData = ReadData_in;       // Change datapath as appropriate if supporting lb/lbu/lh/lhu
+    assign WriteData_out = WriteData;    // Change datapath as appropriate if supporting sb/sh
+    assign MemWrite_out = {4{MemWrite}}; // Change datapath as appropriate if supporting sb/sh
+    assign SizeSel = 3'b010;             // Change this to be generated by the Decoder (control) as appropriate if 
+                                         // supporting lb/sb/lbu/lh/sh/lhu/lw/sw. Hint: funct3
+
+    // todo: other datapath connections here
+	
+    // Instantiate RegFile
+    RegFile RegFile1( 
+                    CLK,
+                    WE,
+                    rs1,
+                    rs2,
+                    rd,
+                    WD,
+                    RD1,
+                    RD2     
+                );
+                
+     // Instantiate Extend Module
+    Extend Extend1(
+                    ImmSrc,
+                    InstrImm,
+                    ExtImm
+                );
+                
+    // Instantiate Decoder
+    Decoder Decoder1(
+                    Opcode,
+                    Funct3,
+                    Funct7,
+                    PCS,
+                    RegWrite,
+                    MemWrite,
+                    MemtoReg,
+                    //ALUSrcA,
+                    ALUSrcB,
+                    ImmSrc,
+                    ALUControl
+                );
+                
+    // Instantiate PC_Logic
+	PC_Logic PC_Logic1(
+                    PCS,
+                    Funct3,
+                    ALUFlags,
+                    PCSrc
+		);
+                
+    // Instantiate ALU        
+    ALU ALU1(
+                    Src_A,
+                    Src_B,
+                    ALUControl,
+                    ALUResult,
+                    ALUFlags
+                );                
+    
+    // Instantiate ProgramCounter    
+    ProgramCounter #(.PC_INIT(PC_INIT)) ProgramCounter1(
+                    CLK,
+                    RESET,
+                    WE_PC,    
+                    PC_IN,
+                    PC  
+                );                         
+endmodule

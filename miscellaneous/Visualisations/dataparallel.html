@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Parallelism: SIMD and SIMT</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --panel2: #eef0f4; --ink: #1d2230; --dim: #667085; --line: #d4d8e0;
+  --issue: #2f6fdf; --pathA: #2f6fdf; --pathB: #d9661a; --good: #1f9d6b; --bad: #c8372d;
+  --wait: #f6d9bd; --ready: #dfe3ea; --cur: #fff1c2; --accent: #2f6fdf; --onfill: #fff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+    --issue: #5b8def; --pathA: #5b8def; --pathB: #e8803a; --good: #3fcf95; --bad: #ff7a6e;
+    --wait: #5a3d22; --ready: #2c3345; --cur: #4a3f16; --accent: #6b9dff; --onfill: #0d1117;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --panel: #1a1e27; --panel2: #232836; --ink: #e4e7ee; --dim: #97a0b3; --line: #343a4a;
+  --issue: #5b8def; --pathA: #5b8def; --pathB: #e8803a; --good: #3fcf95; --bad: #ff7a6e;
+  --wait: #5a3d22; --ready: #2c3345; --cur: #4a3f16; --accent: #6b9dff; --onfill: #0d1117;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { font-size: clamp(13px, 1.05vw, 28px); }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 1rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+button, select, input { font: inherit; color: inherit; }
+select, button { background: var(--panel); border: 1px solid var(--line); border-radius: 0.462rem; padding: 0.231rem 0.538rem; min-height: 2.154rem; }
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled, select:disabled, input:disabled { opacity: .45; cursor: default; }
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+/* ---------- header ---------- */
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.462rem 0.769rem; display: flex; flex-direction: column; gap: 0.462rem; flex: 0 0 auto; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.462rem 1.077rem; align-items: center; }
+.grp { display: flex; align-items: center; gap: 0.385rem; white-space: nowrap; flex: 0 0 auto; }
+.grp label { color: var(--dim); }
+h1 { font-size: 1.154rem; margin: 0; font-weight: 650; }
+#tabs { display: flex; gap: 0.308rem; flex-wrap: wrap; }
+#tabs button.on { background: var(--accent); color: var(--onfill); border-color: var(--accent); }
+#setupBtn { display: none; }
+#cfgs { flex: 1 1 auto; display: flex; justify-content: flex-end; }
+.cfg { display: none; flex-wrap: wrap; gap: 0.462rem 1.077rem; align-items: center; }
+.cfg.on { display: flex; }
+.cfg input[type=range] { width: 6.923rem; accent-color: var(--accent); }
+.cfg output { min-width: 2.615rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+#scrub { flex: 1 1 12.308rem; min-width: 9.231rem; accent-color: var(--accent); }
+.grow { display: flex; align-items: center; gap: 0.615rem; flex: 1 1 15.385rem; min-width: 12.308rem; }
+#stepNo { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 6rem; text-align: right; }
+#narr { display: flex; gap: 0.615rem; align-items: baseline; min-height: 2.6rem; background: var(--panel2); border-left: 0.3rem solid var(--accent); border-radius: 0.4rem; padding: 0.35rem 0.7rem; font-size: 1.1rem; }
+#narrTitle { font-weight: 650; flex: 0 0 auto; }
+#narrDetail { color: var(--dim); }
+
+/* ---------- views ---------- */
+main { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0.615rem; display: flex; flex-direction: column; }
+.view { display: none; }
+.view.on { display: flex; flex-direction: column; flex: 1 0 auto; }
+.view.on > .card.mach-card { flex: 1 0 auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 0.615rem; padding: 0.615rem 0.769rem; margin-bottom: 0.615rem; }
+.card h2 { font-size: 1rem; margin: 0 0 2px; font-weight: 650; display: flex; gap: 0.615rem; align-items: baseline; flex-wrap: wrap; }
+.sub { color: var(--dim); font-weight: 400; font-size: 0.923rem; }
+.sect { margin: 0.615rem 0 0.231rem; font-size: 0.846rem; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.ok { color: var(--good); font-weight: 600; }
+.badge { font-size: 0.846rem; padding: 1px 0.538rem; border-radius: 0.692rem; border: 1px solid currentColor; white-space: nowrap; font-weight: 500; }
+.b-div { color: var(--pathB); } .b-uni { color: var(--good); }
+table.kv { border-collapse: collapse; width: 100%; font-size: 1rem; }
+table.kv td { padding: 2px 0.308rem; border-bottom: 1px solid var(--line); }
+table.kv td:first-child { color: var(--dim); }
+table.kv td:last-child { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.308rem 0.923rem; font-size: 0.846rem; color: var(--dim); margin-top: 0.462rem; }
+.legend i { display: inline-block; width: 0.846rem; height: 0.846rem; border-radius: 2px; vertical-align: -1px; margin-right: 0.231rem; border: 1px solid var(--line); }
+.code { margin: 0; font-size: 0.885rem; line-height: 1.5; overflow: auto; }
+.ln { display: flex; white-space: pre; padding-right: 0.615rem; }
+.ln .no { color: var(--dim); opacity: .6; width: 1.846rem; text-align: right; padding-right: 0.615rem; flex: 0 0 auto; user-select: none; }
+.ln.cur { background: var(--cur); }
+.tk-c { color: var(--dim); font-style: italic; }
+pre.src { margin: 0.462rem 0 0; padding: 0.462rem 0.615rem; background: var(--panel2); border-radius: 0.462rem; font-size: 0.885rem; line-height: 1.5; overflow: auto; }
+
+/* lanes */
+.lanes { display: grid; grid-template-columns: repeat(var(--n), minmax(var(--minw, 2.308rem), var(--maxw, 1fr))); gap: 0.231rem; }
+.mach > div { min-width: 0; }
+.lanes.many { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.lanes.many .c { font-size: 0.692rem; padding: 2px 0; }
+.lanes.many .c b { font-size: 0.692rem; }
+.lanes.many button.dcell { font-size: 0.692rem; padding: 2px 0; }
+.c { border: 1.5px dashed var(--line); border-radius: 0.385rem; min-height: clamp(2.3rem, 4.6vh, 3.6rem); padding: 2px 0.231rem; font-size: 0.846rem; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--dim); text-align: center; overflow: hidden; }
+.c b { font-weight: 650; font-size: 0.846rem; }
+.c.act { border-style: solid; border-color: var(--issue); background: var(--issue); color: var(--onfill); }
+.c.act.A { border-color: var(--pathA); background: var(--pathA); }
+.c.act.B { border-color: var(--pathB); background: var(--pathB); }
+.c.act.neutral { border-color: var(--dim); background: var(--panel2); color: var(--ink); }
+.c.fin { opacity: .45; }
+.c.done { border-style: solid; border-color: var(--good); background: var(--good); color: var(--onfill); }
+.c.wait { border-style: solid; border-color: var(--dim); }
+
+/* ---------- tab 1 ---------- */
+.mach { display: grid; grid-template-columns: minmax(19.231rem, 26.154rem) 1fr; gap: 0.769rem 1.077rem; margin-top: 0.462rem; }
+.mstats { font-size: 0.923rem; color: var(--dim); display: flex; gap: 0.308rem 1.077rem; flex-wrap: wrap; margin-bottom: 0.308rem; font-variant-numeric: tabular-nums; }
+.mstats b { color: var(--ink); font-weight: 600; }
+.curop { font-size: 0.885rem; min-height: 1.308rem; margin-bottom: 0.231rem; color: var(--ink); }
+.ystrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(1.9rem, 1fr)); gap: 0.15rem; }
+.y { border: 1px solid var(--line); border-radius: 0.231rem; font-size: 0.808rem; text-align: center; padding: 1px 0; color: var(--dim); background: var(--panel); }
+.y.done { background: var(--good); border-color: var(--good); color: var(--onfill); }
+.y.fly { outline: 2px solid var(--pathB); outline-offset: 0; }
+
+/* ---------- tab 2 ---------- */
+.two { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(19.231rem, 1fr); gap: 0.615rem; align-items: start; }
+.warps { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: 0.615rem; }
+.wblock { border: 1px solid var(--line); border-radius: 0.615rem; padding: 0.462rem 0.615rem; background: var(--panel); }
+.wblock .wh { display: flex; gap: 0.615rem; align-items: baseline; margin-bottom: 0.308rem; }
+.prow { display: grid; grid-template-columns: 4.923rem 1fr; gap: 0.462rem; align-items: center; margin-top: 0.231rem; }
+.prow .plab { font-size: 0.846rem; color: var(--dim); line-height: 1.15; }
+.prow .plab i { font-style: normal; display: block; }
+.prow.future .lanes { opacity: .35; }
+.prow.skip .skipmsg { font-size: 0.846rem; color: var(--dim); border: 1.5px dashed var(--line); border-radius: 0.385rem; padding: 0.462rem; text-align: center; }
+.prow.run .plab { color: var(--ink); font-weight: 600; }
+button.dcell { padding: 2px 0.231rem; min-height: 2.308rem; font-size: 0.846rem; border-radius: 0.385rem; border: 1.5px solid var(--line); background: var(--panel2); }
+button.dcell.A { border-color: var(--pathA); box-shadow: inset 0 -3px 0 var(--pathA); }
+button.dcell.B { border-color: var(--pathB); box-shadow: inset 0 -3px 0 var(--pathB); }
+
+/* ---------- tab 3 ---------- */
+.tlwrap { overflow-x: auto; padding-bottom: 0.308rem; }
+.tl { display: grid; gap: 2px; align-items: center; width: max-content; min-width: 100%; }
+.tl .rl { font-size: 0.846rem; color: var(--dim); padding-right: 0.462rem; position: sticky; left: 0; background: var(--panel); z-index: 1; white-space: nowrap; }
+.tl .h { font-size: 0.769rem; color: var(--dim); text-align: center; font-variant-numeric: tabular-nums; }
+.tl .t { height: clamp(1.7rem, 4.4vh, 3.4rem); border-radius: 0.231rem; background: transparent; border: 1px dashed var(--line); opacity: .5; }
+.tl .t.I { background: var(--issue); border: 1px solid var(--issue); opacity: 1; }
+.tl .t.M { background: var(--wait); border: 1px solid var(--wait); opacity: 1; }
+.tl .t.R { background: var(--ready); border: 1px solid var(--ready); opacity: 1; }
+.tl .t.D { background: transparent; border: 1px solid var(--line); opacity: .35; }
+.tl .l { height: clamp(1.7rem, 4.4vh, 3.4rem); border-radius: 0.231rem; font-size: 0.808rem; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--bg); }
+.tl .l.idle { background: repeating-linear-gradient(135deg, var(--bad) 0 0.231rem, transparent 0.231rem 0.462rem); color: var(--ink); border: 1px solid var(--bad); }
+.tl .l.future { background: transparent; border: 1px dashed var(--line); opacity: .5; }
+.tl .cur { box-shadow: 0 0 0 2px var(--cur); }
+
+/* ---------- tab 4 ---------- */
+.mem { display: flex; flex-wrap: wrap; gap: 0.308rem; }
+.seg { display: flex; border: 1.5px solid var(--line); border-radius: 0.385rem; padding: 2px; gap: 1px; }
+.seg.hit { border-color: var(--pathB); }
+.seg.fetching { background: var(--pathB); border-color: var(--pathB); }
+.seg.fetched { border-color: var(--good); background: color-mix(in srgb, var(--good) 22%, transparent); }
+.mc { width: clamp(1.3rem, 1.9vw, 3.4rem); height: clamp(1.8rem, 4vh, 3.4rem); font-size: clamp(0.7rem, 0.85vw, 1.1rem); border-radius: 2px; background: var(--panel2); color: var(--dim); display: flex; align-items: center; justify-content: center; }
+.mc.use { background: var(--accent); color: var(--onfill); font-weight: 650; }
+.mc.multi { background: var(--accent); color: var(--onfill); }
+.hidden { display: none !important; }
+
+/* ---------- narrow layout ---------- */
+@media (max-width: 860px) {
+  header { padding: 0.462rem 0.615rem; gap: 0.385rem; }
+  #setupBtn { display: inline-block; }
+  .cfg.on { display: none; }
+  body.setup .cfg.on { display: flex; }
+  header > .bar:first-child { gap: 0.462rem 0.769rem; }
+  #tabs { order: 3; flex: 1 1 100%; flex-wrap: nowrap; }
+  #cfgs { order: 4; flex: 1 1 100%; justify-content: flex-start; }
+  #narr { font-size: 1rem; padding: 0.25rem 0.5rem; }
+  #tabs button { flex: 1 1 0; padding: 0.231rem 2px; font-size: 0.923rem; min-width: 0; }
+  header > .bar:first-child > .grp:last-child { margin-left: auto; }
+  #scrub { min-width: 5.385rem; flex-basis: 5.385rem; }
+  #stepNo { min-width: 4.308rem; }
+  .grow { min-width: 0; flex: 1 1 0; gap: 0.308rem; }
+  #transport { gap: 0.462rem 0.615rem; flex-wrap: nowrap; }
+  #transport .grp label { display: none; }
+  #transport .grp:first-child button { padding: 0.231rem 0.385rem; min-width: 2.308rem; }
+  #narr { min-height: 0; flex-wrap: wrap; row-gap: 0; }
+  #narrDetail { font-size: 0.923rem; }
+  main { padding: 0.462rem; }
+  .mach, .two { grid-template-columns: 1fr; }
+  .prow { grid-template-columns: 4rem 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="grp"><h1>Data parallelism</h1></div>
+    <div id="tabs" role="tablist"></div>
+    <div id="cfgs"></div>
+    <div class="grp"><button id="setupBtn" title="Show or hide the settings for this demo">Setup</button></div>
+  </div>
+  <div class="bar" id="transport">
+    <div class="grp">
+      <button id="bReset" title="Back to the start (Home)">⏮</button>
+      <button id="bBack" title="Previous cycle (←)">◀</button>
+      <button id="bPlay" title="Play / pause (Space)" style="min-width:44px">▶</button>
+      <button id="bStep" title="Next cycle (→)">▶|</button>
+    </div>
+    <div class="grow"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Cycle"><span id="stepNo"></span></div>
+    <div class="grp"><label for="selSpeed">Speed</label><select id="selSpeed">
+      <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option>
+    </select></div>
+  </div>
+  <div id="narr"><span id="narrTitle"></span><span id="narrDetail"></span></div>
+</header>
+<main id="main"></main>
+
+<script src="dataparallel_engine.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const pct = v => Math.round(v * 100) + '%';
+const range = n => Array.from({ length: n }, (_, i) => i);
+
+function listing(lines, cur) {
+  return lines.map((l, i) => {
+    const h = l.indexOf('#');
+    const code = h < 0 ? l : l.slice(0, h), cm = h < 0 ? '' : l.slice(h);
+    return `<div class="ln${i === cur ? ' cur' : ''}"><span class="no">${i + 1}</span><span>${esc(code)}</span>${cm ? `<span class="tk-c">${esc(cm)}</span>` : ''}</div>`;
+  }).join('');
+}
+const opts = a => a.map(v => Array.isArray(v) ? v : [v, v]);
+
+/* ===================================================================== tabs */
+const TABS = [];
+
+/* ---- 1. one loop, three machines ---- */
+TABS.push({
+  name: 'SIMD · SIMT', title: 'Scalar, SIMD and SIMT',
+  ctrls: [
+    { id: 'n', label: 'Elements', opts: opts([8, 12, 16, 20, 24, 32, 48]), def: 20, title: 'Array length n. Choose a value that is not a multiple of the lane count to see the tail.' },
+    { id: 'w', label: 'Lanes', opts: opts([1, 2, 4, 8, 16]), def: 8, title: 'Vector register width in elements / threads per warp' },
+  ],
+  build: c => { const m = DP.axpy({ n: +c.n, w: +c.w }); m.steps = Math.max(...Object.values(m.machines).map(s => s.cycles)) + 1; return m; },
+  view(m, k) {
+    const defs = [
+      ['scalar', 'Scalar core', 'one thread, one element per instruction'],
+      ['vector', 'Vector (SIMD) core', 'one thread with wide registers; the program forms the vectors'],
+      ['simt', 'SIMT GPU core', 'scalar threads; the hardware forms the warps'],
+    ];
+    let html = '', fin = [];
+    for (const [id, title, sub] of defs) {
+      const S = m.machines[id], t = Math.min(k, S.cycles), rec = t > 0 ? S.records[t - 1] : null, done = t >= S.cycles;
+      const y = DP.yAt(m, id, t);
+      let useful = 0, slots = 0;
+      for (let c = 0; c < t; c++) { const r = S.records[c]; if (r.kind !== 'setvl') { slots += S.width; useful += r.lanes.filter(i => i >= 0).length; } }
+      const lanes = range(S.width).map(j => {
+        const i = rec ? rec.lanes[j] : -1, v = rec ? rec.vals[j] : null;
+        const cls = `c${i >= 0 ? ' act' : ''}${done ? ' fin' : ''}`;
+        const arr = rec && rec.line === (id === 'vector' ? 1 : 0) ? 'x' : 'y';
+        return `<div class="${cls}" data-lane="${j}" title="lane ${j}">${i >= 0 ? `<b>${S.width > 8 ? i : arr + '[' + i + ']'}</b><span>${v}</span>` : `<span>${rec && rec.kind !== 'setvl' ? 'idle' : '·'}</span>`}</div>`;
+      }).join('');
+      const fly = rec ? new Set(rec.lanes.filter(i => i >= 0)) : new Set();
+      const ys = y.map((v, i) => `<div class="y${v === m.expected[i] ? ' done' : ''}${fly.has(i) && !done ? ' fly' : ''}" title="y[${i}]">${v}</div>`).join('');
+      const where = !rec ? '' : id === 'scalar' ? `element ${rec.group + 1} of ${m.n}` : id === 'vector' ? `strip ${rec.group + 1} of ${S.groups}, vl = ${rec.vl}` : `warp ${rec.group + 1} of ${S.groups}, ${rec.vl} of ${m.w} threads live`;
+      const op = rec ? S.listing[rec.line].split('#')[0].trim() : '';
+      const verdict = done && y.every((v, i) => v === m.expected[i]) ? ' <span class="ok">✓ y correct</span>' : '';
+      if (done) fin.push(`${title.split(' ')[0].toLowerCase()} ${S.cycles}`);
+      html += `<div class="card mach-card" data-m="${id}"><h2>${title}<span class="sub">${sub}</span>${verdict}</h2>
+        <div class="mach"><div><div class="code">${listing(S.listing, rec && !done ? rec.line : -1)}</div>
+        ${id === 'simt' ? `<pre class="src">// OpenCL: one work-item per element
+int i = get_global_id(0);
+if (i &lt; n) y[i] = a*x[i] + y[i];
+// CUDA: i = blockIdx.x*blockDim.x + threadIdx.x</pre>` : ''}</div>
+        <div><div class="mstats"><span>issued <b data-s="issued">${t}</b> / ${S.cycles}</span><span>lanes busy <b>${slots ? pct(useful / slots) : '–'}</b> <span>(final ${pct(S.util)})</span></span><span>${esc(where)}</span></div>
+        <div class="curop mono">${esc(op)}</div>
+        <div class="lanes${S.width > 8 ? ' many' : ''}" style="--n:${S.width};--minw:${S.width > 4 ? 30 : 44}px;--maxw:${S.width <= 2 ? '90px' : '1fr'}">${lanes}</div>
+        <div class="sect" style="text-transform:none">y[0..${m.n - 1}]</div><div class="ystrip">${ys}</div></div></div></div>`;
+    }
+    const s = m.machines;
+    const detail = k === 0 ? `y[i] = ${m.a}·x[i] + y[i] for ${m.n} elements. Each machine issues one instruction per cycle.`
+      : k >= m.steps - 1 ? `Cycles to finish: scalar ${s.scalar.cycles}, vector ${s.vector.cycles}, SIMT ${s.simt.cycles}. Same y, ${(s.scalar.cycles / s.simt.cycles).toFixed(1)}× fewer instructions on ${m.w} lanes.`
+      : `Scalar: element ${Math.min(m.n, Math.floor((Math.min(k, s.scalar.cycles) - 1) / 4) + 1)} of ${m.n}. Vector: strip ${Math.min(s.vector.groups, Math.floor((Math.min(k, s.vector.cycles) - 1) / 5) + 1)} of ${s.vector.groups}. SIMT: warp ${Math.min(s.simt.groups, Math.floor((Math.min(k, s.simt.cycles) - 1) / 4) + 1)} of ${s.simt.groups}.`;
+    return { html, title: k === 0 ? 'Same loop, three machines' : `Cycle ${k}`, detail };
+  },
+});
+
+/* ---- 2. divergence ---- */
+TABS.push({
+  name: 'Divergence',
+  seed: 1, flips: [],
+  ctrls: [
+    { id: 'w', label: 'Lanes', opts: opts([4, 8, 16]), def: 8, title: 'Threads per warp' },
+    { id: 'warps', label: 'Warps', opts: opts([1, 2, 4, 8]), def: 4 },
+    { id: 'order', label: 'Order', opts: [['random', 'random'], ['sorted', 'sorted by sign'], ['alternating', 'alternating']], def: 'random', title: 'How the signs of x are laid out across threads' },
+    { id: 'p', type: 'range', label: 'Taken', min: 0, max: 100, step: 10, def: 50, unit: '%', title: 'Share of elements with x > 0 (not used for alternating)', off: c => c.order === 'alternating' },
+    { id: 'costA', label: 'A cost', opts: opts([1, 2, 3, 4, 6, 8]), def: 4, title: 'Instructions on the then-path' },
+    { id: 'costB', label: 'B cost', opts: opts([1, 2, 3, 4, 6, 8]), def: 4, title: 'Instructions on the else-path' },
+    { id: 'shuf', type: 'button', label: 'Reshuffle', title: 'New data values (and a new placement for random order)' },
+  ],
+  build(c, tab) {
+    const m = DP.diverge({ w: +c.w, warps: +c.warps, pattern: c.order, p: c.p / 100, seed: tab.seed, costA: +c.costA, costB: +c.costB, flips: tab.flips });
+    // First and last record index of each pass of each warp.
+    m.pos = range(m.warps).map(() => ({}));
+    m.records.forEach((r, i) => { const o = m.pos[r.warp]; (o[r.pass] = o[r.pass] || [i, i])[1] = i + 1; });
+    m.steps = m.cycles + 1;
+    return m;
+  },
+  view(m, k) {
+    const w = m.w, t = Math.min(k, m.cycles);
+    let useful = 0;
+    for (let c = 0; c < t; c++) useful += m.records[c].active.filter(Boolean).length;
+    const row = (g, pass, label) => {
+      const p = m.pos[g][pass], i0 = g * w;
+      const name = pass === 'cmp' ? 'compare' : `then ${pass}`;
+      if (!p) return `<div class="prow skip"><div class="plab">${name}</div><div class="skipmsg">skipped: no lane takes it</div></div>`;
+      const st = t <= p[0] ? 'future' : t < p[1] ? 'run' : 'doneP';
+      const rec = m.records[p[0]];
+      const cells = rec.active.map(a => `<div class="c ${a ? 'act ' + (pass === 'cmp' ? 'neutral' : pass) : ''}">${a ? (pass === 'cmp' ? 'cmp' : pass) : 'idle'}</div>`).join('');
+      const prog = st === 'run' ? `${t - p[0]}/${p[1] - p[0]}` : p[1] - p[0] > 1 ? `×${p[1] - p[0]}` : '';
+      return `<div class="prow ${st}"><div class="plab">${name}<i>${prog}</i></div><div class="lanes${w > 8 ? ' many' : ''}" style="--n:${w};--minw:26px">${cells}</div></div>`;
+    };
+    let warps = '';
+    for (let g = 0; g < m.warps; g++) {
+      const inf = m.info[g];
+      const badge = inf.divergent ? '<span class="badge b-div">divergent</span>' : `<span class="badge b-uni">uniform, path ${inf.anyA ? 'A' : 'B'} only</span>`;
+      const data = range(w).map(j => { const gi = g * w + j; return `<button class="dcell ${m.taken[gi] ? 'A' : 'B'}" data-flip="${gi}" title="Click to flip the sign of x[${gi}]">${m.x[gi]}</button>`; }).join('');
+      warps += `<div class="wblock" data-warp="${g}"><div class="wh"><b>warp ${g}</b>${badge}<span class="sub">x[${g * w}..${g * w + w - 1}]</span></div>
+        <div class="prow"><div class="plab">data</div><div class="lanes${w > 8 ? ' many' : ''}" style="--n:${w};--minw:26px">${data}</div></div>
+        ${row(g, 'cmp')}${row(g, 'A')}${row(g, 'B')}</div>`;
+    }
+    const right = `<div class="card"><table class="kv">
+      <tr><td>Cycle</td><td>${t} / ${m.cycles}</td></tr>
+      <tr><td>Lanes doing useful work</td><td>${t ? pct(useful / (t * w)) : '–'} <span class="sub">(final ${pct(m.util)})</span></td></tr>
+      <tr><td>Divergent warps</td><td>${m.divergentWarps} of ${m.warps}</td></tr>
+      <tr><td>Independent lanes would need</td><td>${m.independent} cycles</td></tr>
+      <tr><td>Slowdown from divergence</td><td>${m.slowdown.toFixed(2)}×</td></tr></table>
+      <div class="legend"><span><i style="background:var(--pathA)"></i>path A</span><span><i style="background:var(--pathB)"></i>path B</span><span><i style="border-style:dashed"></i>lane masked off</span></div></div>
+      <div class="card"><div class="sect" style="margin-top:0">SIMT: the programmer writes</div><pre class="src" style="margin-top:2px">if (x[i] &gt; 0) A;
+else          B;</pre>
+      <div class="sect">Vector ISA: the compiler builds the mask</div><pre class="src" style="margin-top:2px">vmfgt.vf v0, v1, ft0   # mask = x &gt; 0
+A...      v2, v1, v0.t # lanes with mask 1
+vmnot.m   v0, v0
+B...      v2, v1, v0.t # the other lanes</pre></div>`;
+    const detail = k === 0 ? 'A warp has one PC. When its threads disagree, both paths run and the lanes not on a path are switched off. Click a data cell to flip a lane.'
+      : t >= m.cycles ? `${m.cycles} cycles; independent lanes would need ${m.independent}. ${m.divergentWarps} of ${m.warps} warps diverged.`
+      : (() => { const r = m.records[t - 1]; return r.pass === 'cmp' ? `Warp ${r.warp}: every lane evaluates x > 0.` : `Warp ${r.warp}, path ${r.pass}: ${r.active.filter(Boolean).length} of ${w} lanes active.`; })();
+    return { html: `<div class="two"><div class="warps">${warps}</div><div>${right}</div></div>`, title: k === 0 ? 'Branches mask lanes, they do not jump' : `Cycle ${k}`, detail };
+  },
+  bind(el, tab, rebuild) {
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-flip]');
+      if (!b) return;
+      const i = +b.dataset.flip, f = tab.flips, at = f.indexOf(i);
+      if (at >= 0) f.splice(at, 1); else f.push(i);
+      rebuild(true);
+    });
+  },
+  onButton(id, tab) { if (id === 'shuf') { tab.seed++; tab.flips = []; } },
+  onChange(tab) { tab.flips = []; },
+});
+
+/* ---- 3. latency hiding ---- */
+TABS.push({
+  name: 'Latency', title: 'Latency hiding',
+  ctrls: [
+    { id: 'warps', label: 'Warps', opts: opts([1, 2, 3, 4, 5, 6, 8]), def: 4, title: 'Warps whose registers stay on the core' },
+    { id: 'issue', label: 'Burst length', opts: opts([1, 2, 3, 4]), def: 2, title: 'Instructions a warp issues before its load stalls it' },
+    { id: 'lat', label: 'Memory latency', opts: opts([2, 4, 6, 8, 10, 12]), def: 6, title: 'Cycles a warp waits after issuing a load' },
+    { id: 'rounds', label: 'Bursts per warp', opts: opts([1, 2, 3, 4]), def: 3 },
+  ],
+  build: c => { const m = DP.latency({ warps: +c.warps, issue: +c.issue, lat: +c.lat, rounds: +c.rounds }); m.steps = m.cycles + 1; return m; },
+  view(m, k) {
+    const t = Math.min(k, m.cycles), W = m.warps;
+    let issued = 0; for (let c = 0; c < t; c++) if (m.issuedBy[c] >= 0) issued++;
+    let g = `<div class="rl"></div>` + range(m.cycles).map(c => `<div class="h">${c + 1}</div>`).join('');
+    for (let w = 0; w < W; w++) {
+      g += `<div class="rl" title="warp ${w}">W${w}</div>` + range(m.cycles).map(c => `<div class="t ${c < t ? m.grid[w][c] : ''}${c === t - 1 ? ' cur' : ''}"></div>`).join('');
+    }
+    g += `<div class="rl" title="warp the core issues from each cycle">core</div>` + range(m.cycles).map(c => {
+      const w = m.issuedBy[c];
+      return `<div class="l ${c >= t ? 'future' : w < 0 ? 'idle' : ''}${c === t - 1 ? ' cur' : ''}">${c < t ? (w < 0 ? '' : 'W' + w) : ''}</div>`;
+    }).join('');
+    const full = m.warps >= m.warpsToHide;
+    const html = `<div class="card"><div class="tlwrap" id="tlwrap"><div class="tl" style="grid-template-columns:auto repeat(${m.cycles}, minmax(20px, 1fr))">${g}</div></div>
+      <div class="legend"><span><i style="background:var(--issue)"></i>issuing</span><span><i style="background:var(--wait)"></i>waiting on a memory load</span><span><i style="background:var(--ready)"></i>ready, not picked</span><span><i style="background:repeating-linear-gradient(135deg,var(--bad) 0 3px,transparent 3px 6px)"></i>core idle</span></div></div>
+      <div class="two"><div class="card"><table class="kv">
+        <tr><td>Cycle</td><td>${t} / ${m.cycles}</td></tr>
+        <tr><td>Core busy so far</td><td>${t ? pct(issued / t) : '–'} <span class="sub">(final ${pct(m.util)})</span></td></tr>
+        <tr><td>Time for these warps, one after another</td><td>${m.warps * m.soloCycles} cycles</td></tr>
+        <tr><td>Time interleaved</td><td>${m.cycles} cycles (${m.speedup.toFixed(2)}× faster)</td></tr>
+        <tr><td>Warp 0 finishes at</td><td>cycle ${m.finishedAt[0]} <span class="sub">(alone: ${m.soloCycles})</span></td></tr>
+        <tr><td>Warps needed to hide the latency</td><td>⌈(${m.issue} + ${m.lat}) / ${m.issue}⌉ = ${m.warpsToHide} ${full ? '<span class="ok">✓</span>' : ''}</td></tr></table></div>
+      <div class="card"><div class="sect" style="margin-top:0">One warp's program</div><pre class="src" style="margin-top:2px">repeat ${m.rounds} times:
+  ${m.issue === 1 ? 'ld.global r, [addr]' : `${m.issue - 1} × ALU instruction\n  ld.global r, [addr]`}
+  (stalls ${m.lat} cycles until r arrives)
+last burst ends in st.global, no stall</pre></div></div>`;
+    const detail = k === 0 ? 'Each warp issues a burst, then waits for its load. While it waits, the core issues from another warp.'
+      : t >= m.cycles ? `Core busy ${pct(m.util)}; ${m.speedup.toFixed(2)}× faster than running the ${m.warps} warps one after another. Warp 0 is not faster: its latency is unchanged.`
+      : (m.issuedBy[t - 1] >= 0 ? `Warp ${m.issuedBy[t - 1]} issues.` : 'No warp is ready: the core idles.') + ` Waiting: ${m.grid.filter(r => r[t - 1] === 'M').length} of ${m.warps}.`;
+    return { html, title: k === 0 ? 'Hide latency, don\'t avoid it' : `Cycle ${k}`, detail, after() { const el = $('tlwrap'); if (el) { const x = (t / Math.max(1, m.cycles)) * el.scrollWidth; el.scrollLeft = Math.max(0, x - el.clientWidth * 0.7); } } };
+  },
+});
+
+/* ---- 4. coalescing ---- */
+TABS.push({
+  name: 'Coalescing',
+  seed: 1,
+  ctrls: [
+    { id: 'w', label: 'Lanes', opts: opts([8, 16, 32]), def: 8, title: 'Threads per warp' },
+    { id: 'seg', label: 'Segment', opts: [[4, '4 words'], [8, '8 words'], [16, '16 words']], def: 4, title: 'Memory is fetched in aligned segments of this size (4-byte words)' },
+    { id: 'pattern', label: 'Access', opts: Object.entries(DP.PATTERNS).map(([k, v]) => [k, v.label]), def: 'unit', title: 'Address each thread loads' },
+    { id: 'stride', label: 'Stride', opts: opts([2, 3, 4, 8]), def: 2, title: 'Words between neighbouring threads', off: c => c.pattern !== 'stride' },
+    { id: 'shuf', type: 'button', label: 'Reshuffle', title: 'New random indices', off: c => c.pattern !== 'random' },
+  ],
+  build(c, tab) { const m = DP.coalesce({ w: +c.w, seg: +c.seg, pattern: c.pattern, stride: +c.stride, seed: tab.seed }); m.steps = m.T + 3; return m; },
+  view(m, k) {
+    const nseg = m.memSize / m.seg;
+    const txOf = new Map(); m.transactions.forEach((tx, i) => tx.lanes.forEach(j => txOf.set(j, i)));
+    const lanes = range(m.w).map(j => {
+      const got = k - 2 > txOf.get(j);
+      return `<div class="c ${got ? 'done' : k >= 1 ? 'wait' : ''}" data-lane="${j}"><b>${j}</b><span>a[${m.addrs[j]}]</span></div>`;
+    }).join('');
+    const users = new Map(); m.addrs.forEach((a, j) => { (users.get(a) || users.set(a, []).get(a)).push(j); });
+    let mem = '';
+    for (let s = 0; s < nseg; s++) {
+      const idx = m.transactions.findIndex(tx => tx.seg === s);
+      const cls = idx < 0 || k < 1 ? '' : k - 2 === idx ? ' hit fetching' : k - 2 > idx ? ' hit fetched' : ' hit';
+      let cells = '';
+      for (let a = s * m.seg; a < (s + 1) * m.seg; a++) {
+        const u = users.get(a);
+        cells += `<div class="mc${u ? (u.length > 1 ? ' multi' : ' use') : ''}" title="a[${a}]${u ? ' ← lane ' + u.join(', ') : ''}">${u ? (u.length > 1 ? '×' + u.length : u[0]) : ''}</div>`;
+      }
+      mem += `<div class="seg${cls}" data-seg="${s}">${cells}</div>`;
+    }
+    const html = `<div class="card"><div class="sect" style="margin-top:0">Lane: address</div><div class="lanes${m.w > 8 ? ' many' : ''}" style="--n:${m.w};--minw:34px">${lanes}</div>
+        <div class="sect">Memory: ${m.memSize} words in ${nseg} segments of ${m.seg}</div><div class="mem">${mem}</div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>word a lane reads (lane number)</span><span><i style="border-color:var(--pathB)"></i>segment to fetch</span><span><i style="background:var(--pathB)"></i>fetching now</span><span><i style="border-color:var(--good)"></i>fetched</span></div></div>
+      <div class="two"><div class="card"><table class="kv">
+        <tr><td>Memory transactions</td><td>${m.T} <span class="sub">(best possible: ${m.ideal})</span></td></tr>
+        <tr><td>Words used per word fetched</td><td>${pct(m.efficiency)}</td></tr>
+        <tr><td>Cycles for the load</td><td>${m.T}</td></tr>
+        <tr><td>Vector ISA equivalent</td><td>${esc(m.vec)}</td></tr></table></div>
+        <div class="card"><div class="sect" style="margin-top:0">Load</div><pre class="src" style="margin-top:2px">${esc(DP.PATTERNS[m.pattern].label.replace('s*', m.stride + '*').replace('w-1', m.w - 1))}  // thread i, ${m.w} threads in the warp</pre></div></div>`;
+    const detail = k === 0 ? `Each of the ${m.w} lanes computes its own address.`
+      : k === 1 ? `The coalescer groups the ${m.w} addresses by ${m.seg}-word segment: ${m.T} segment${m.T > 1 ? 's' : ''} touched.`
+      : k === m.T + 2 ? `All ${m.w} lanes have their data after ${m.T} transaction${m.T > 1 ? 's' : ''}.`
+      : `Transaction ${k - 1} of ${m.T}: segment ${m.transactions[k - 2].seg} serves ${m.transactions[k - 2].lanes.length} lane${m.transactions[k - 2].lanes.length > 1 ? 's' : ''}.`;
+    return { html, title: k === 0 ? 'One warp, one load' : k === 1 ? 'Coalescing' : k === m.T + 2 ? 'Load complete' : `Cycle ${k - 1}`, detail };
+  },
+  onButton(id, tab) { if (id === 'shuf') tab.seed++; },
+});
+
+/* ================================================================== driver */
+const app = {
+  tab: 0, k: TABS.map(() => 0), model: [], cfg: TABS.map(() => ({})), playing: false, timer: null, speed: 1,
+  go(k) { goTo(k); }, setTab(i) { setTab(i); },
+};
+window.app = app;
+
+function buildControls() {
+  $('tabs').innerHTML = TABS.map((t, i) => `<button data-tab="${i}" role="tab" title="${esc(t.title || t.name)} (key ${i + 1})">${esc(t.name)}</button>`).join('');
+  $('cfgs').innerHTML = TABS.map((t, i) => `<div class="cfg" id="cfg${i}">${t.ctrls.map(c => {
+    const id = `c${i}_${c.id}`;
+    if (c.type === 'button') return `<div class="grp"><button id="${id}" title="${esc(c.title || '')}">${c.label}</button></div>`;
+    if (c.type === 'range') return `<div class="grp"><label for="${id}">${c.label}</label><input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.def}" title="${esc(c.title || '')}"><output id="${id}_o">${c.def}${c.unit || ''}</output></div>`;
+    return `<div class="grp"><label for="${id}">${c.label}</label><select id="${id}" title="${esc(c.title || '')}">${c.opts.map(([v, l]) => `<option value="${v}"${v == c.def ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
+  }).join('')}</div>`).join('');
+  $('main').innerHTML = TABS.map((t, i) => `<section class="view" id="view${i}"></section>`).join('');
+  TABS.forEach((t, i) => {
+    t.ctrls.forEach(c => {
+      const el = $(`c${i}_${c.id}`);
+      if (c.type === 'button') el.addEventListener('click', () => { t.onButton && t.onButton(c.id, t); rebuild(true); });
+      else el.addEventListener(c.type === 'range' ? 'input' : 'change', () => { t.onChange && t.onChange(t); rebuild(true); });
+    });
+    if (t.bind) t.bind($(`view${i}`), t, rebuild);
+  });
+}
+
+function readCfg(i) {
+  const t = TABS[i], c = {};
+  for (const d of t.ctrls) if (d.type !== 'button') { const el = $(`c${i}_${d.id}`); c[d.id] = d.type === 'range' ? +el.value : el.value; if (d.type === 'range') $(`c${i}_${d.id}_o`).textContent = el.value + (d.unit || ''); }
+  for (const d of t.ctrls) if (d.off) $(`c${i}_${d.id}`).closest('.grp').classList.toggle('hidden', !!d.off(c));
+  return c;
+}
+
+function rebuild(resetK) {
+  const i = app.tab, t = TABS[i];
+  app.cfg[i] = readCfg(i);
+  app.model[i] = t.build(app.cfg[i], t);
+  if (resetK) app.k[i] = 0;
+  app.k[i] = Math.min(app.k[i], app.model[i].steps - 1);
+  const s = $('scrub'); s.max = app.model[i].steps - 1;
+  stopPlay();
+  render();
+}
+
+function render() {
+  const i = app.tab, m = app.model[i], k = app.k[i];
+  const v = TABS[i].view(m, k);
+  $(`view${i}`).innerHTML = v.html;
+  $('narrTitle').textContent = v.title;
+  $('narrDetail').textContent = v.detail;
+  $('scrub').value = k;
+  $('stepNo').textContent = `${k} / ${m.steps - 1}`;
+  $('bBack').disabled = $('bReset').disabled = k === 0;
+  $('bStep').disabled = k >= m.steps - 1;
+  $('bPlay').textContent = app.playing ? '⏸' : '▶';
+  if (v.after) v.after();
+}
+
+function goTo(k) {
+  const m = app.model[app.tab];
+  app.k[app.tab] = Math.max(0, Math.min(m.steps - 1, k));
+  render();
+}
+
+function setTab(i) {
+  stopPlay();
+  app.tab = i;
+  document.querySelectorAll('#tabs button').forEach((b, j) => b.classList.toggle('on', j === i));
+  document.querySelectorAll('.cfg').forEach((c, j) => c.classList.toggle('on', j === i));
+  document.querySelectorAll('.view').forEach((c, j) => { c.classList.toggle('on', j === i); if (j !== i) c.innerHTML = ''; });
+  rebuild(false);
+  $('main').scrollTop = 0;
+}
+
+function stopPlay() { app.playing = false; clearInterval(app.timer); app.timer = null; $('bPlay').textContent = '▶'; }
+function startPlay() {
+  const m = app.model[app.tab];
+  if (app.k[app.tab] >= m.steps - 1) app.k[app.tab] = 0;
+  app.playing = true;
+  clearInterval(app.timer);
+  app.timer = setInterval(() => {
+    const mm = app.model[app.tab];
+    if (app.k[app.tab] >= mm.steps - 1) { stopPlay(); render(); return; }
+    goTo(app.k[app.tab] + 1);
+  }, 500 / app.speed);
+  render();
+}
+const togglePlay = () => (app.playing ? (stopPlay(), render()) : startPlay());
+
+buildControls();
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) setTab(+b.dataset.tab); });
+$('bPlay').addEventListener('click', togglePlay);
+$('bStep').addEventListener('click', () => { stopPlay(); goTo(app.k[app.tab] + 1); });
+$('bBack').addEventListener('click', () => { stopPlay(); goTo(app.k[app.tab] - 1); });
+$('bReset').addEventListener('click', () => { stopPlay(); goTo(0); });
+$('scrub').addEventListener('input', e => { stopPlay(); goTo(+e.target.value); });
+$('selSpeed').addEventListener('change', e => { app.speed = +e.target.value; if (app.playing) startPlay(); });
+$('setupBtn').addEventListener('click', () => document.body.classList.toggle('setup'));
+document.addEventListener('keydown', e => {
+  if (e.target.matches('select, input, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'ArrowRight') { stopPlay(); goTo(app.k[app.tab] + 1); }
+  else if (e.key === 'ArrowLeft') { stopPlay(); goTo(app.k[app.tab] - 1); }
+  else if (e.key === 'Home') { stopPlay(); goTo(0); }
+  else if (/^[1-4]$/.test(e.key)) setTab(+e.key - 1);
+});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+setTab(0);
+</script>
+</body>
+</html>
