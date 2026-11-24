@@ -7,7 +7,8 @@
  *
  * Covers what the shipped examples never exercise: 16-bit and 24-bit colour,
  * vary_col / vary_row triggering, both autoadvance directions including their
- * wrap, and the sub-word write rules each colour mode imposes.
+ * wrap and repositioning mid-stream, and the sub-word write rules each colour
+ * mode imposes.
  *
  *   node riscv_simulator_tests/oneoff_oled_modes.js
  */
@@ -252,6 +253,25 @@ const CASES = [
                     data(0xF800), data(0xF800), data(0xF800),
                     ctrl(0x10), data(0x001F)),
     note: 'same arming rule on the other axis'
+  },
+  {
+    name: 'repositioning in autoadvance_col puts the next pixel where it was set',
+    prog: [].concat(ctrl(0x14), col(0), row(10),
+                    data(0xF800), data(0xF800), data(0xF800),
+                    col(0), row(11), data(0x07E0), data(0x07E0)),
+    note: 'the green run starts at column 0 of row 11, as a program redrawing a frame from (0,0) expects'
+  },
+  {
+    name: 'repositioning in autoadvance_row puts the next pixel where it was set',
+    prog: [].concat(ctrl(0x15), col(30), row(0),
+                    data(0xF800), data(0xF800), data(0xF800),
+                    col(31), row(0), data(0x001F), data(0x001F)),
+    note: 'the blue run starts at row 0 of column 31'
+  },
+  {
+    name: 'vary_col before any data write paints black, not x',
+    prog: [].concat(ctrl(0x01), row(2), col(3), col(4)),
+    note: 'OLED_Data powers up as 0 on the FPGA, and now in simulation too'
   },
   {
     name: 'out-of-range column 96 folds onto 32, it does not wrap to 0',

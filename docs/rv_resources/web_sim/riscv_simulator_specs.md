@@ -979,9 +979,98 @@ looks and behaves as it does in a browser; what differs:
   (`contextIsolation`, `sandbox`), and links leave for the system browser.
 - **No menu bar** on Windows and Linux; macOS keeps the standard menu, without which
   copy and paste stop working.
+- **Verilator** can be chosen instead of Icarus ([§5.19](#519-verilator-desktop-app)).
 
 Building, packaging and signing are described in
 [`electron/README.md`](electron/README.md).
+
+### 5.19 Verilator (desktop app)
+
+*Simulator* (⚙ Settings → Simulation) chooses Icarus Verilog or Verilator. The browser
+shows the same setting, disabled, with a tooltip saying it needs the desktop app, so
+that the two look alike. The choice is remembered in `localStorage`.
+
+Verilator 5.054, built by `electron/scripts/build-verilator.sh`, translates the
+sources and the same generated testbench to C++ (`--cc --exe --main --timing --trace`,
+`-Wno-fatal`, lint and style warnings off), and `electron/verilator_native.js`
+compiles it with `-Os` in parallel and links a model, which then takes the same
+plusargs and files as `vvp`. Nothing else in the page changes: the trace, stepping,
+peripherals, input changes and the waveform work as with Icarus.
+
+| 40,000 / 200,000 cycles of DIP to LED on the `RV/` RTL, through the page | Icarus (native) | Verilator |
+|---|---|---|
+| Build | 0.05 s | 3.6 s after a source edit; 11 s the first time (its runtime) |
+| 200,000 cycles, waveform on | 27.4 s | 1.6 s |
+| 200,000 cycles, waveform off | 19.5 s | 1.0 s |
+
+What differs:
+
+- **Two-state.** What Icarus shows as `x` (a register never written, an output never
+  driven) is 0, and the console says so on the first build. Instruction, register and
+  memory records match Icarus otherwise; `test_verilator.js` checks 40,000 cycles.
+- **Builds are cached** by content (sources, testbench, language, Verilator, compiler)
+  in the app's data folder, the last 8 kept, so changing the program, Reset and input
+  changes reuse the model. Verilator's runtime is compiled once per compiler.
+- **No checkpoints.** Verilator takes one top level, so `cg3207_hdl_ck` cannot sit beside
+  the testbench; replays start from reset, which at this speed is cheap.
+- **Post-synthesis simulation is hidden** while Verilator is chosen: it compares the
+  RTL run against an Icarus run of the netlist, and two-state against four-state would
+  diverge at every `x`.
+- **Wrapper signals only** cannot use `$dumpvars` depth, which Verilator ignores, nor
+  `--trace-depth`, since inlining puts everything under the Wrapper at one level. A
+  config file passed with the build, `tracing_off -scope "cg3207_hdl_tb.dut.*.*"`, keeps
+  the testbench's and the Wrapper's own signals and drops the rest (8.4 MB against
+  22.1 MB for 40,000 cycles); ticking it builds a second cached model.
+- **Warnings** are counted by kind with the first of each (`Verilator COMBDLY ×149: …`);
+  errors are listed with file, line and column.
+- **The status line** reports each step of a build (translating, compiling the runtime
+  and the model file by file, linking), and Reset kills the build.
+
+**Live runs.** With Verilator, Run is live: the model keeps running until Pause, a
+breakpoint or *Cycles per Run / Resume* (1,000,000 by default for Verilator, 2,000 for
+Icarus, each remembered separately), and switches, buttons, the accelerometer and typed
+UART input take effect while it runs. A C++ helper compiled into every model
+(`cg3207_live_poll`, called through DPI from a `` `ifdef VERILATOR `` block of the
+testbench at every rising edge) reads commands from stdin, drives an input change at the
+edge, which puts it in force from the next cycle exactly as a `stim.mem` entry would, and
+reports it (`@@V`, `@@U`) with that cycle, so the input timeline, and with it Back, a
+replay and the waveform, is the same as if the inputs had been there from the start. It
+flushes output every 30 ms; the app passes it on every 50 ms and the page follows the
+recording every 100 ms with a forward-only seek. *Real time* paces the model itself to
+the clock: 2,275 cycles in 1.5 s at 1.53 kHz. Flat out, live, the page takes in about
+285,000 cycles a second (5,000,000 cycles in 17.5 s).
+
+- **Resume** restarts the model from reset with the inputs recorded so far and
+  `+TRACEFROM` at the old end: nothing is printed before it, so the replay runs at full
+  speed, and the records that follow join onto the recording. Changing an input while
+  paused does the same from the first cycle the input timelines differ, rather than
+  re-recording from reset: 4.7 s near the end of a 5,000,000-cycle run.
+- **No cap.** The recording keeps the last 2,000,000 cycles (`HDL_VL_KEEP`). Once it is a
+  quarter over, the instructions before that are folded into a snapshot of the state
+  they leave (registers, data memory, peripherals, both OLED pages, UART output) and a
+  seek starts there; the instruction count still counts from reset, and Back stops at
+  the start of what is kept. The cross-check against the JS model, which runs from
+  reset, is not offered once a recording has been trimmed.
+- **The waveform** (*Waveform*, shown with Verilator): *Built on Pause* replays the run
+  with the dump on once it stops; *While running* dumps as it goes and the page re-reads
+  it twice a second, which is useful at a slow *Real time* clock. Either way it covers at
+  most the last 50,000 cycles (`+VCDFROM`), which also applies to Verilator's ordinary
+  runs.
+- The DPI import is SystemVerilog, so it is wrapped in `` `begin_keywords "1800-2017" ``;
+  the design itself is still parsed as the selected Verilog standard. The helper reads
+  stdin with `read(2)`: a thread blocked in stdio holds stdin's lock, and `exit()`
+  flushing every stream waited on it for ever once the testbench called `$finish`.
+
+**The C++ compiler.** `CXX`, then `g++` and `clang++` (on macOS only when
+`xcode-select -p` finds the command line tools, since probing `clang++` without them
+opens Apple's installer), each checked by compiling a C++20 coroutine. With none, Zig
+0.17.1 is downloaded from ziglang.org into the data folder, its SHA-256 checked, and
+`zig c++` used: about 57 MB (100 MB on Windows), unpacked to about 400 MB, plus Zig's own
+cache. The console says why, the status line counts the megabytes, and Zig's first
+compile builds its C++ library (about 30 s, once), so a first build from nothing took
+45 s here and later ones 5 s. Offline, the build fails with a message naming the
+alternatives, and the next build tries again. Zig is not bundled, which keeps it out of
+every installer.
 
 ---
 
@@ -1017,6 +1106,8 @@ the engine they configure, so a setting's scope is visible from where it sits.
 |   BOTH ENGINES     [x] Statement Stepping (Fast Mode)                                             |
 |   PROCESSOR SOURCES   drop .v files / browse…   [Wrapper.v ▸ WRAPPER] [RV.v] [ALU.v] …            |
 |                       [ Clear files ] [ Save testbench ]                                          |
+|   SIMULATION       Simulator [ Icarus Verilog | Verilator ]  (Verilator: desktop app only)        |
+|                    Waveform [ Built on Pause | While running ]  (Verilator only)                   |
 |   RECORDING        Cycles per Run / Resume [ 2000 ]   [ ] Waveform: Wrapper signals only          |
 |                    [x] Record the architectural trace                                             |
 |   COMPILER&OUTPUT  Verilog standard [ Verilog-2005 ]  [ ] VCD   [ ] Cross-check vs JS model       |
@@ -1178,6 +1269,7 @@ read from it.
   - `0x2` (`vary_row_mode`): Writing `OLED_DATA` updates pixel and increments row index (`row = (row + 1) % 64`).
   - `0x4` (`autoadvance_col`): Column auto-advances across line; wraps to next row when reaching column 95.
   - `0x5` (`autoadvance_row`): Row auto-advances down column; wraps to next column when reaching row 63. Perfect for column-major framebuffer streams.
+  - In both auto-advance modes the first data write paints at the position set, and writing `OLED_COL` or `OLED_ROW` sets where the next one goes, so a frame is redrawn by setting both to 0 and streaming it again.
 
 ### 8.2 3-axis accelerometer & temperature sensor (`0xFFFF0040`–`0xFFFF0044`)
 - **`0xFFFF0040` (RO)**: `ACCEL_DATA` — 32-bit packed `{temperature, X, Y, Z}` from **MSB to LSB**:
@@ -1321,9 +1413,10 @@ No `0x` prefix on Content (Hex) — the header already says it's hex; Memory's A
 A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests). Every
 suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file
 rather than a copy of its logic. `npm test` runs **18** of them, there is no build step
-and nothing else to run. Three more need things `npm test` cannot assume and are run on
-their own: `test_hdl_native.js` a native Icarus build, `test_hdl_folder_browser.js`
-Chrome, and `test_electron_app.js` the desktop app and a display.
+and nothing else to run. Four more need things `npm test` cannot assume and are run on
+their own: `test_hdl_native.js` a native Icarus build, `test_verilator.js` native
+Icarus and Verilator builds and a C++ compiler, `test_hdl_folder_browser.js` Chrome,
+and `test_electron_app.js` the desktop app and a display.
 The remaining files there are shared test infrastructure, not suites of their own:
 `godbolt_cache.js`/`.json` mock Godbolt's response for C compilation, and
 `examples_fetch.js` serves `examples/` from disk — both stand in for network access
@@ -1352,7 +1445,8 @@ jsdom does not have.
 | `test_jsdom.js` | Boot smoke test under jsdom. |
 | `test_hdl_native.js` | **Native Icarus against WASM (26 assertions).** Two pages, one bridged to `electron/iverilog/<os>-<arch>` (or `HDL_NATIVE_DIR`), one to `vendor/verisim/` run in Node, each load a copy of `RV/` as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also the folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. Not in `npm test`: build Icarus first (`npm run build:iverilog` in `electron/`). |
 | `test_hdl_folder_browser.js` | **The folder picker in headless Chrome (11 assertions).** An origin-private folder stands in for a picked one; checks what loads, re-reading on focus, the handle surviving a reload, *Clear files* forgetting it, and the `webkitdirectory` fallback. Not in `npm test`: needs Chrome (`CHROME_CHANNEL` to choose another). |
-| `test_electron_app.js` | **The desktop app (12 assertions).** Launches `electron/` through Playwright, or a packaged build given by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run from the toolbar lighting the LEDs, nothing fetched for the engines, and the folder remembered across a restart. Not in `npm test`: opens a window. |
+| `test_verilator.js` | **Verilator through the page (43 assertions).** The Simulator setting in a browser (disabled, with its tooltip) and in the app; a build reported on the status line and cached; a 40,000-cycle run recording what Icarus records; an input change, Resume, the Wrapper-only waveform, a compile error, and Reset during a build; live runs (a switch moved while running and the recording checked against a replay of its timeline, Pause under real-time pacing, Resume joined on, a breakpoint, typed UART input, the per-simulator cycle defaults, and a 5,000,000-cycle run trimmed to its last 2,000,000 with an input change joined on afterwards); then 200,000 cycles timed on both simulators, waveform on and off. Not in `npm test`: needs native Icarus and Verilator builds and a C++ compiler (`RVSIM_FORCE_ZIG=1` tests the Zig path). |
+| `test_electron_app.js` | **The desktop app (17 assertions).** Launches `electron/` through Playwright, or a packaged build given by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run from the toolbar lighting the LEDs, Verilator chosen in Settings and run from the toolbar, a switch flipped during a live run showing on the LEDs before Pause, nothing fetched for the engines, and the folder remembered across a restart. Not in `npm test`: opens a window. |
 
 ### 12.1 Instruction semantics, and why assembling is not enough
 
@@ -1440,6 +1534,9 @@ Newest first. Versions before v15.0 are grouped.
 
 | Version | Milestone description & features implemented |
 |---------|----------------------------------------------|
+| **v24.132 (Live Runs With Verilator)** | With Verilator in the desktop app, Run is live (§5.19): the model keeps running and inputs take effect as they change, instead of the run being recorded first and an input waiting for Pause. The testbench gains a `` `ifdef VERILATOR `` block that calls a C++ helper through DPI at every rising edge; the helper reads the app's commands from stdin, paces the model to the *Real time* clock, flushes output for streaming, and asks for a stop or a waveform flush. Every input it applies is reported with the cycle it took effect, so the recording equals a replay of its input timeline from reset, which the tests check. The testbench also gains `+TRACEFROM` (no records before a cycle) and `+VCDFROM` (the waveform starts at a cycle): Resume restarts the model from reset with the recorded inputs and joins on at the old end, and an input changed while paused joins on at the change, both without re-recording what is already there. Verilator's recordings are not capped at 2,000,000 cycles: they keep the last 2,000,000 and fold the rest into a state snapshot that seeks start from. *Cycles per Run / Resume* is kept per simulator, 2,000 for Icarus and 1,000,000 for Verilator; a *Waveform* setting chooses between building the waveform on Pause and following the run, and either covers at most the last 50,000 cycles. The trace parser takes input in pieces and shares one empty array between steps with nothing written, and `hdlSeek` can carry on forward from the last seek. Found on the way: the helper first read stdin through `std::cin`, and the model then hung at `$finish`, `exit()` waiting on the lock of the stdin stream the reader thread was blocked in. **Testing.** `test_verilator.js` grows from 21 to 43 assertions and `test_electron_app.js` from 14 to 17, the latter flipping a switch in the packaged AppImage during a live run; `test_hdl_mode` (191), `test_waveform` (98), `test_m_extension` (21), `test_hdl_native` (26), `test_hdl_folder_browser` (11), `test_statement_stepping`, `test_backstep_peripherals`, `test_oled_swap_race`, `test_datapath`, `test_pipeline`, the C and image suites, `test_comprehensive_suite` and `test_jsdom` pass. |
+| **v24.131 (OLED: Repositioning in Auto-Advance; Wrapper Fix)** | The image example drew its first frame correctly and every later one shifted by a pixel, the last column of each row landing at the start of the next: 0 of 6144 pixels in place from frame 2 on, against `Uphill.png`. The program sets `OLED_ROW` and `OLED_COL` to 0 before each frame, and in an auto-advance mode `Wrapper.v` cleared its `autoadvance_col`/`autoadvance_row` flag only on a triggering write in another mode, so the flag stayed armed from the previous frame and the first data write advanced before painting. The JS model has copied that since v24.70, which is when the simulator began showing it; the RTL, and so the board, always had it. **Fixed in the Wrapper**: writing `OLED_COL` or `OLED_ROW` disarms both flags, so the next pixel goes where the position was set, and the model follows. Writing `OLED_CTRL` deliberately does not disarm: the position register holds the last pixel drawn, so disarming on a colour-format change mid-stream would repaint it. **Also in the Wrapper**: `OLED_Data` is initialised to 0, as the FPGA powers it up, so painting by coordinate before any data write gives black rather than x in simulation, matching the model. Not changed: in 24-bit colour, the auto-advance modes trigger only on a write covering byte lane 0, while `vary_pixel_data` triggers on any lane, which lets R and G be written before B paints. The examples are unchanged. Checked absolutely as well as engine against engine: with the fixed Wrapper the original program puts all 6144 pixels of frames 1 to 3 in place in JS mode and on the RTL through Verilator, against 0 of 6144 in frames 2 and 3 with the old Wrapper. `oneoff_oled_modes.js` gains repositioning in both auto-advance directions and `vary_col` before any data write (24 comparisons, all matching). The copies in `examples/hdl/` and the course's Asst_02 templates follow, and the course's peripherals page says what writing `OLED_COL`/`OLED_ROW` does in auto-advance. **Also:** the Credits name Verilator and Zig; user-facing text says "the top-level module" instead of naming `TOP_Nexys.vhd`, and "Wrapper"/"RV" without `.v` (the Clock tooltips, the sources drop zone, the Wrapper warning, the console's memory-depth messages, and the user guide's clock paragraph). |
+| **v24.130 (Verilator in the Desktop App)** | Native Icarus is 1.6× the WASM build, all of it Icarus's own evaluation, so the desktop app gains **Verilator** as a second simulator (§5.19): 200,000 cycles of the `RV/` RTL in 1.6 s against 27.4 s with the waveform on, 1.0 s against 19.5 s with it off, recording the same instructions, register and memory writes. A *Simulator* setting heads the Simulation group; in a browser it is shown disabled, with a tooltip, so the page looks the same in both. `electron/verilator_native.js` calls `verilator_bin` directly and compiles the C++ itself in parallel, so neither Perl nor make is needed; models are cached by content and Verilator's runtime once per compiler, giving 3.6 s for a rebuild after an edit. Verilator is two-state, which the console states; it has no checkpoints (one top level), so its replays start from reset; post-synthesis simulation is hidden while it is chosen; and *Wrapper signals only* is a `tracing_off` scope in a config file, since Verilator ignores `$dumpvars` depth and inlining defeats `--trace-depth`. Builds report their steps on the status line and Reset kills them. **The compiler** is the computer's own when one compiles a C++20 coroutine; otherwise Zig 0.17.1 is downloaded on first use, checked against its SHA-256, and unpacked into the app's data folder, with the console saying why and the status line counting megabytes, rather than shipping 55 to 100 MB in every installer. Measured with a local mirror and no system compiler: 45 s for the first build, 5 s after. The workflow builds Verilator on each runner and runs `test_verilator.js` there; only Linux has been run. The AppImage grows from 146 to 153 MB. The user guide gains a tentative section 6 on the desktop app, saying it is not yet available for download, with what differs from the page: native Icarus, the Verilator choice and its two-state results, the one-off compiler download, and opening an unsigned installer. **Testing.** `test_verilator.js` (21) is new; `test_electron_app.js` (now 14) chooses Verilator in Settings in the packaged AppImage and runs DIP to LED from the toolbar. `test_hdl_native` (26), `test_hdl_folder_browser` (11), `test_hdl_mode` (191), `test_waveform` (98), `test_m_extension` (21), `test_comprehensive_suite` and `test_jsdom` pass. |
 | **v24.129 (Resume Re-runs 16 Cycles; a Wrapper-Only Waveform)** | **Resume.** Checkpoints fell every 1024 cycles, and an extension has to start at least 16 cycles before the old recording's end so the replay can be checked against it, so with the default 2000 *Cycles per Run / Resume* every Resume re-simulated from cycle 1024: 976 cycles of the old recording again before any new ones, and more as the spacing doubled. Choosing a multiple of 1024 would not help, because of those 16 cycles. The checkpoint module now also takes one at `+CKAT`, which the page sets 17 cycles before the end of each run, so an extension starts there whatever the setting: 40,000 to 42,000 cycles takes 0.42 s native. **Waveform: Wrapper signals only**, under *Cycles per Run / Resume* and off by default, limits `$dumpvars` to the testbench and Wrapper levels (§6): the VCD of a 40,000-cycle run drops from 47.8 MB to 9.7 MB and the run takes 23 to 29 % less time on either engine. A replay joins only onto a VCD of the same scope; the trace records which. **Testing.** `test_hdl_native.js` section 6 (now 26 assertions) checks the signals the reduced waveform keeps and drops, that a Resume loads the checkpoint 17 cycles before the old end, and that the resumed recording and waveform equal a run from reset of the same length on both engines. `test_hdl_mode` (191), `test_waveform` (98), `test_comprehensive_suite` and `test_jsdom` pass. |
 | **v24.128 (A Desktop App With Native Icarus; HDL Sources From a Folder)** | **Desktop app** (§5.18): `electron/` packages the unchanged page with Electron 45 and a native Icarus Verilog for each platform, built from source at the commit the WASM engine came from (`c7530db`) by `electron/scripts/build-iverilog.sh` and stripped to 8 MB. `hdlTool()` gains one branch: given `window.rvNative.icarus`, it sends the stage's files and arguments over IPC to `electron/hdl_native.js`, which runs the tool in a temporary directory, and a Reset kills the process. Measured on 40,000 cycles of the `RV/` RTL: compile 40 ms against 180 ms, simulation 5.2 s against 8.6 s, so native Icarus is 1.7× the WASM build; with trace, VCD and checkpoints off it is still 18,000 cycles a second, which puts the remaining time in Icarus itself and makes Verilator, not native Icarus, the route to a faster engine. `.github/workflows/desktop.yml` builds Icarus and the installers on Linux, Windows (MSYS2) and macOS (arm64, x64), runs `test_hdl_native.js` against each build, and attaches the installers to the run, or to a draft release for a `desktop-v*` tag; signing and notarization happen only when the secrets are set. Only the Linux build has been run so far. The app's icon is the page's favicon rendered at 1024 px (`electron/build/icon.png`). **Folder** (§5.17): *folder…* beside *browse…* loads a folder's Verilog, keeping the files whose modules sit under the Wrapper and skipping Vivado's output folders, so testbenches and stale copies are not compiled as extra top levels. It is read again on window focus and before each run from reset, with changes named in the console, and remembered across restarts in the app and across reloads in Chromium (an IndexedDB handle); Firefox and Safari get a one-off `webkitdirectory` copy. The HDL settings note that files are compiled in the browser and must be loaded once per session now says they are compiled on this computer and that a folder is remembered. **Testing.** `test_hdl_native.js` (21), `test_hdl_folder_browser.js` (11) and `test_electron_app.js` (12, also run against the packaged AppImage's contents) are new and outside `npm test`, since each needs a native build, Chrome or a display. `playwright-core` joins the test dependencies. `test_hdl_mode`, `test_waveform`, `test_m_extension`, `test_comprehensive_suite` and `test_jsdom` pass unchanged. |
 | **v24.127 (HDL Replays From Checkpoints; the Engine Off the Page's Thread)** | An input change, or extending the recording, re-simulated from reset to the end of the recording, and the page froze for all of it: a 40,000-cycle recording of the `RV/` RTL took about 5 s each time, the prebuilt core about 3 s per 10,000 cycles. **Checkpoints** (§5.11): a generated `cg3207_hdl_ck` module saves every reg and written memory of the design and the testbench every 1024+ cycles and restores one with `+CKLOAD`; the state is found by walking the sources from the Wrapper. A replay starts from the latest checkpoint before the input timeline changed, is joined onto the old recording and VCD, and must reproduce the old recording over at least 16 cycles first, or the run is repeated from reset and checkpoints stay off for those sources. After an input change the recording now reaches one *Cycles* past it rather than back to its old end. Measured: a DIP change at cycle 38,000 of 40,000 takes 1.4 s instead of 5.3 s (RTL), at 8,500 of 10,000 on the prebuilt core 0.8 s instead of 2.8 s, both joined recordings identical to the run from reset. **The worker**: preprocess, compile and simulate run in a module worker (§5.15), falling back to the page; during a 6 s simulation the page's longest stall was 21 ms. Reset now stops a running simulation, and an input moved during a run is applied where the run stops. HDL test section 15 covers the join, the waveform, an extension, a corrupted checkpoint and the `generate` refusal. |

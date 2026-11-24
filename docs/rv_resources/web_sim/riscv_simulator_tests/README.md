@@ -50,13 +50,14 @@ npm run test:hdl          # or any other script in package.json
 node riscv_simulator_tests/test_hdl_mode.js
 ```
 
-Every suite in this directory is wired into `npm test` except three that need something
+Every suite in this directory is wired into `npm test` except four that need something
 it cannot assume, run on their own:
 
 ```bash
 npm run test:native    # test_hdl_native.js: a native Icarus build (cd ../electron && npm run build:iverilog)
 npm run test:folder    # test_hdl_folder_browser.js: Chrome
 npm run test:app       # test_electron_app.js: the desktop app; opens a window
+npm run test:verilator # test_verilator.js: native Icarus and Verilator builds, and a C++ compiler
 ```
 
 What each checks is in §12 of the specs. There is no build step: `riscv_simulator.html`

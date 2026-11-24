@@ -88,6 +88,7 @@ function makePage(runner, folder) {
           createImageData: (w,h) => ({ data: new Uint8Array(w*h*4), width:w, height:h }),
           putImageData(){}, fillRect(){}, clearRect(){}, drawImage(){}, fillText(){}, strokeRect(){},
           beginPath(){}, moveTo(){}, lineTo(){}, stroke(){}, save(){}, restore(){}, rect(){}, clip(){},
+          setTransform(){}, closePath(){}, fill(){}, translate(){}, scale(){}, arc(){}, setLineDash(){}, strokeText(){},
           getImageData: () => ({ data: new Uint8Array(4) }), measureText: () => ({ width: 0 })
         });
       }

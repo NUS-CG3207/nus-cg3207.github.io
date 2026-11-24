@@ -63,7 +63,7 @@ module Wrapper
 	output reg OLED_Write,			// Indicates that the pixel is to be updated. This could happen when you change row or col or data depending on OLED_CTRL[3:0]
 	output reg [6:0] OLED_Col = 7'd0,
 	output reg [5:0] OLED_Row = 6'd0,
-	output reg [23:0] OLED_Data,		// 24-bit pixel so as to see easily on the display. <5R, 6G, 8B>, each extended to 8 bits left aligned.
+	output reg [23:0] OLED_Data = 24'd0,	// 24-bit pixel so as to see easily on the display. <5R, 6G, 8B>, each extended to 8 bits left aligned.
 	output reg OLED_Swap = 1'b0,		// Present the drawn page. A one-cycle pulse; the OLED controller runs on the undivided clock and edge-detects it.
 	input  OLED_SwapPending,		// High from the request until the page exchange and its copy have completed. Software reads this at OLED_STATUS.
 	input [31:0] ACCEL_Data,		// Packed <Temp, X, Y, Z> from MSB to LSB. X, Y, Z are in +/-2g range, 8-bit signed.
@@ -435,10 +435,18 @@ always@(posedge CLK) begin
 	if( MemWrite_out[0] && dec_OLED_CTRL )
 		if( WriteData_out[3] ) OLED_Swap <= 1'b1 ;
 		else OLED_ctrl_reg <= WriteData_out[7:0] ;
-	if( MemWrite_out[0] && dec_OLED_ROW ) 
+	// Setting the position disarms auto-advance, so the next pixel goes where
+	// it was set rather than one past it.
+	if( MemWrite_out[0] && dec_OLED_ROW ) begin
         OLED_Row <= WriteData_out[5:0] ;
-	if( MemWrite_out[0] && dec_OLED_COL )
+		autoadvance_row <= 1'b0;
+		autoadvance_col <= 1'b0;
+	end
+	if( MemWrite_out[0] && dec_OLED_COL ) begin
         OLED_Col <= WriteData_out[6:0] ;
+		autoadvance_row <= 1'b0;
+		autoadvance_col <= 1'b0;
+	end
            
 end
 

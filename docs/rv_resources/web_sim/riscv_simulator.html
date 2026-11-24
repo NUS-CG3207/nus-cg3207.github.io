@@ -1642,6 +1642,8 @@
 
     .hdl-drop b { color: #a6adc8; }
 
+    #hdlSimulator:disabled { opacity: 0.5; cursor: not-allowed; }
+    #hdlSimulatorRow:has(#hdlSimulator:disabled) label { opacity: 0.6; }
     .hdl-btn {
       background: #313244;
       border: 1px solid #45475a;
@@ -4005,7 +4007,7 @@
                   The program has to fit the instruction memory the processor
                   actually has. In this simulator that limit is <b>Code (.text)
                   size</b> in Settings → Linker; on the FPGA it is set by
-                  <code>IROM_DEPTH_BITS</code> in <code>Wrapper.v</code>, and the two
+                  <code>IROM_DEPTH_BITS</code> in <code>Wrapper</code>, and the two
                   have to agree. The status bar reports the size after every
                   assemble, and says by how many words the program overruns if it
                   does. Raising the optimisation level, or raising both limits
@@ -4060,11 +4062,11 @@
             <div class="sim-card">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-weight:600;color:#cba6f7;font-size:13px;"
-                  title="The CPU clock on the board: TOP_Nexys.vhd divides 100 MHz by 2^CLK_DIV_BITS. The same setting for both engines.">Clock</span>
+                  title="The CPU clock on the board: the top-level module divides 100 MHz by 2^CLK_DIV_BITS. The same setting for both engines.">Clock</span>
                 <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a6adc8;">
                   CLK_DIV_BITS
                   <input type="number" data-clk="div" min="0" max="26" step="1" value="5" class="pipe-select" style="width:52px;"
-                    title="As in TOP_Nexys.vhd: 0 is 100 MHz, 1 is 50 MHz, 5 is 3.13 MHz, 26 is about 1.5 Hz">
+                    title="As in the top-level module: 0 is 100 MHz, 1 is 50 MHz, 5 is 3.13 MHz, 26 is about 1.5 Hz">
                   <span data-clk="hz" style="min-width:62px;color:#cdd6f4;">3.13 MHz</span>
                   <select data-clk="pace" class="pipe-select"
                     title="Max speed runs as fast as the browser can. Real time runs at the clock above, so delay loops take as long as on the board; if the browser cannot keep up, the toolbar shows the fraction of real time it reaches. In HDL mode a run is recorded first and then played back at the clock.">
@@ -4136,13 +4138,13 @@
               <button type="button" class="hdl-btn" id="hdlFolderBtn" style="display:none;padding:2px 8px;"
                 onclick="hdlPickFolder()">folder…</button>
               <input type="file" id="hdlFolderInput" webkitdirectory multiple style="display:none;">
-              <br>Include <b>Wrapper.v</b>, <b>RV.v</b> and every submodule.
+              <br>Include <b>Wrapper</b>, <b>RV</b> and every submodule.
               <br><span style="color:#6c7086;">You can also drop them anywhere on the page, or open them with 📂 Open.</span>
             </div>
             <div class="hdl-file-list" id="hdlFileList"></div>
             <div class="hdl-warn" id="hdlWrapperWarn">
               None of the loaded files declares <code>module Wrapper</code>. The generated
-              testbench instantiates <code>Wrapper</code> by name, so add your Wrapper.v.
+              testbench instantiates <code>Wrapper</code> by name, so add the file that declares it.
             </div>
             <div class="hdl-row" style="margin-top:8px;">
               <button type="button" class="hdl-btn" id="hdlPrebuiltBtn" onclick="hdlLoadPrebuiltProcessor()"
@@ -4155,6 +4157,26 @@
             <div class="sim-group-hdr"><span class="sim-group-title">Simulation</span></div>
 
             <div class="sim-card">
+              <div id="hdlSimulatorRow" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <label for="hdlSimulator" style="font-weight:600;color:#cba6f7;font-size:13px;">Simulator</label>
+                <select id="hdlSimulator" onchange="setHdlSimulator(this.value)"
+                  style="padding:4px 8px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-family:inherit;font-size:12px;">
+                  <option value="icarus">Icarus Verilog</option>
+                  <option value="verilator">Verilator</option>
+                </select>
+              </div>
+              <div id="hdlLiveWaveRow" style="display:none;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;"
+                title="With Verilator a run is live: inputs take effect as you change them. The waveform can follow it while it runs, which slows a fast run down and is only worth it with Real time at a slow clock, or be built when you pause. Either way it covers at most the last 50,000 cycles.">
+                <label for="hdlLiveWave" style="font-weight:600;color:#cba6f7;font-size:13px;">Waveform</label>
+                <select id="hdlLiveWave" onchange="setHdlLiveWave(this.value)"
+                  style="padding:4px 8px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-family:inherit;font-size:12px;">
+                  <option value="pause">Built on Pause</option>
+                  <option value="live">While running</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sim-card" id="hdlSynthCard">
               <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:#cba6f7;cursor:pointer;font-size:13px;">
                 <input type="checkbox" id="hdlSynth" onchange="setHdlSynth(this.checked)"
                   style="accent-color:#cba6f7;width:16px;height:16px;cursor:pointer;">
@@ -4316,8 +4338,11 @@
               6</a>, and C is compiled by <a href="https://godbolt.org/" target="_blank"
               rel="noopener noreferrer">Compiler Explorer</a>. HDL mode runs on <a href="https://github.com/steveicarus/iverilog" target="_blank"
               rel="noopener noreferrer">Icarus Verilog</a>, compiled to WebAssembly by
-            <a href="https://github.com/senolgulgonul/verisim" target="_blank" rel="noopener noreferrer">verisim</a>,
-            and post-synthesis simulation runs on <a href="https://github.com/YosysHQ/yosys" target="_blank"
+            <a href="https://github.com/senolgulgonul/verisim" target="_blank" rel="noopener noreferrer">verisim</a>.
+            The desktop app runs Icarus natively and can use
+            <a href="https://www.veripool.org/verilator/" target="_blank" rel="noopener noreferrer">Verilator</a> instead,
+            with <a href="https://ziglang.org/" target="_blank" rel="noopener noreferrer">Zig</a> as the C++ compiler
+            where none is installed. Post-synthesis simulation runs on <a href="https://github.com/YosysHQ/yosys" target="_blank"
               rel="noopener noreferrer">Yosys</a>, compiled to WebAssembly by
             <a href="https://github.com/YoWASP/yosys" target="_blank" rel="noopener noreferrer">YoWASP</a>.</p>
           <p>Feedback and bug reports are welcome: rajesh&lt;at&gt;nus.edu.sg.</p>
@@ -5277,9 +5302,9 @@
       // Truncated to the register's 7 bits, not wrapped at 96: the panel,
       // not the Wrapper, decides where an out-of-range column lands.
       { addr: OLED_COL, name: 'OLED COL', access: 'WO', panel: 'oled', read: () => oledCol,
-        write: (off, val) => { oledCol = val & 0x7F; oledTrigger(0x1); } },
+        write: (off, val) => { oledCol = val & 0x7F; oledAdvCol = oledAdvRow = false; oledTrigger(0x1); } },
       { addr: OLED_ROW, name: 'OLED ROW', access: 'WO', panel: 'oled', read: () => oledRow,
-        write: (off, val) => { oledRow = val & 0x3F; oledTrigger(0x2); } },
+        write: (off, val) => { oledRow = val & 0x3F; oledAdvCol = oledAdvRow = false; oledTrigger(0x2); } },
       { addr: OLED_DATA, name: 'OLED DATA', access: 'WO', panel: 'oled', read: () => oledDataVal,
         write: (off, val, size) => oledDataWrite(off, val, size) },
       // Write-only on hardware; echoed back so the Memory view has something
@@ -6276,7 +6301,7 @@
         log(`⚠️ Code is ${totalCodeBytes} bytes, ${totalCodeBytes - codeSize} over the ` +
             `${codeSize}-byte Code segment — ${overWords} instruction` +
             `${overWords === 1 ? '' : 's'} that will not be loaded. Raise ` +
-            `"Code (.text) size" in Settings → Linker, and IROM_DEPTH_BITS in Wrapper.v ` +
+            `"Code (.text) size" in Settings → Linker, and IROM_DEPTH_BITS in Wrapper ` +
             `for HDL mode.`, 'warn');
         lastCodeOverflowWords = overWords;
       }
@@ -6285,7 +6310,7 @@
       if (totalDataBytes > dataSize && editorLanguageMode !== 'c') {
         log(`⚠️ Data is ${totalDataBytes} bytes, ${totalDataBytes - dataSize} over the ` +
             `${dataSize}-byte Data segment. Raise "Data (.data) size" in Settings → Linker, ` +
-            `and DMEM_DEPTH_BITS in Wrapper.v for HDL mode.`, 'warn');
+            `and DMEM_DEPTH_BITS in Wrapper for HDL mode.`, 'warn');
       }
 
       return output;
@@ -7258,7 +7283,8 @@
     // seen a write: the Wrapper arms a flag on the first write and gates the
     // increment on its previous value. That ordering is what puts the first
     // pixel on the column you set, and leaves the register on the last pixel
-    // drawn rather than one past it.
+    // drawn rather than one past it. Writing OLED_COL or OLED_ROW disarms the
+    // flag, so the next pixel lands where it was set.
     function oledDataWrite(off, val, size) {
       oledStoreData(off, val, size);
       const triggerMode = oledCtrl & 0x0F;
@@ -12944,7 +12970,7 @@ int main()
       log('Memory layout for this example: IROM_DEPTH_BITS ' + d.irom + ' (code segment 0x' +
           newCode.toString(16) + '), DMEM_DEPTH_BITS ' + d.dmem + ' (data segment 0x' +
           newData.toString(16) + '), stack top 0x' + (stackBase >>> 0).toString(16) +
-          '. Change these in Settings → Linker, and in Wrapper.v, if you change the program.', 'info');
+          '. Change these in Settings → Linker, and in Wrapper, if you change the program.', 'info');
     }
 
     function buildMemSegmentsPanel() {
@@ -13056,14 +13082,18 @@ int main()
           const el = document.getElementById(id);
           if (el) el[prop] = v;
         };
-        set('hdlCycles', '2000', 'value');
+        Object.assign(hdlCyclesFor, HDL_CYCLES_DEFAULT);
+        set('hdlLiveWave', 'pause', 'value');
+        setHdlLiveWave('pause');
         set('hdlGeneration', '2005', 'value');
         set('hdlVcd', true, 'checked');
         set('hdlWaveTop', false, 'checked');
+        setHdlSimulator('icarus');
         set('hdlCompare', false, 'checked');
         set('hdlTrace', true, 'checked');
         set('hdlRegPath', '', 'value');
-        setHdlCycles(2000);
+        setHdlCycles(HDL_CYCLES_DEFAULT[hdlSimulator]);
+        set('hdlCycles', String(hdlCycleBudget), 'value');
         setHdlDumpVcd(true);
         setHdlWaveTop(false);
         setHdlCompare(false);
@@ -13825,7 +13855,7 @@ int main()
         log(`⚠️ Data is ${estimatedDataBytes} bytes, over the ${dataSize}-byte Data segment. ` +
             `The startup stack pointer was moved to 0x${effectiveStack.toString(16)} so the stack ` +
             `clears it. On hardware the segment size is fixed — raise "Data (.data) size" in ` +
-            `Settings → Linker, and DMEM_DEPTH_BITS in Wrapper.v, to match.`, 'warn');
+            `Settings → Linker, and DMEM_DEPTH_BITS in Wrapper, to match.`, 'warn');
         setStatus(`Data section is ${estimatedDataBytes} bytes — stack moved to ` +
           `0x${effectiveStack.toString(16)}. See the console.`, 'warn');
       }
@@ -14462,6 +14492,7 @@ int main()
       // whole simulation in one go; Step and Back then move through that
       // recording, which is why there is no pause to mirror here.
       if (simEngineMode === 'hdl') {
+        if (hdlLive) { hdlLiveStop(); return; }
         if (hdlStopPlay()) {
           setStatus('HDL playback paused at cycle ' + totalCycles + ' - Run carries on', 'info');
           return;
@@ -15174,7 +15205,16 @@ int main()
     let hdlFiles = [];            // [{ name, src }] uploaded Verilog sources
     let hdlLastVcd = null;        // most recent VCD text, for download
     let hdlRunning = false;
-    let hdlCycleBudget = 2000;    // cycles recorded per run, grown on demand
+    // Cycles a run records, per simulator: Verilator's live runs are the
+    // point of choosing it, and 2000 cycles would be over before they began.
+    const HDL_CYCLES_DEFAULT = { icarus: 2000, verilator: 1000000 };
+    const HDL_MAX_CYCLES = 2000000;      // Icarus: the whole recording is kept
+    const HDL_VL_MAX_RUN = 1000000000;   // Verilator: one run; the recording is trimmed (HDL_VL_KEEP)
+    // A waveform of a long Verilator run is the last this many cycles of it;
+    // the whole run would be hundreds of megabytes.
+    const HDL_VL_VCD_WINDOW = 50000;
+    const hdlCyclesFor = Object.assign({}, HDL_CYCLES_DEFAULT);
+    let hdlCycleBudget = HDL_CYCLES_DEFAULT.icarus;
     let hdlDumpVcd = true;
     let hdlWaveTop = false;       // dump only the testbench's and the Wrapper's own signals
     let hdlTraceEnabled = true;   // record the architectural trace (needed to step)
@@ -15304,7 +15344,7 @@ self.onmessage = async ({ data: job }) => {
     // Ends the worker and fails whatever it was running. With no error
     // given, that is a cancellation: the run was discarded mid-flight.
     function hdlStopWorker(err) {
-      if (hdlNative) for (const id of hdlNativeJobs) hdlNative.hdlKill(id);
+      if (window.rvNative) for (const id of hdlNativeJobs) window.rvNative.hdlKill(id);
       if (hdlWorker) hdlWorker.terminate();
       if (hdlWorkerUrl) URL.revokeObjectURL(hdlWorkerUrl);
       hdlWorker = null;
@@ -15393,10 +15433,110 @@ self.onmessage = async ({ data: job }) => {
     // budget, trace level, switch positions and the sizes of the stimulus
     // files are all read by the testbench at $value$plusargs time. The
     // checkpoints a run writes come back as { cycle: { txt, mem: [] } }.
+    const HDL_RUN_KEEP = /^(dump\.vcd|ck_\d+(_m\d+\.mem|\.txt))$/;
     async function hdlSimulate(vvpBytes, memFiles, plusargs) {
       const files = Object.assign({ 'sim.vvp': vvpBytes }, memFiles);
       const r = await hdlTool('vvp', files, ['/sim.vvp'].concat(plusargs || []),
-        { merge: true, keep: /^(dump\.vcd|ck_\d+(_m\d+\.mem|\.txt))$/ });
+        { merge: true, keep: HDL_RUN_KEEP });
+      return hdlDecodeRun(r);
+    }
+
+    // A Verilator model takes the same plusargs and files as vvp does.
+    async function hdlRunModel(model, files, plusargs) {
+      const id = ++hdlWorkerSeq;
+      hdlNativeJobs.add(id);
+      let r;
+      try {
+        r = await window.rvNative.vlRun(id, model, files, plusargs || [], { merge: true, keep: HDL_RUN_KEEP.source });
+      } finally {
+        hdlNativeJobs.delete(id);
+      }
+      if (r.cancelled) throw Object.assign(new Error('cancelled'), { cancelled: true });
+      return hdlDecodeRun(r);
+    }
+
+    // Builds the design with Verilator in the desktop app. Headers are
+    // handed over to be included, not compiled on their own.
+    let hdlVerilatorNoted = false;
+    let hdlZigNoted = false;
+
+    // A first build can take a minute: on a computer with no C++ compiler,
+    // one is downloaded and prepared before Verilator's own runtime is
+    // compiled. Each step goes to the status line, so it is never a silent
+    // wait.
+    function hdlOnVerilatorProgress(id, e) {
+      if (!hdlNativeJobs.has(id)) return;
+      const mb = n => (n / 1048576).toFixed(0);
+      if (e.phase === 'compiler-download') {
+        if (!hdlZigNoted) {
+          hdlZigNoted = true;
+          hdlLog('No C++ compiler was found on this computer, so the one Verilator needs (Zig, about ' +
+            '55 MB, 100 MB on Windows) is being downloaded. This happens once.', 'sys');
+        }
+        hdlStatus('downloading the C++ compiler for Verilator' +
+          (e.total ? ': ' + mb(e.received) + ' of ' + mb(e.total) + ' MB' : '...'), 'busy');
+      } else if (e.phase === 'compiler-unpack') {
+        hdlStatus('unpacking the C++ compiler...', 'busy');
+      } else if (e.phase === 'compiler-check') {
+        hdlStatus('preparing the C++ compiler (once; it builds its C++ library first)...', 'busy');
+      } else if (e.phase === 'verilate') {
+        hdlStatus('Verilator: translating the design to C++...', 'busy');
+      } else if (e.phase === 'runtime') {
+        hdlStatus('Verilator: compiling its runtime, once (' + e.done + ' of ' + e.total + ')...', 'busy');
+      } else if (e.phase === 'cxx') {
+        hdlStatus('Verilator: compiling the model (' + e.done + ' of ' + e.total + ' files)...', 'busy');
+      } else if (e.phase === 'link') {
+        hdlStatus('Verilator: linking...', 'busy');
+      }
+    }
+    if (window.rvNative && window.rvNative.onVlProgress) window.rvNative.onVlProgress(hdlOnVerilatorProgress);
+    async function hdlVerilate(tb, gen) {
+      const language = { '1995': '1364-1995', '2001': '1364-2001', '2005-sv': '1800-2017' }[gen] || '1364-2005';
+      const files = {}, headers = {};
+      for (const f of hdlFiles) (/\.(vh|svh)$/i.test(f.name) ? headers : files)[f.name] = f.src;
+      files['cg3207_hdl_tb.v'] = tb;
+      if (!hdlVerilatorNoted) {
+        hdlVerilatorNoted = true;
+        hdlLog('Verilator simulates two-state logic: what Icarus shows as x, such as a register ' +
+          'that has never been written, is 0 here.', 'sys');
+      }
+      hdlStatus('building with Verilator...', 'busy');
+      const id = ++hdlWorkerSeq;
+      hdlNativeJobs.add(id);
+      let r;
+      try {
+        r = await window.rvNative.vlBuild(id, files, { language, headers, waveTop: hdlWaveTop });
+      } finally {
+        hdlNativeJobs.delete(id);
+      }
+      if (r.cancelled) throw Object.assign(new Error('cancelled'), { cancelled: true });
+      if (r.ok) {
+        hdlLog(r.cached ? 'Reusing the Verilator model built earlier for these sources.'
+          : 'Verilator build ' + ((r.ms.verilate + r.ms.cxx) / 1000).toFixed(1) + ' s (' + r.compiler + ')', 'sys');
+      }
+      return { ok: !!r.ok, model: r.ok ? r.key : null, log: r.log || '' };
+    }
+
+    // Errors are listed as they come. Warnings, which a student design can
+    // have by the hundred, are counted by kind with the first of each; the
+    // testbench's own are left out.
+    function hdlReportVerilator(log) {
+      const errs = [], warn = new Map();
+      for (const line of String(log || '').split('\n')) {
+        const m = /^%(Error|Warning)(?:-([A-Z0-9_]+))?: (.*)$/.exec(line);
+        if (!m) continue;
+        if (m[1] === 'Error') { if (!/^Exiting due to/.test(m[3])) errs.push(m[3]); continue; }
+        if (/cg3207_hdl_tb\.v/.test(m[3])) continue;
+        const k = m[2] || 'WARNING';
+        if (!warn.has(k)) warn.set(k, { n: 0, first: m[3] });
+        warn.get(k).n++;
+      }
+      for (const [k, w] of warn) hdlLog('Verilator ' + k + (w.n > 1 ? ' ×' + w.n : '') + ': ' + w.first, 'warn');
+      for (const e of errs) hdlLog(e, 'err');
+      if (/C\+\+ compilation failed|Linking failed|No C\+\+20 compiler/.test(log)) hdlLog(String(log).slice(-3000), 'err');
+    }
+
+    function hdlDecodeRun(r) {
       const dec = new TextDecoder();
       const ck = {};
       for (const name in r.files) {
@@ -16103,7 +16243,7 @@ self.onmessage = async ({ data: job }) => {
       hdlDiscardTrace();
       hdlLog('Set the prebuilt Wrapper to IROM_DEPTH_BITS ' + need.irom +
         ', DMEM_DEPTH_BITS ' + need.dmem + ' for this program. Set the same two ' +
-        'localparams in your own Wrapper.v.', 'sys');
+        'localparams in your own Wrapper.', 'sys');
       setStatus('Prebuilt Wrapper sized for this program: IROM ' + need.irom +
         ', DMEM ' + need.dmem, 'info');
       renderHdlFileList();
@@ -16234,9 +16374,9 @@ self.onmessage = async ({ data: job }) => {
       // swap-pending flag. That is the only way the page can tell a program
       // that polls from one that does not.
       const dbufReport = dbuf
-        ? '      if (OLED_Swap && !OLED_Swap_d) $display("@@B %0d", cyc - 1);\n' +
+        ? '      if (OLED_Swap && !OLED_Swap_d && cyc - 1 >= trace_from) $display("@@B %0d", cyc - 1);\n' +
           '      OLED_Swap_d <= OLED_Swap;\n' +
-          '      if (dut.MemRead && dut.dec_OLED_STATUS) $display("@@P %0d", cyc - 1);'
+          '      if (dut.MemRead && dut.dec_OLED_STATUS && cyc - 1 >= trace_from) $display("@@P %0d", cyc - 1);'
         : '';
       const arch = rb
         ? `  // Architectural register file, reached by hierarchical reference.
@@ -16249,7 +16389,7 @@ self.onmessage = async ({ data: job }) => {
     if (!RESET && trace_lvl >= 2) begin
       for (j = 1; j < 32; j = j + 1)
         if (${rb}[j] !== rf_shadow[j]) begin
-          $display("@@W %0d %0d %0h", cyc - 1, j, ${rb}[j]);
+          if (cyc - 1 >= trace_from) $display("@@W %0d %0d %0h", cyc - 1, j, ${rb}[j]);
           rf_shadow[j] = ${rb}[j];
         end
     end
@@ -16289,6 +16429,9 @@ ${about}
 //   plusargs     +CYCLES=<d> +TRACE=<d> +DIP=<h> +PB=<h> +ACCEL=<h>
 //                +ADRDY=<h> +NSTIM=<d> +NRX=<d> +VCD
 //                +VCDTOP (with +VCD: the testbench and Wrapper levels only)
+//                +VCDFROM=<d> (start the waveform at that cycle)
+//                +TRACEFROM=<d> (leave out every record before that cycle)
+//                +LIVE (Verilator: inputs arrive while it runs, see below)
 //   stim.mem     timed input changes : <cycle> <code> <value> triples,
 //                codes 1=DIP 2=PB 3=ACCEL_Data 4=ACCEL_DReady
 //   uart_rx.mem  timed UART input    : <cycle> <byte> pairs
@@ -16311,6 +16454,8 @@ module cg3207_hdl_tb;
   localparam integer RX_MAX   = 4096;
 
   integer max_cycles = ${run ? run.cycles : 2000};
+  integer trace_from = 0;
+  integer vcd_from   = 0;
   integer trace_lvl  = ${run ? 1 : 2};
   integer nstim      = ${stim.length};
   integer nrx        = ${rx.length};
@@ -16362,13 +16507,18 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
   initial begin
     if ($value\$plusargs("CYCLES=%d", max_cycles)) begin end
     if ($value\$plusargs("TRACE=%d",  trace_lvl))  begin end
+    if ($value\$plusargs("TRACEFROM=%d", trace_from)) begin end
     if ($value\$plusargs("NSTIM=%d", nstim) && nstim > 0) $readmemh("stim.mem", stim_mem);
     if ($value\$plusargs("NRX=%d",   nrx)   && nrx   > 0) $readmemh("uart_rx.mem", rx_mem);
     if ($value\$plusargs("DIP=%h",   argv)) DIP          = argv[15:0];
     if ($value\$plusargs("PB=%h",    argv)) PB           = argv[2:0];
     if ($value\$plusargs("ACCEL=%h", argv)) ACCEL_Data   = argv;
     if ($value\$plusargs("ADRDY=%h", argv)) ACCEL_DReady = argv[0];
+  end
+
+  initial begin
     if ($test\$plusargs("VCD")) begin
+      if ($value\$plusargs("VCDFROM=%d", vcd_from) && vcd_from > 0) wait (cyc >= vcd_from);
       $dumpfile("dump.vcd");
       if ($test\$plusargs("VCDTOP")) begin
         $dumpvars(1, cg3207_hdl_tb);
@@ -16402,6 +16552,48 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
       end
     end
   end
+
+\`ifdef VERILATOR
+\`begin_keywords "1800-2017"
+  //------------------------------------------------------------------
+  // Live runs (the desktop app, with Verilator). At every rising edge the
+  // app's pending commands are taken: an input change is driven now, which
+  // puts it in force from cycle cyc+1 exactly as a stim.mem entry stamped
+  // cyc+1 would be, and reported with that stamp so that a replay of the
+  // recorded timeline reproduces the run. A UART byte goes onto the receive
+  // feed no sooner than the edge after this one, and a gap after the last.
+  //------------------------------------------------------------------
+  import "DPI-C" function int cg3207_live_poll(input int cycle, input int from,
+                                               output int code, output int value);
+  integer live = 0, live_code, live_value, live_at;
+  initial if ($test\$plusargs("LIVE")) live = 1;
+  always @(posedge CLK) begin
+    if (!RESET && live) begin
+      while (cg3207_live_poll(cyc, trace_from, live_code, live_value) != 0) begin
+        case (live_code)
+          1: DIP          <= live_value[15:0];
+          2: PB           <= live_value[2:0];
+          3: ACCEL_Data   <= live_value;
+          4: ACCEL_DReady <= live_value[0];
+          5: begin
+               live_at = cyc + 2;
+               if (nrx > 0 && rx_mem[2*nrx-2] + (live_value >>> 8) > live_at)
+                 live_at = rx_mem[2*nrx-2] + (live_value >>> 8);
+               rx_mem[2*nrx]   = live_at;
+               rx_mem[2*nrx+1] = live_value & 32'hFF;
+               nrx = nrx + 1;
+               $display("@@U %0d %0h", live_at, live_value & 32'hFF);
+             end
+          6: max_cycles = cyc + 1;
+          7: $dumpflush;
+          default: ;
+        endcase
+        if (live_code >= 1 && live_code <= 4) $display("@@V %0d %0d %0h", cyc + 1, live_code, live_value);
+      end
+    end
+  end
+\`end_keywords
+\`endif
 
   //------------------------------------------------------------------
   // UART receive feed - stands in for the holding register in TOP_Nexys.vhd,
@@ -16442,10 +16634,10 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
   always @(posedge CLK) begin
     if (!RESET && trace_lvl >= 2) begin
       if (dut.PC !== pc_prev) begin
-        $display("@@I %0d %0h %0h", cyc, dut.PC, dut.Instr);
+        if (cyc >= trace_from) $display("@@I %0d %0h %0h", cyc, dut.PC, dut.Instr);
         pc_prev <= dut.PC;
       end
-      if (|dut.MemWrite_out)
+      if (|dut.MemWrite_out && cyc >= trace_from)
         $display("@@M %0d %0h %0h %0h", cyc, dut.ALUResult, dut.MemWrite_out, dut.WriteData_out);
     end
   end
@@ -16470,19 +16662,19 @@ ${arch}
   always @(negedge CLK) begin
     if (!RESET && trace_lvl >= 1) begin
       if (LED_OUT !== led_prev) begin
-        $display("@@L %0d %0h", cyc - 1, LED_OUT);
+        if (cyc - 1 >= trace_from) $display("@@L %0d %0h", cyc - 1, LED_OUT);
         led_prev <= LED_OUT;
       end
       if (SEVENSEGHEX !== ss_prev) begin
-        $display("@@S %0d %0h", cyc - 1, SEVENSEGHEX);
+        if (cyc - 1 >= trace_from) $display("@@S %0d %0h", cyc - 1, SEVENSEGHEX);
         ss_prev <= SEVENSEGHEX;
       end
-      if (UART_TX_valid) $display("@@T %0d %0h", cyc - 1, UART_TX);
-      if (OLED_Write)    $display("@@O %0d %0d %0d %0h", cyc - 1, OLED_Col, OLED_Row, OLED_Data);
+      if (UART_TX_valid && cyc - 1 >= trace_from) $display("@@T %0d %0h", cyc - 1, UART_TX);
+      if (OLED_Write && cyc - 1 >= trace_from)    $display("@@O %0d %0d %0d %0h", cyc - 1, OLED_Col, OLED_Row, OLED_Data);
 ${dbufReport}
       // The processor has taken the pending RX byte, so the byte leaves the
       // console's queue. Without this the UI could never clear RX_VALID.
-      if (UART_RX_ack)   $display("@@A %0d", cyc - 1);
+      if (UART_RX_ack && cyc - 1 >= trace_from) $display("@@A %0d", cyc - 1);
     end
   end
 
@@ -16915,19 +17107,45 @@ endmodule
       let rb = hdlRegBankPath();
       const dbuf = hdlHasDoubleBuffer();
       const state = hdlCkState();
-      let ck = state.off ? null : state;
+      // Verilator takes one top level, so the checkpoint module cannot go in
+      // beside the testbench; its replays start from reset, which at its
+      // speed costs little.
+      const vl = hdlSimulator === 'verilator';
+      let ck = state.off || vl ? null : state;
       const build = () => ({
         tb: hdlBuildTestbench({ regBankPath: rb }),
         ck: ck ? hdlBuildCkModule(ck, rb, dbuf) : ''
       });
       let src = build();
-      const key = hdlHash(gen + ' ' + hdlAllSources() + ' ' + src.tb + ' ' + src.ck);
+      const key = hdlHash(hdlSimulator + (vl && hdlWaveTop ? ' top ' : ' ') + gen + ' ' + hdlAllSources() + ' ' + src.tb + ' ' + src.ck);
       if (hdlVvpCache && hdlVvpCache.key === key) {
         hdlLog('Reusing the compiled design (sources unchanged).', 'sys');
         return hdlVvpCache;
       }
-      if (state.off) hdlLog('Checkpoints are off for these sources (' + state.off +
+      if (state.off && !vl) hdlLog('Checkpoints are off for these sources (' + state.off +
         '), so an input change replays the run from reset.', 'sys');
+
+      if (vl) {
+        for (;;) {
+          const c = await hdlVerilate(src.tb, gen);
+          if (c.ok) {
+            hdlReportVerilator(c.log);
+            hdlVvpCache = { key: key, vvp: null, model: c.model, regBank: rb, ck: false };
+            return hdlVvpCache;
+          }
+          if (rb && /cg3207_hdl_tb\.v/.test(c.log)) {
+            hdlLog('Could not resolve the register-file path `' + rb + '`. ' +
+              'Retrying without the architectural register view - set the path ' +
+              'explicitly under Settings > Simulation to restore it.', 'warn');
+            rb = null;
+            src = build();
+            continue;
+          }
+          hdlReportVerilator(c.log);
+          hdlStatus('compile error', 'err');
+          return null;
+        }
+      }
 
       for (;;) {
         hdlStatus('preprocessing...', 'busy');
@@ -17190,43 +17408,82 @@ endmodule
     // ================================================================
     // Trace capture
     // ================================================================
-    function hdlParseTrace(stdout) {
-      const steps = [];
-      const pre = [];
+    // Reads the testbench's records into a trace. A live run feeds it output
+    // as it arrives, in pieces that need not end on a line; base continues a
+    // trace already recorded, which a run with +TRACEFROM extends. A step's
+    // write lists share one frozen empty array until the step has a write,
+    // since a long recording is mostly steps with none.
+    const HDL_NONE = Object.freeze([]);
+    function hdlTraceParser(base) {
+      const t = base || { steps: [], pre: [], preAcks: 0, final: null, next: null, userOutput: '' };
       const userLines = [];
-      let cur = null, final = null, next = null, preAcks = 0;
-      for (const line of String(stdout || '').split('\n')) {
-        const m = /^@@([ILSTOMWFNABP])\s+(.*)$/.exec(line);
-        if (!m) { if (line.trim()) userLines.push(line); continue; }
+      const inputs = [];          // @@V / @@U: inputs a live run applied, with their cycles
+      let cur = t.steps.length ? t.steps[t.steps.length - 1] : null;
+      let partial = '';
+      const line = l => {
+        const m = /^@@([ILSTOMWFNABPUV])\s+(.*)$/.exec(l);
+        if (!m) { if (l.trim()) userLines.push(l); return; }
         const k = m[1];
         const f = m[2].trim().split(/\s+/);
         if (k === 'I') {
           cur = { cyc: parseInt(f[0], 10), pc: parseInt(f[1], 16) >>> 0,
-                  instr: parseInt(f[2], 16) >>> 0, regw: [], memw: [], per: [], acks: 0 };
-          steps.push(cur);
-          continue;
+                  instr: parseInt(f[2], 16) >>> 0, regw: HDL_NONE, memw: HDL_NONE, per: HDL_NONE, acks: 0 };
+          t.steps.push(cur);
+          return;
         }
         if (k === 'F') {
-          final = { cyc: parseInt(f[0], 10), led: parseInt(f[1], 16) & 0xFF, ss: f[2] };
-          continue;
+          t.final = { cyc: parseInt(f[0], 10), led: parseInt(f[1], 16) & 0xFF, ss: f[2] };
+          return;
         }
-        if (k === 'N') { next = parseInt(f[1], 16) >>> 0; continue; }
+        if (k === 'N') { t.next = parseInt(f[1], 16) >>> 0; return; }
+        if (k === 'V') { inputs.push({ cycle: parseInt(f[0], 10), code: parseInt(f[1], 10), value: parseInt(f[2], 16) >>> 0 }); return; }
+        if (k === 'U') { inputs.push({ cycle: parseInt(f[0], 10), byte: parseInt(f[1], 16) & 0xFF }); return; }
         // The hardware has taken a byte off the UART RX line. Counting these
         // is what lets the console's FIFO - and with it RX_VALID - drain as
         // the recording is stepped through.
-        if (k === 'A') { if (cur) cur.acks++; else preAcks++; continue; }
-        if (k === 'W') { if (cur) cur.regw.push([parseInt(f[1], 10), parseInt(f[2], 16) >>> 0, parseInt(f[0], 10)]); continue; }
+        if (k === 'A') { if (cur) cur.acks++; else t.preAcks++; return; }
+        if (k === 'W') {
+          if (!cur) return;
+          if (cur.regw === HDL_NONE) cur.regw = [];
+          cur.regw.push([parseInt(f[1], 10), parseInt(f[2], 16) >>> 0, parseInt(f[0], 10)]);
+          return;
+        }
         if (k === 'M') {
-          if (cur) cur.memw.push([parseInt(f[1], 16) >>> 0, parseInt(f[2], 16) & 0xF, parseInt(f[3], 16) >>> 0,
-                                  parseInt(f[0], 10)]);
-          continue;
+          if (!cur) return;
+          if (cur.memw === HDL_NONE) cur.memw = [];
+          cur.memw.push([parseInt(f[1], 16) >>> 0, parseInt(f[2], 16) & 0xF, parseInt(f[3], 16) >>> 0,
+                         parseInt(f[0], 10)]);
+          return;
         }
         // Peripheral activity, which is also captured when the
         // architectural trace is switched off.
-        (cur ? cur.per : pre).push([k, f]);
-      }
-      return { steps: steps, pre: pre, preAcks: preAcks, final: final, next: next,
-               userOutput: userLines.join('\n') };
+        if (!cur) { t.pre.push([k, f]); return; }
+        if (cur.per === HDL_NONE) cur.per = [];
+        cur.per.push([k, f]);
+      };
+      return {
+        trace: t,
+        feed(text) {
+          const parts = (partial + text).split('\n');
+          partial = parts.pop();
+          for (const l of parts) line(l);
+        },
+        takeInputs() { return inputs.splice(0); },
+        finish() {
+          if (partial) line(partial);
+          partial = '';
+          const out = userLines.join('\n');
+          t.userOutput = base && t.userOutput ? t.userOutput + (out ? '\n' + out : '') : out;
+          t.newOutput = out;
+          return t;
+        }
+      };
+    }
+
+    function hdlParseTrace(stdout) {
+      const p = hdlTraceParser();
+      p.feed(String(stdout || ''));
+      return p.finish();
     }
 
     // Run the cached binary with the current environment. Only vvp runs -
@@ -17245,12 +17502,14 @@ endmodule
       ];
       if (hdlDumpVcd) plus.push('+VCD');
       if (hdlDumpVcd && hdlWaveTop) plus.push('+VCDTOP');
+      if (hdlDumpVcd && hdlSimulator === 'verilator' && budget > HDL_VL_VCD_WINDOW)
+        plus.push('+VCDFROM=' + (budget - HDL_VL_VCD_WINDOW));
       return plus;
     }
 
     // With `from` ({ k, txt, mem }), the run starts from that checkpoint.
-    async function hdlRunVvp(budget, traceLvl, memFiles, from) {
-      const plus = hdlPlusargs(budget, traceLvl);
+    async function hdlRunVvp(budget, traceLvl, memFiles, from, extra) {
+      const plus = hdlPlusargs(budget, traceLvl).concat(extra || []);
       const files = Object.assign({}, memFiles, {
         'stim.mem': hdlStimFile(),
         'uart_rx.mem': hdlRxFile()
@@ -17264,19 +17523,24 @@ endmodule
         files['ck_load.txt'] = from.txt;
         from.mem.forEach((m, i) => { files['ck_load_m' + i + '.mem'] = m; });
       }
-      const s = await hdlSimulate(hdlVvpCache.vvp, files, plus);
+      const s = hdlVvpCache.model
+        ? await hdlRunModel(hdlVvpCache.model, files, plus)
+        : await hdlSimulate(hdlVvpCache.vvp, files, plus);
       // $writememb warns about every memory declared high-to-low, at every
       // checkpoint; saving and restoring read it the same way, so it is noise.
-      s.out = s.out.split('\n').filter(l => !/\/cg3207_hdl_ck\.v:\d+:/.test(l)).join('\n');
+      s.out = s.out.split('\n').filter(l => !/\/cg3207_hdl_ck\.v:\d+:/.test(l) &&
+        !/^- (cg3207_hdl_tb\.v:\d+: Verilog \$finish|S i m u l a t i o n|Verilator: )/.test(l)).join('\n');
       return s;
     }
 
     // Build (or rebuild) the trace for the current program, sources and
     // input timeline. Everything downstream is a view onto what this
     // produces, so a run, a step and an input change all funnel through it.
-    async function hdlBuildTrace(budget, opts) {
+    // What every run needs before it starts: the memory images from a
+    // pristine program, a refusal if the program does not fit the Wrapper,
+    // and the compiled design.
+    async function hdlPrepareRun(opts) {
       opts = opts || {};
-      const epoch = hdlEpoch;
       const wrapper = hdlFindWrapper();
       if (!wrapper) throw new Error('No `module Wrapper` found among the loaded sources.');
       if (!machineCode || !machineCode.length)
@@ -17311,7 +17575,7 @@ endmodule
       if (tooBig.length) {
         const need = hdlRequiredDepths();
         hdlLog('This program does not fit the Wrapper you loaded, so it was not run. ' +
-          tooBig.join('. ') + '. Raise them in your Wrapper.v to at least ' + need.irom +
+          tooBig.join('. ') + '. Raise them in your Wrapper to at least ' + need.irom +
           ' and ' + need.dmem + ' (each +1 doubles that memory) and load it again.', 'err');
         setStatus('Program does not fit this Wrapper — raise its depth bits, see the console', 'error');
         return null;
@@ -17320,6 +17584,15 @@ endmodule
       await loadHdlEngine();
       const compiled = await hdlEnsureCompiled();
       if (!compiled) return null;
+      return { mem, compiled };
+    }
+
+    async function hdlBuildTrace(budget, opts) {
+      opts = opts || {};
+      const epoch = hdlEpoch;
+      const prep = await hdlPrepareRun(opts);
+      if (!prep) return null;
+      const { mem, compiled } = prep;
 
       const lvl = hdlTraceEnabled ? 2 : 1;
       const timeline = { stim: hdlStim.slice(), rx: hdlRx.slice() };
@@ -17346,10 +17619,20 @@ endmodule
         if (best > 0) from = Object.assign({ k: best, verifyTo }, hdlCk.at.get(best));
       }
 
+      // Verilator: a replay runs from reset but prints only from the first
+      // cycle its inputs differ from the recording's, and is joined on there.
+      const vlKey = hdlSimulator === 'verilator'
+        ? hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|')) : null;
+      let vlFrom = 0;
+      if (vlKey && hdlTrace && hdlTrace.vlKey === vlKey && hdlTrace.timeline) {
+        const c = Math.min(hdlTimelineDiff(hdlTrace.timeline, timeline), hdlTrace.budget);
+        if (c > (hdlTrace.base ? hdlTrace.base.cyc : 0)) vlFrom = c;
+      }
+
       hdlStatus(from ? 'simulating cycles ' + from.k + ' to ' + budget + '...'
         : 'simulating ' + budget + ' cycles...', 'busy');
       const t0 = performance.now();
-      let s = await hdlRunVvp(budget, lvl, mem.files, from);
+      let s = await hdlRunVvp(budget, lvl, mem.files, from, vlFrom ? ['+TRACEFROM=' + vlFrom] : null);
       if (epoch !== hdlEpoch) return null;
       let out = s.out, vcd = s.vcd || null;
       if (from) {
@@ -17375,14 +17658,23 @@ endmodule
       const t1 = performance.now();
 
       hdlLastRtlOut = out;
-      const t = hdlParseTrace(out);
+      let t;
+      if (vlFrom) {
+        const p = hdlTraceParser(hdlCutTrace(hdlTrace, vlFrom));
+        p.feed(out);
+        t = p.finish();
+      } else {
+        t = hdlParseTrace(out);
+      }
       t.budget = budget;
       t.regBank = compiled.regBank;
-      t.raw = out;
+      t.raw = vlKey ? null : out;
       t.timeline = timeline;
       t.ckKey = hdlCk ? ckKey : null;
+      t.vlKey = vlKey;
       t.vcdScope = vcd ? vcdScope : null;
       hdlTrace = t;
+      if (vlKey) hdlTrimTrace(t);
       hdlLastVcd = vcd;
       refreshDownloadMenu();
 
@@ -17397,7 +17689,7 @@ endmodule
 
       if (!opts.quiet) {
         const noise = /\$readmemh\(AA_(IROM|DMEM)\.mem\): Not enough words/;
-        const filtered = t.userOutput.split('\n').filter(l => l.trim() && !noise.test(l)).join('\n');
+        const filtered = String(t.newOutput || '').split('\n').filter(l => l.trim() && !noise.test(l)).join('\n');
         if (filtered.trim()) hdlLog(filtered, 'out');
         hdlLog('simulate ' + (t1 - t0).toFixed(0) + ' ms, ' + t.steps.length +
           ' instructions in ' + budget + ' cycles' +
@@ -17462,6 +17754,61 @@ endmodule
     // Only writes the Wrapper actually commits to DMEM belong in the memory
     // image; MMIO writes at the same port are peripheral activity and arrive
     // as their own events.
+    // A Verilator recording is kept to its last HDL_VL_KEEP cycles, so that a
+    // run need not stop. The instructions before that are folded into a
+    // snapshot of the state they leave, which a seek starts from instead of
+    // reset; offset counts them, so the instruction count stays true.
+    const HDL_VL_KEEP = 2000000;
+    function hdlRestoreBase(b) {
+      loadProgram(machineCode);
+      regs.set(b.regs);
+      hdlRegKnown.set(b.regKnown);
+      for (let i = 0; i < b.mem.length; i++) setMemByte(dataBase + i, b.mem[i]);
+      hdlResetPeripheralState();
+      restorePeriphState(b.periph);
+      uartTxBytes = b.tx.slice();
+      uartTxBuffer = b.txBuf;
+      oledPages[0].set(b.oled[0]);
+      oledPages[1].set(b.oled[1]);
+      oledBuffer = oledPages[oledBackPage];
+    }
+    // Returns how many steps were folded away, 0 when it was not yet time.
+    function hdlTrimTrace(t) {
+      const steps = t.steps;
+      if (steps.length < 2) return 0;
+      const last = steps[steps.length - 1].cyc;
+      if (last - steps[0].cyc <= HDL_VL_KEEP * 1.25) return 0;
+      const want = last - HDL_VL_KEEP;
+      let lo = 0, hi = steps.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (steps[mid].cyc < want) lo = mid + 1; else hi = mid; }
+      const cut = lo, was = hdlIdx;
+      hdlSeek(cut);
+      const mem = new Uint8Array(hdlDmemBytes);
+      for (let i = 0; i < mem.length; i++) mem[i] = getMemByte(dataBase + i);
+      t.base = { cyc: steps[cut].cyc, regs: regs.slice(), regKnown: hdlRegKnown.slice(), mem,
+                 periph: capturePeriphState(), tx: uartTxBytes.slice(), txBuf: uartTxBuffer,
+                 oled: oledPages.map(p => p.slice()), acks: hdlSeekMark.acks };
+      t.offset = (t.offset || 0) + cut;
+      t.steps = steps.slice(cut);
+      t.pre = [];
+      t.preAcks = 0;
+      hdlIdx = 0;
+      hdlSeekMark = { trace: t, idx: 0, acks: t.base.acks };
+      hdlSeek(Math.max(0, was - cut), true);
+      return cut;
+    }
+    // Drops what a recording holds from cycle c on, so that a run printing
+    // from c (+TRACEFROM) can be joined onto it.
+    function hdlCutTrace(t, c) {
+      let k = t.steps.length;
+      while (k > 0 && t.steps[k - 1].cyc >= c) k--;
+      t.steps.length = k;
+      t.final = null;
+      t.next = null;
+      hdlSeekMark = null;
+      return t;
+    }
+
     function hdlApplyMemWrite(addr, be, data) {
       if (addr < dataBase || addr >= dataBase + hdlDmemBytes) return;
       const word = addr & ~3;
@@ -17478,19 +17825,33 @@ endmodule
 
     // Position `idx` means "idx instructions have completed"; the state
     // shown is the state the hardware was in just before instruction idx.
-    function hdlSeek(idx) {
+    // forward: carry on from the last seek instead of replaying from cycle 0,
+    // which is how a live run follows its own end. Only valid when nothing
+    // else has touched the state since that seek, so only the live run asks.
+    let hdlSeekMark = null;   // { trace, idx, acks } as the last seek left them
+    function hdlSeek(idx, forward) {
       if (!hdlTrace) return;
       const steps = hdlTrace.steps;
       idx = Math.max(0, Math.min(idx, steps.length));
 
-      loadProgram(machineCode);
-      hdlRegKnown.fill(0);
-      hdlResetPeripheralState();
-      for (const e of hdlTrace.pre) hdlApplyPer(e[0], e[1]);
+      let k0 = 0, acks;
+      const mark = hdlSeekMark;
+      if (forward && mark && mark.trace === hdlTrace && mark.idx === hdlIdx && idx >= hdlIdx) {
+        k0 = hdlIdx;
+        acks = mark.acks;
+      } else if (hdlTrace.base) {
+        hdlRestoreBase(hdlTrace.base);
+        acks = hdlTrace.base.acks;
+      } else {
+        loadProgram(machineCode);
+        hdlRegKnown.fill(0);
+        hdlResetPeripheralState();
+        for (const e of hdlTrace.pre) hdlApplyPer(e[0], e[1]);
+        acks = hdlTrace.preAcks || 0;
+      }
 
       let changed = -1;
-      let acks = hdlTrace.preAcks || 0;
-      for (let k = 0; k < idx; k++) {
+      for (let k = k0; k < idx; k++) {
         const s = steps[k];
         for (const w of s.regw) { regs[w[0]] = w[1] | 0; hdlRegKnown[w[0]] = 1; }
         if (k === idx - 1 && s.regw.length) changed = s.regw[s.regw.length - 1][0];
@@ -17500,11 +17861,12 @@ endmodule
       }
 
       hdlIdx = idx;
+      hdlSeekMark = { trace: hdlTrace, idx, acks };
       lastChangedReg = changed;
       pc = idx < steps.length ? steps[idx].pc
          : (hdlTrace.next !== null && hdlTrace.next !== undefined ? hdlTrace.next
          : (steps.length ? steps[steps.length - 1].pc : baseAddress));
-      instructionCount = idx;
+      instructionCount = (hdlTrace.offset || 0) + idx;
       totalCycles = hdlCurrentCycle();
       currentExecLine = sourceLineForPc(pc);
 
@@ -17642,10 +18004,205 @@ endmodule
       return hdlBuildTrace(budget, opts);
     }
 
+    // ================================================================
+    // Live runs (Verilator, in the desktop app)
+    // ================================================================
+    // The model keeps running until Pause, a breakpoint or the cycle limit,
+    // taking inputs as they change. Its records stream into the recording,
+    // which the page follows, so the result is the same recording a replay
+    // of the inputs would make and everything after Pause works as usual.
+    // Resume restarts the model from reset with the inputs recorded so far
+    // and +TRACEFROM at the old end: up to there it prints nothing and runs
+    // at full speed, and what follows joins onto the recording.
+    let hdlLive = null;   // { id, parser, stopAt, stopSent, checked } during a live run
+
+    function hdlLiveCapable() {
+      return hdlSimulator === 'verilator' && !!(window.rvNative && window.rvNative.vlLive);
+    }
+    function hdlLiveHz() { return runPace === 'real' ? cpuHz() : 0; }
+    function hdlLiveSend(line) { if (hdlLive) window.rvNative.vlLiveSend(hdlLive.id, line); }
+    function hdlLiveStop() {
+      if (!hdlLive || hdlLive.stopSent) return;
+      hdlLive.stopSent = true;
+      hdlLiveSend('stop');
+      hdlStatus('pausing...', 'busy');
+    }
+    if (window.rvNative && window.rvNative.onVlLiveData) {
+      window.rvNative.onVlLiveData((id, text) => {
+        if (hdlLive && hdlLive.id === id) hdlLive.parser.feed(text);
+      });
+    }
+    // Inputs the model applied go onto the timeline with the cycle it chose.
+    function hdlLiveTakeInputs(parser) {
+      for (const e of parser.takeInputs()) {
+        if ('byte' in e) hdlRx.push(e);
+        else hdlStim.push(e);
+      }
+    }
+
+    async function hdlRunLive() {
+      return hdlWithBusy(async () => {
+        const resume = !!(hdlTrace && hdlTraceEnabled);
+        if (resume) {
+          // A breakpoint still ahead in what is already recorded is reached
+          // without running anything.
+          const hit = hdlBreakAt(hdlIdx + 1);
+          if (hit >= 0) {
+            hdlSeek(hit);
+            hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
+            setStatus('HDL stopped at breakpoint (line ' + currentExecLine + ', instruction ' + hit + ')', 'warn');
+            return hdlTrace;
+          }
+        } else {
+          hdlClearConsole();
+          await hdlReadFolder();
+          hdlStim = [];
+          hdlRx = [];
+          hdlIdx = 0;
+          hdlCaptureBaseInputs();
+          hdlSyncRx();
+        }
+        const epoch = hdlEpoch;
+        const from = resume ? hdlTrace.budget : 0;
+        const budget = from + hdlCycleBudget;
+        const prep = await hdlPrepareRun({ quiet: resume });
+        if (!prep || epoch !== hdlEpoch) return null;
+        const { mem, compiled } = prep;
+
+        const liveWave = hdlDumpVcd && hdlLiveWave === 'live';
+        const plus = hdlPlusargs(budget, hdlTraceEnabled ? 2 : 1).filter(a => !/^\+VCD/.test(a));
+        if (liveWave) {
+          plus.push('+VCD', '+LIVEVCD');
+          if (hdlWaveTop) plus.push('+VCDTOP');
+          if (from > HDL_VL_VCD_WINDOW) plus.push('+VCDFROM=' + (from - HDL_VL_VCD_WINDOW));
+        }
+        plus.push('+LIVE', '+TRACEFROM=' + from, '+HZ=' + hdlLiveHz());
+        const files = Object.assign({}, mem.files, { 'stim.mem': hdlStimFile(), 'uart_rx.mem': hdlRxFile() });
+
+        if (resume) hdlSeek(hdlCutTrace(hdlTrace, from).steps.length);
+        const parser = hdlTraceParser(resume ? hdlTrace : null);
+        const t = parser.trace;
+        if (!resume) {
+          t.budget = 0;
+          hdlTrace = t;
+        }
+        const id = ++hdlWorkerSeq;
+        hdlNativeJobs.add(id);
+        const live = hdlLive = { id, parser, stopAt: -1, stopSent: false, checked: resume ? t.steps.length : 0 };
+        updateToolbarButtonStates();
+
+        let waveBusy = false, lastWave = 0;
+        const tick = () => {
+          if (hdlLive !== live) return;
+          hdlLiveTakeInputs(parser);
+          const cut = hdlTrimTrace(t);
+          if (cut) {
+            live.checked = Math.max(0, live.checked - cut);
+            if (live.stopAt >= 0) live.stopAt = Math.max(0, live.stopAt - cut);
+          }
+          const steps = t.steps;
+          if (live.stopAt < 0) {
+            const hit = hdlBreakAt(live.checked);
+            live.checked = steps.length;
+            if (hit >= 0) { live.stopAt = hit; hdlLiveStop(); }
+          }
+          const target = live.stopAt >= 0 ? Math.min(live.stopAt, steps.length) : steps.length;
+          if (target > hdlIdx) hdlSeek(target, true);
+          if (!live.stopSent) {
+            const cyc = steps.length ? steps[steps.length - 1].cyc : from;
+            hdlStatus('running live - cycle ' + cyc.toLocaleString() + ' of ' + budget.toLocaleString() +
+              (runPace === 'real' ? ', paced to ' + fmtHz(cpuHz()) : ''), 'busy');
+          }
+          if (liveWave && !waveBusy && performance.now() - lastWave > 500) {
+            waveBusy = true;
+            lastWave = performance.now();
+            window.rvNative.vlLiveRead(id, 'dump.vcd').then(b => {
+              waveBusy = false;
+              // Past this size the waveform cannot be redrawn twice a second;
+              // the one read when the run ends still shows.
+              if (!b || hdlLive !== live || b.length > 40e6) return;
+              hdlLastVcd = new TextDecoder().decode(b);
+              updateWaveView();
+            }, () => { waveBusy = false; });
+          }
+        };
+        hdlStatus(resume ? 'replaying to cycle ' + from.toLocaleString() + '...' : 'starting live...', 'busy');
+        const timer = setInterval(tick, 100);
+        let r;
+        try {
+          r = await window.rvNative.vlLive(id, compiled.model, files, plus, { keep: '^dump\\.vcd$' });
+        } finally {
+          clearInterval(timer);
+          hdlNativeJobs.delete(id);
+          if (hdlLive === live) hdlLive = null;
+        }
+        if (r.cancelled) throw Object.assign(new Error('cancelled'), { cancelled: true });
+        if (epoch !== hdlEpoch) return null;
+        parser.finish();
+        hdlLiveTakeInputs(parser);
+
+        t.budget = t.final ? t.final.cyc : budget;
+        t.regBank = compiled.regBank;
+        t.raw = null;
+        t.ckKey = null;
+        t.vlKey = hdlHash([compiled.key, hdlTraceEnabled ? 2 : 1, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'));
+        const cutEnd = hdlTrimTrace(t);
+        if (cutEnd && live.stopAt >= 0) live.stopAt = Math.max(0, live.stopAt - cutEnd);
+        t.timeline = { stim: hdlStim.slice(), rx: hdlRx.slice() };
+        hdlLastRtlOut = null;
+        const noise = /\$readmemh\(AA_(IROM|DMEM)\.mem\): Not enough words|^- (cg3207_hdl_tb\.v:\d+: Verilog \$finish|S i m u l a t i o n|Verilator: )/;
+        const said = String(t.newOutput || '').split('\n').filter(l => l.trim() && !noise.test(l));
+        if (said.length) hdlLog(said.slice(-200).join('\n'), 'out');
+
+        if (!hdlDumpVcd) {
+          hdlLastVcd = null;
+        } else if (liveWave && r.files && r.files['dump.vcd']) {
+          hdlLastVcd = new TextDecoder().decode(r.files['dump.vcd']);
+          t.vcdScope = hdlWaveTop ? 'top' : 'all';
+        } else {
+          hdlStatus('building the waveform...', 'busy');
+          const s = await hdlRunModel(compiled.model,
+            Object.assign({}, mem.files, { 'stim.mem': hdlStimFile(), 'uart_rx.mem': hdlRxFile() }),
+            hdlPlusargs(t.budget, 0));
+          if (epoch !== hdlEpoch) return null;
+          hdlLastVcd = s.vcd || null;
+          t.vcdScope = hdlWaveTop ? 'top' : 'all';
+        }
+        refreshDownloadMenu();
+
+        hdlSeek(live.stopAt >= 0 ? live.stopAt : t.steps.length);
+        if (live.stopAt >= 0) {
+          hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
+          setStatus('HDL stopped at breakpoint (line ' + currentExecLine + ', instruction ' + live.stopAt + ')', 'warn');
+        } else if (live.stopSent) {
+          hdlStatus('paused at cycle ' + t.budget.toLocaleString(), 'ok');
+          setStatus('HDL paused - ' + t.steps.length + ' instructions in ' + t.budget + ' cycles', 'info');
+        } else {
+          hdlStatus('done - ' + t.budget.toLocaleString() + ' cycles, LED=0x' + ledState.toString(16).padStart(2, '0'), 'ok');
+          setStatus('HDL live run finished - ' + t.steps.length + ' instructions in ' + t.budget + ' cycles', 'success');
+        }
+        if (hdlCompareEnabled) await hdlCompareWithJs();
+        waveRevealForRun();
+        return t;
+      });
+    }
+
+    const hdlBaseSetRunPace = setRunPace;
+    setRunPace = function (v) {
+      hdlBaseSetRunPace(v);
+      hdlLiveSend('hz ' + hdlLiveHz());
+    };
+    const hdlBaseSetClkDivBits = setClkDivBits;
+    setClkDivBits = function (v) {
+      hdlBaseSetClkDivBits(v);
+      hdlLiveSend('hz ' + hdlLiveHz());
+    };
+
     // The Run button. With a recording already in hand this resumes from the
     // current position rather than throwing the run away - Reset is how you
     // ask for a fresh one, exactly as in the functional engine.
     async function runHdlSimulation() {
+      if (hdlLiveCapable()) return hdlRunLive();
       if (hdlTrace && hdlTraceEnabled) {
         return hdlWithBusy(async () => {
           await hdlResumeRun(r => {
@@ -17701,7 +18258,8 @@ endmodule
     // step. The Cycles field itself is never rewritten - it stays the
     // increment the user chose.
     async function hdlGrowTrace(target) {
-      const grown = Math.min(2000000, Math.max(target, hdlTrace.budget + 1));
+      const cap = hdlSimulator === 'verilator' ? Infinity : HDL_MAX_CYCLES;
+      const grown = Math.min(cap, Math.max(target, hdlTrace.budget + 1));
       if (grown <= hdlTrace.budget) {
         hdlLog('Already recording the maximum of 2,000,000 cycles.', 'warn');
         return false;
@@ -17886,7 +18444,13 @@ endmodule
     }
 
     function hdlOnInputChanged(code, value) {
-      if (simEngineMode !== 'hdl' || !hdlTrace) return;
+      if (simEngineMode !== 'hdl') return;
+      if (hdlLive) {
+        hdlLiveSend('in ' + code + ' ' + (value >>> 0));
+        hdlStimmedInRun.add(code);
+        return;
+      }
+      if (!hdlTrace) return;
       const cyc = hdlCurrentCycle();
       if (hdlRunning) hdlStimmedInRun.add(code);
       // One change per input per cycle; a later edit at the same point
@@ -17916,6 +18480,11 @@ endmodule
     // the hardware's do, so a first write of 0 is no change on either.
     async function hdlCompareWithJs() {
       if (!hdlTrace || !hdlTrace.steps.length) return;
+      if (hdlTrace.offset) {
+        hdlLog('Cross-check: the JS model runs from reset, and this recording now starts at instruction ' +
+          hdlTrace.offset + ', so the two cannot be compared. Reset and run a shorter stretch to cross-check.', 'warn');
+        return;
+      }
       if (!hdlTrace.regBank)
         hdlLog('Cross-check: no register-file path, so only data memory writes are compared.', 'warn');
       const at = hdlIdx;
@@ -18936,7 +19505,8 @@ endmodule
     function setHdlCycles(v) {
       const n = parseInt(v, 10);
       if (!Number.isFinite(n) || n <= 0) return;
-      hdlCycleBudget = Math.min(n, 2000000);
+      hdlCycleBudget = Math.min(n, hdlSimulator === 'verilator' ? HDL_VL_MAX_RUN : HDL_MAX_CYCLES);
+      hdlCyclesFor[hdlSimulator] = hdlCycleBudget;
       // Keep the field honest when the budget is set from anywhere else,
       // including the automatic extension when stepping off the end.
       const el = document.getElementById('hdlCycles');
@@ -18947,6 +19517,61 @@ endmodule
       updateWaveView();
     }
     function setHdlWaveTop(on) { hdlWaveTop = !!on; }
+    let hdlLiveWave = 'pause';    // 'pause' | 'live': when a live run's waveform is built
+    function setHdlLiveWave(v) { hdlLiveWave = v === 'live' ? 'live' : 'pause'; }
+
+    // Which simulator builds and runs the design. Verilator needs the desktop
+    // app; the page shows the same choice in a browser, disabled, so that the
+    // two look alike.
+    const hdlVerilatorAvail = !!(window.rvNative && window.rvNative.verilator);
+    let hdlSimulator = 'icarus';
+    const HDL_SIMULATOR_KEY = 'rvsim.hdlSimulator';
+
+    function hdlInitSimulator() {
+      const sel = document.getElementById('hdlSimulator');
+      const row = document.getElementById('hdlSimulatorRow');
+      if (!sel || !row) return;
+      sel.disabled = !hdlVerilatorAvail;
+      row.title = hdlVerilatorAvail
+        ? 'Icarus Verilog simulates four-state logic (x and z) and starts at once. Verilator first compiles ' +
+          'your design to C++, which takes several seconds each time the sources change, and then runs ' +
+          'tens of times faster; it is two-state, so what Icarus shows as x is 0. Post-synthesis ' +
+          'simulation needs Icarus.'
+        : window.rvNative ? 'This build of the desktop app has no Verilator.'
+        : 'Verilator is available only in the desktop app.';
+      let saved = null;
+      try { saved = localStorage.getItem(HDL_SIMULATOR_KEY); } catch (e) { /* private mode */ }
+      setHdlSimulator(saved === 'verilator' ? 'verilator' : 'icarus', true);
+    }
+
+    function setHdlSimulator(v, restoring) {
+      if (v !== 'verilator' || !hdlVerilatorAvail) v = 'icarus';
+      const changed = v !== hdlSimulator;
+      hdlSimulator = v;
+      hdlCycleBudget = hdlCyclesFor[v];
+      const cyc = document.getElementById('hdlCycles');
+      if (cyc) {
+        cyc.max = String(v === 'verilator' ? HDL_VL_MAX_RUN : HDL_MAX_CYCLES);
+        cyc.value = hdlCycleBudget;
+      }
+      const lw = document.getElementById('hdlLiveWaveRow');
+      if (lw) lw.style.display = v === 'verilator' ? 'flex' : 'none';
+      const sel = document.getElementById('hdlSimulator');
+      if (sel) sel.value = v;
+      if (!restoring) { try { localStorage.setItem(HDL_SIMULATOR_KEY, v); } catch (e) { /* private mode */ } }
+      const synth = document.getElementById('hdlSynthCard');
+      if (synth) synth.style.display = v === 'verilator' ? 'none' : '';
+      if (v === 'verilator' && hdlSynthEnabled) {
+        setHdlSynth(false);
+        const cb = document.getElementById('hdlSynth');
+        if (cb) cb.checked = false;
+      }
+      if (changed) hdlDiscardTrace();
+    }
+
+    function hdlSimulatorName() {
+      return hdlSimulator === 'verilator' ? 'Verilator' : hdlNative ? 'Icarus Verilog' : 'Icarus/WASM';
+    }
     function setHdlTrace(on) {
       hdlTraceEnabled = !!on;
       hdlDiscardTrace();
@@ -19043,11 +19668,10 @@ endmodule
         // on whichever instruction the other engine reached, so the two hand
         // over at the same point in the program.
         if (hdlTrace && hdlTrace.steps.length && machineCode && machineCode.length) {
-          hdlSeek(Math.min(instructionCount, hdlTrace.steps.length));
+          hdlSeek(Math.max(0, Math.min(instructionCount - (hdlTrace.offset || 0), hdlTrace.steps.length)));
           setStatus('HDL mode - resumed the recording at instruction ' + hdlIdx, 'info');
         } else {
-          setStatus('HDL mode - Run and Step execute your Verilog through ' +
-            (hdlNative ? 'Icarus Verilog' : 'Icarus/WASM'), 'info');
+          setStatus('HDL mode - Run and Step execute your Verilog through ' + hdlSimulatorName(), 'info');
         }
         loadHdlEngine().catch(e => hdlLog(String(e.message || e), 'err'));
       } else {
@@ -19140,6 +19764,7 @@ endmodule
         e.target.value = '';
       });
       hdlInitFolder();
+      hdlInitSimulator();
       if (drop) {
         ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
           e.preventDefault(); e.stopPropagation();
@@ -19281,16 +19906,16 @@ endmodule
         if (title) b.title = title;
       };
       const resuming = !!(hdlTrace && hdlTraceEnabled);
-      set('runPauseBtn', ready, resuming
+      set('runPauseBtn', ready || !!hdlLive, resuming
         ? 'Continue the hardware run to the next breakpoint, recording another ' +
           hdlCycleBudget + ' cycles if it reaches the end (Reset to start over)'
         : 'Simulate your Verilog, stopping at the first breakpoint or after ' +
           hdlCycleBudget + ' cycles');
       const runBtn = document.getElementById('runPauseBtn');
       if (runBtn) {
-        runBtn.innerHTML = hdlPlay ? '\u23F8 Pause' : (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
-        runBtn.style.opacity = ready ? '1' : '0.45';
-        runBtn.style.cursor = ready ? 'pointer' : 'not-allowed';
+        runBtn.innerHTML = (hdlPlay || hdlLive) ? '\u23F8 Pause' : (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
+        runBtn.style.opacity = (ready || hdlLive) ? '1' : '0.45';
+        runBtn.style.cursor = (ready || hdlLive) ? 'pointer' : 'not-allowed';
       }
       set('btnStep', ready && hdlTraceEnabled,
         hdlTraceEnabled ? 'Advance one instruction through the recorded hardware trace'
@@ -19367,6 +19992,10 @@ endmodule
       if (btn) { btn.innerText = 'Send'; btn.style.background = ''; }
       if (!added.length) { hdlOnUartInput(); return; }
       const gap = uartGapInstr();
+      if (hdlLive) {
+        for (const b of added) hdlLiveSend('in 5 ' + (((b & 0xFF) | (gap << 8)) >>> 0));
+        return;
+      }
       const at = hdlCurrentCycle();
       added.forEach((b, i) => hdlRx.push({ cycle: at + i * gap, byte: b & 0xFF }));
       const st = document.getElementById('uartAutoSendStatus');

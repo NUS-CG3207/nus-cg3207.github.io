@@ -77,6 +77,31 @@ async function launch(userData) {
     console.log('    ' + (m ? m[0] : 'no timing line'));
     check('The console carries no engine error', !/\[HDL\].*(error|failed)/i.test(log));
     await page.screenshot({ path: path.join(SHOT, 'rvsim_app_run.png') });
+
+    console.log('\n[3b] Verilator, chosen in Settings');
+    await page.evaluate(() => openSettingsModal('simulator'));
+    check('The Simulator setting can be changed', !(await page.isDisabled('#hdlSimulator')));
+    await page.selectOption('#hdlSimulator', 'verilator');
+    await page.screenshot({ path: path.join(SHOT, 'rvsim_app_verilator_settings.png') });
+    await page.evaluate(() => { closeSettingsModal(); setDipSwitches(0x005a); });
+    await page.click('#runPauseBtn');
+    const vlLit = await page.waitForFunction(() => getLedState() === 0x5a, null, { timeout: 180000 }).then(() => true, () => false);
+    const vlLog = await page.evaluate(() => [...document.querySelectorAll('#console div')].map(d => d.textContent).join('\n'));
+    const vb = /Verilator build ([\d.]+) s \(([^)]+)\)/.exec(vlLog);
+    console.log('    ' + (vb ? vb[0] : 'no build line'));
+    check('Run builds with Verilator and lights the LEDs', vlLit && !!vb);
+    await page.evaluate(() => { resetAll(); setHdlCycles(50000000); });
+    await page.click('#runPauseBtn');
+    await page.waitForFunction(() => /running live/.test(document.getElementById('statusBar').textContent), null, { timeout: 60000 });
+    await page.evaluate(() => setDipSwitches(0x000f));
+    const followed = await page.waitForFunction(() => getLedState() === 0x0f, null, { timeout: 10000 }).then(() => true, () => false);
+    const stillLive = await page.evaluate(() => /running live/.test(document.getElementById('statusBar').textContent));
+    check('A switch flipped during a live run shows on the LEDs while it runs', followed && stillLive);
+    check('The Run button reads Pause while it runs', /Pause/.test(await page.textContent('#runPauseBtn')));
+    await page.click('#runPauseBtn');
+    const paused = await page.waitForFunction(() => /paused/.test(document.getElementById('statusBar').textContent), null, { timeout: 30000 }).then(() => true, () => false);
+    check('Pause stops it', paused);
+    await page.evaluate(() => setHdlSimulator('icarus'));
     check('No HDL engine was fetched from the network (' + run.net.filter(u => /verisim|yosys/.test(u)).length + ')',
       !run.net.some(u => /verisim|yosys/.test(u)));
     check('No page errors (' + run.errors.join('; ') + ')', run.errors.length === 0);

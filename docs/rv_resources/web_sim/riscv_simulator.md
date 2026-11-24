@@ -98,8 +98,8 @@ the program.
 
 ## 3. Clock and real time
 
-The clock frequency is set by `CLK_DIV_BITS`, as in the board template's top-level module
-(`TOP_Nexys.vhd`): the board's 100 MHz clock divided by 2^`CLK_DIV_BITS`. 1 gives 50 MHz, and
+The clock frequency is set by `CLK_DIV_BITS`, as in the board template's top-level module:
+the board's 100 MHz clock divided by 2^`CLK_DIV_BITS`. 1 gives 50 MHz, and
 the default of 5 gives 3.125 MHz. The setting also determines how many cycles a UART
 character takes.
 
@@ -219,7 +219,36 @@ compilation error.
 - If every register shows `xxxxxxxx`, either none has been written yet or the register file
   was not found; the Registers panel indicates which.
 
-## 6. Running locally, and the full reference
+## 6. The desktop app
+
+The simulator is also being packaged as a desktop app for Linux, Windows and macOS. It is
+not available for download yet, and the details below may change before it is. The app
+looks and behaves like the page, with these differences:
+
+- Icarus Verilog runs as a native program, so HDL mode works offline. It is about one and a
+  half times as fast as in the browser.
+- **Verilator** can be chosen instead of Icarus under *Simulator* in **Settings →
+  Simulation**; in the browser the setting is shown but disabled. Verilator compiles your
+  design to C++ before running it, which takes several seconds after each change to your
+  Verilog (not after a change of program, a Reset or an input change), and then simulates
+  15 to 20 times faster than Icarus.
+- Verilator is two-state: a signal that Icarus shows as `x`, such as a register that has
+  never been written, is 0. Use Icarus when looking for uninitialised state. Post-synthesis
+  simulation is only available with Icarus.
+- With Verilator, a run is live: switches, buttons, the accelerometer and UART input take
+  effect while it runs, and it continues until **Pause**, a breakpoint or *Cycles per Run /
+  Resume* (1,000,000 by default). Back reaches only the last 2,000,000 cycles of a longer
+  run. *Real time* slows the simulation to the set clock, and with *Waveform: While running*
+  the waveform follows it, which is useful at a slow clock. The waveform covers at most the
+  last 50,000 cycles.
+- Verilator needs a C++ compiler. On a computer without one (`g++` on Linux, the Xcode
+  command line tools on macOS), the first build downloads one, about 60 MB (100 MB on
+  Windows), and takes about a minute. Later builds use it offline.
+- The installers are not signed. On macOS the app is refused the first time it is opened;
+  allow it in System Settings → Privacy & Security → *Open Anyway*. On Windows, choose
+  *More info* → *Run anyway*. On Linux, make the AppImage executable.
+
+## 7. Running locally, and the full reference
 
 To run a local copy, serve the folder through a web server rather than opening the file
 directly. From a `file://` address the browser blocks the page's own requests, so only the
