@@ -8,7 +8,7 @@
 | File | What it is |
 |---|---|
 | [`riscv_simulator.html`](riscv_simulator.html) | The simulator. Single file, no build step. Assembling, simulating and the HDL engine all run in the browser with nothing fetched; **DIP to LED** (both languages) is baked in for the same reason. Every other example, and C compilation, need the page served over `http://` — see below. |
-| [`examples/`](examples/index.txt) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
+| [`examples/`](examples/) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
 | [`vendor/`](vendor/README.md) | Local copies of the three external engines (CodeMirror, Icarus Verilog, Yosys), used only when the CDN cannot be reached. |
 
 **Live:** <https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/> · Vibe coded by Rajesh Panicker.
@@ -711,9 +711,10 @@ and the recording is searched by mapping each recorded PC back to its line.
 * **Resume** continues from wherever you are to the next breakpoint. With no
   breakpoints it runs to the end of what has been recorded.
 * **Resume at the end of the recording** records another *Cycles* worth and carries
-  on — that is the "run for another N cycles" button.
+  on — that is the "run for another N cycles" button. The new cycles are simulated
+  from the last checkpoint (§5.11), not from reset.
 * **Reset** (⟲) discards the recording, so the next Run starts the hardware from
-  reset again.
+  reset again. Pressed while a simulation is running, it stops it.
 
 **Statement Stepping** applies here too. With it on, one **Step** covers every machine
 instruction the current source line expands to — a `la` pseudo-op, or a C statement —
@@ -732,11 +733,38 @@ Because the simulation is deterministic, a change made mid-run does not have to 
 the illusion. Flip a DIP switch, press a button, move the accelerometer or type into the
 UART console while paused, and the change is **timestamped at the current cycle** and
 the run replayed. Everything before that point comes out bit-identical, so you land
-exactly where you were with the change now in effect. It costs one re-simulation —
-typically a few hundred milliseconds, since the compile is cached.
+exactly where you were with the change now in effect. What had been recorded after the
+change was recorded with the old input, so the replay stops one *Cycles* past the change
+instead of going back to where the old recording ended.
 
 This is what `stim.mem` and `uart_rx.mem` are for: the timeline of inputs is data the
 testbench reads, not something baked into it.
+
+**Checkpoints.** A replay does not start from reset. `vvp` cannot save its own state
+(Icarus does not implement `$save`), so a second top-level module, `cg3207_hdl_ck`,
+compiled in beside the testbench, does it: every `+CKEVERY` cycles, 1 ns after the
+falling edge, it writes every `reg` of the design and of the testbench to
+`ck_<cycle>.txt` and every memory that something assigns to `ck_<cycle>_m<i>.mem`, in
+binary so that x and z bits survive. `+CKLOAD=<cycle>` loads one back 1 ns into a run,
+before the first rising edge, and the run carries on from that cycle. The page keeps up
+to 40 checkpoints, 1024 cycles apart to start with, the spacing doubling as the recording
+grows. A replay starts from the latest one before the first cycle at which the input
+timeline changed; extending the recording starts from the last one.
+
+The new run's records are joined onto the old recording's up to the checkpoint, and its
+VCD onto the old VCD, moved 10 ns per cycle later. That join is only right if the
+checkpoint held all of the design's state, and the state is found by reading the
+sources (regs, `integer`s, ANSI `output reg` ports, instances, through the hierarchy
+under the Wrapper). So the replay always starts at least 16 cycles before the change and
+must reproduce the old recording over that stretch record for record. If it does not,
+the run is repeated from reset, and checkpoints stay off for those sources. A design
+with a `generate` loop, an array of instances, a `generate` block that declares regs or
+instances, or a multi-dimensional memory has no checkpoints at all, and the console
+says which. Section 15 of the HDL test suite checks that a replay from a checkpoint,
+joined, is the run from reset, waveform included.
+
+The checkpoint module is not in the downloadable testbench, and it is a separate top
+level so that `$dumpvars(0, cg3207_hdl_tb)` leaves it out of the waveform.
 
 ### 5.12 Cross-checking against the functional model
 
@@ -842,6 +870,12 @@ The pipeline mirrors what the `iverilog` driver does natively:
 Files move between stages through each module's in-memory filesystem; nothing touches
 your disk.
 
+Each stage runs in a module worker, made from a script inside the page, which imports the
+same `.js` by URL, so a long simulation does not freeze the page. Where a worker cannot
+start or cannot load the engine, the stages run on the page as before, and the console
+says so once. Stopping a run (Reset) terminates the worker; the next stage starts a new
+one.
+
 > **Licensing.** These WASM modules are builds of **Icarus Verilog** and carry the
 > **GPL** — see [Licensing note](#licensing-note) at the end of this document.
 
@@ -857,8 +891,9 @@ your disk.
   Registers panel says so in place of the values, rather than showing zeros that were
   never read from your hardware — the PC, instructions, memory and peripherals all
   come from the fixed Wrapper and keep working.
-- **Long runs are slow**: roughly 40k-200k cycles/sec. A program that needs millions of
-  cycles is better run in JS mode.
+- **Long runs are slow**: measured in Chrome with the trace and the waveform on, about
+  8,000 cycles a second for the `RV/` RTL and 2,000 to 4,000 for the prebuilt gate-level
+  core. A program that needs millions of cycles is better run in JS mode.
 - **First run downloads ~2.7 MB** of WASM (cached afterwards).
 - Requires a browser context that allows cross-origin `import()` — serve over `http://`
   rather than opening the file with `file://`, or host the engine locally.
@@ -1189,7 +1224,7 @@ No `0x` prefix on Content (Hex) — the header already says it's hex; Memory's A
 
 ## 12. Automated test suite
 
-A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests/README.md). Every
+A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests). Every
 suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file
 rather than a copy of its logic. `npm test` runs all **18** of them — every `test_*.js`
 file in the directory is one of the 18, there is no build step and nothing else to run.
@@ -1306,6 +1341,7 @@ Newest first. Versions before v15.0 are grouped.
 
 | Version | Milestone description & features implemented |
 |---------|----------------------------------------------|
+| **v24.127 (HDL Replays From Checkpoints; the Engine Off the Page's Thread)** | An input change, or extending the recording, re-simulated from reset to the end of the recording, and the page froze for all of it: a 40,000-cycle recording of the `RV/` RTL took about 5 s each time, the prebuilt core about 3 s per 10,000 cycles. **Checkpoints** (§5.11): a generated `cg3207_hdl_ck` module saves every reg and written memory of the design and the testbench every 1024+ cycles and restores one with `+CKLOAD`; the state is found by walking the sources from the Wrapper. A replay starts from the latest checkpoint before the input timeline changed, is joined onto the old recording and VCD, and must reproduce the old recording over at least 16 cycles first, or the run is repeated from reset and checkpoints stay off for those sources. After an input change the recording now reaches one *Cycles* past it rather than back to its old end. Measured: a DIP change at cycle 38,000 of 40,000 takes 1.4 s instead of 5.3 s (RTL), at 8,500 of 10,000 on the prebuilt core 0.8 s instead of 2.8 s, both joined recordings identical to the run from reset. **The worker**: preprocess, compile and simulate run in a module worker (§5.15), falling back to the page; during a 6 s simulation the page's longest stall was 21 ms. Reset now stops a running simulation, and an input moved during a run is applied where the run stops. HDL test section 15 covers the join, the waveform, an extension, a corrupted checkpoint and the `generate` refusal. |
 | **v24.126 (User Guide: CPI, Multi-Cycle Cycle Counts, Tone)** | `riscv_simulator.md` says that CPI is reported (multi-cycle and pipelined; mispredictions too with prediction on), and describes the multi-cycle model as having a user-configurable cycle count for each instruction type, naming the types (ALU, multiply/divide, load, store, branch, jump, floating point, system) instead of "the cycles set in its table". Remaining advisory and conversational phrasing was made neutral: "as they would in any Verilog simulation", "is a good first step", "which is useful for trying HDL mode", "can be designed as you like", "use the Memory panel for them", and the `ecall` explanation of what an FPGA lacks. |
 | **v24.125 (User Guide Without Course Context, in a Manual's Tone)** | `riscv_simulator.md` is public, so it no longer assumes the reader is taking CG3207: "the board" is introduced as a simulated Digilent Nexys 4 / Nexys 4 DDR / Nexys A7 with a Pmod OLED; `Wrapper` and `RV` are said to be the processor with its memories and memory-mapped I/O, and the processor; `CLK_DIV_BITS` is described as the board template's top-level divider of the 100 MHz clock; the datapath's values are said to come from the drawn datapath's decoder and control logic rather than "the reference design"; the hazard switches are named by what they forward (Writeback to Decode, Writeback to Memory) instead of "W→D" and "the mem-mem copy", and the branch predictor's entries hold a predicted direction rather than "PCSrc". Phrasing throughout is a user manual's: "a lint for constructs that won't synthesise" became a description of what the synthesis checks flag and that they appear in the console as warnings; punchy fragments ("It isn't.", "Start there.", "What catches people out") became plain sentences. One correction: *Typed* UART input arrives much more slowly than *Paste*, not at the same rate. CLAUDE.md's guide rule now says to avoid course context and to keep a manual's tone. |
 | **v24.124 (CLK_DIV_BITS Divides by 2^N)** | `RV/TOP_Nexys.vhd`'s divider counter was `CLK_DIV_BITS downto 0` with `CLK` taken from its top bit, so the CPU clock was 100 MHz ÷ 2^(N+1) and 50 MHz was unreachable: 0 bypassed the divider for 100 MHz and 1 already gave 25 MHz. The counter is now `CLK_DIV_BITS-1 downto 0` and `CLK` is `clk_counter(CLK_DIV_BITS-1)`, so the clock is 100 MHz ÷ 2^N and every power-of-two step from 100 MHz down is available. The `CLK_DIV_BITS = 0` generate branch is unchanged. `clkDivider()` follows as `2 ** clkDivBits`, which needs no special case for 0. At the unchanged default of 5 the CPU runs at 3.125 MHz instead of 1.5625 MHz, so a UART character at 115200 baud is 270 cycles rather than 135; `UART_CHAR_INSTR_DEFAULT`, the Paste box's initial value and its tooltip moved with it. The Clock tooltips now read 0 = 100 MHz, 1 = 50 MHz, 5 = 3.13 MHz, 26 ≈ 1.5 Hz. The OLED present-without-poll warning quoted 24,576 and 192 instructions at the default divider; it now computes the frame wait (15.73 ms) and page copy (122.88 µs) in cycles at the current clock, so it stays right whatever the divider. **Testing.** `test_pipeline.js` checks 100 MHz at 0, 50 MHz at 1, 3.125 MHz at 5 and ≈1.49 Hz at 26, and 540 / 270 UART cycles at 4 / 5; the real-time pacing checks in it and in `test_hdl_mode.js` moved up one step (18, 17, 13) to keep the same frequencies. `test_oled_swap_race.js` expects 49,152 cycles at the default. The user guide's clock and UART numbers follow. |

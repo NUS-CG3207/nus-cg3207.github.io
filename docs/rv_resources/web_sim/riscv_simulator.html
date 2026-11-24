@@ -12492,30 +12492,15 @@
     // The one example baked into the page: DIP to LED, in both languages -
     // see the note by EXAMPLE_FILENAMES for why this pair and not Basic.
     const BAKED_ASM_EXAMPLE = `#----------------------------------------------------------------------------------
-#--	MIT License
-#--
-#--	Copyright (c) 2020 Rajesh Panicker
-#--
-#--	Permission is hereby granted, free of charge, to any person obtaining a copy
-#--	of this software and associated documentation files (the "Software"), to deal
-#--	in the Software without restriction, including without limitation the rights
-#--	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#--	copies of the Software, and to permit persons to whom the Software is
-#--	furnished to do so, subject to the following conditions:
-#--
-#--	The above copyright notice and this permission notice shall be included in all
-#--	copies or substantial portions of the Software.
-#--
-#--	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#--	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#--	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#--	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#--	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#--	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#--	SOFTWARE.
-#--
-#--	Not a condition of the license, but if you find this code useful, an email to
-#--	rajesh.panicker <at> u.nus.edu briefly mentioning its use would be appreciated.
+#-- (c) Rajesh Panicker
+#--	License terms :
+#--	You are free to use this code as long as you
+#--		(i) DO NOT post it on any public repository;
+#--		(ii) use it only for educational purposes;
+#--		(iii) accept the responsibility to ensure that your implementation does not violate anyone's intellectual property.
+#--		(iv) accept that the program is provided "as is" without warranty of any kind or assurance regarding its suitability for any particular purpose;
+#--		(v) send an email to rajesh<dot>panicker<at>ieee.org briefly mentioning its use (except when used for the course CG3207 at the National University of Singapore);
+#--		(vi) retain this notice in this file and any files derived from this.
 #----------------------------------------------------------------------------------
 
 # This sample program for RISC-V simulation using RARS
@@ -12592,36 +12577,7 @@ STACK_INIT:	# Stack pointer can be initialised to this location - DMEM+0x200 (i.
 		# Not allocating any heap, as it is unlikely to be used in this simple program. If we need dynamic memory allocation,we need to allocate memory and imeplement a heap manager.
 #------- <Data Memory ends>													
 `;
-    const BAKED_C_EXAMPLE = `/*
-----------------------------------------------------------------------------------
---	MIT License
---
---	Copyright (c) 2020 Rajesh Panicker
---
---	Permission is hereby granted, free of charge, to any person obtaining a copy
---	of this software and associated documentation files (the "Software"), to deal
---	in the Software without restriction, including without limitation the rights
---	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
---	copies of the Software, and to permit persons to whom the Software is
---	furnished to do so, subject to the following conditions:
---
---	The above copyright notice and this permission notice shall be included in all
---	copies or substantial portions of the Software.
---
---	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
---	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
---	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
---	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
---	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
---	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
---	SOFTWARE.
---
---	Not a condition of the license, but if you find this code useful, an email to
---	rajesh.panicker <at> u.nus.edu briefly mentioning its use would be appreciated.
-----------------------------------------------------------------------------------
-*/
-
-// DIP switches mirrored to LEDs, continuously (C translation of DIP_to_LED.asm)
+    const BAKED_C_EXAMPLE = `// DIP switches mirrored to LEDs, continuously (C translation of DIP_to_LED.asm)
 
 // Memory this program needs: IROM_DEPTH_BITS 9, DMEM_DEPTH_BITS 9
 // (2**9 = 512 bytes of code, 2**9 = 512 bytes of data). The simulator sets its
@@ -15267,51 +15223,156 @@ int main()
       return hdlEngineLoading;
     }
 
+    // ---- the engine runs in a worker -----------------------------------
+    // A long simulation is seconds to minutes of uninterrupted WASM, and on
+    // the page's own thread nothing responds until it returns. Each stage
+    // runs in a module worker instead, which imports the same Emscripten
+    // factory by URL. Where a worker cannot be made or cannot load the
+    // engine, the stages run on the page as before.
+    const HDL_WORKER_SRC = `
+const factories = {};
+self.onmessage = async ({ data: job }) => {
+  let factory;
+  try {
+    factory = await (factories[job.url] || (factories[job.url] = import(job.url).then(m => m.default)));
+  } catch (e) {
+    delete factories[job.url];
+    self.postMessage({ id: job.id, load: true, error: String(e && e.message || e) });
+    return;
+  }
+  try {
+    const out = [], err = [];
+    const m = await factory({ print: s => out.push(s), printErr: s => (job.merge ? out : err).push(s) });
+    for (const name in job.files) m.FS.writeFile('/' + name, job.files[name]);
+    try { m.callMain(job.args); } catch (e) { if (!(e && e.name === 'ExitStatus')) throw e; }
+    const files = {};
+    if (job.keep) {
+      const re = new RegExp(job.keep);
+      for (const name of m.FS.readdir('/')) if (re.test(name)) files[name] = m.FS.readFile('/' + name);
+    }
+    self.postMessage({ id: job.id, out, err, files }, Object.values(files).map(f => f.buffer));
+  } catch (e) {
+    self.postMessage({ id: job.id, error: String(e && e.message || e) });
+  }
+};`;
+    let hdlWorker = null;
+    let hdlWorkerUrl = null;
+    let hdlWorkerFailed = false;  // the stages run on the page from then on
+    const hdlWorkerJobs = new Map();
+    let hdlWorkerSeq = 0;
+
+    function hdlWorkerGet() {
+      if (hdlWorker) return hdlWorker;
+      hdlWorkerUrl = URL.createObjectURL(new Blob([HDL_WORKER_SRC], { type: 'text/javascript' }));
+      const w = new Worker(hdlWorkerUrl, { type: 'module' });
+      w.onmessage = ({ data }) => {
+        const job = hdlWorkerJobs.get(data.id);
+        if (!job) return;
+        hdlWorkerJobs.delete(data.id);
+        if (data.error) job.reject(Object.assign(new Error(data.error), { workerBroken: !!data.load }));
+        else job.resolve(data);
+      };
+      w.onerror = ev => {
+        ev.preventDefault();
+        hdlStopWorker(Object.assign(new Error(ev.message || 'the worker did not start'), { workerBroken: true }));
+      };
+      hdlWorker = w;
+      return w;
+    }
+
+    // Ends the worker and fails whatever it was running. With no error
+    // given, that is a cancellation: the run was discarded mid-flight.
+    function hdlStopWorker(err) {
+      if (hdlWorker) hdlWorker.terminate();
+      if (hdlWorkerUrl) URL.revokeObjectURL(hdlWorkerUrl);
+      hdlWorker = null;
+      hdlWorkerUrl = null;
+      const e = err || Object.assign(new Error('cancelled'), { cancelled: true });
+      for (const job of hdlWorkerJobs.values()) job.reject(e);
+      hdlWorkerJobs.clear();
+    }
+
+    // Run one stage: write `files` into its file system, call main with
+    // `args`, and return its output lines and the files matching `keep`.
+    async function hdlTool(tool, files, args, opts) {
+      opts = opts || {};
+      await loadHdlEngine();
+      if (!hdlWorkerFailed) {
+        try {
+          return await new Promise((resolve, reject) => {
+            const id = ++hdlWorkerSeq;
+            hdlWorkerJobs.set(id, { resolve, reject });
+            try {
+              hdlWorkerGet().postMessage({
+                id, url: new URL(hdlEngineBase + tool + '.js', location.href).href,
+                files, args, merge: !!opts.merge, keep: opts.keep ? opts.keep.source : null
+              });
+            } catch (e) {
+              hdlWorkerJobs.delete(id);
+              reject(Object.assign(e, { workerBroken: true }));
+            }
+          });
+        } catch (e) {
+          if (!e || !e.workerBroken) throw e;
+          hdlWorkerFailed = true;
+          hdlStopWorker(e);
+          hdlLog('The simulator runs on the page itself here (' + e.message + '), so the page ' +
+            'does not respond while it compiles or simulates.', 'warn');
+        }
+      }
+      const out = [], err = [];
+      const m = await hdlEngine[tool]({ print: s => out.push(s), printErr: s => (opts.merge ? out : err).push(s) });
+      for (const name in files) m.FS.writeFile('/' + name, files[name]);
+      m.callMain(args);
+      const got = {};
+      if (opts.keep) for (const name of m.FS.readdir('/')) if (opts.keep.test(name)) got[name] = m.FS.readFile('/' + name);
+      return { out, err, files: got };
+    }
+
     // ---- stage 1: preprocess every source in one pass -----------------
     // A single ivlpp pass over all files gives them a shared macro table,
     // exactly like `iverilog a.v b.v ...` does.
     async function hdlPreprocess(files) {
-      const out = [];
-      const errs = [];
-      const m = await hdlEngine.ivlpp({ print: s => out.push(s), printErr: s => errs.push(s) });
+      const fsFiles = {};
       const args = ['-L']; // emit `line directives so ivl errors map back to the right file
       for (const f of files) {
-        m.FS.writeFile('/' + f.name, f.src.endsWith('\n') ? f.src : f.src + '\n');
+        fsFiles[f.name] = f.src.endsWith('\n') ? f.src : f.src + '\n';
         args.push('/' + f.name);
       }
-      m.callMain(args);
-      return { src: out.join('\n') + '\n', err: errs.join('\n') };
+      const r = await hdlTool('ivlpp', fsFiles, args);
+      return { src: r.out.join('\n') + '\n', err: r.err.join('\n') };
     }
 
     // ---- stage 2: compile to .vvp bytecode ----------------------------
     async function hdlCompile(src, generation) {
-      const errs = [];
-      const m = await hdlEngine.ivl({ print: () => {}, printErr: s => errs.push(s) });
-      m.FS.writeFile('/ivl.conf',
-        'basedir:/\nmodule:system.vpi\ngeneration:' + (generation || '2005') +
-        '\ngeneration:no-specify\nout:/out.vvp\niwidth:32\nwidthcap:65536\n' +
-        'functor:cprop\nfunctor:nodangle\nflag:DLL=vvp.tgt\n');
-      m.FS.writeFile('/src.v', src);
-      m.callMain(['-C/ivl.conf', '--', '/src.v']);
-      let vvp = null;
-      try { vvp = m.FS.readFile('/out.vvp'); } catch (e) { /* compile failed */ }
-      return { vvp, err: hdlFilterNoise(errs.join('\n')) };
+      const r = await hdlTool('ivl', {
+        'ivl.conf': 'basedir:/\nmodule:system.vpi\ngeneration:' + (generation || '2005') +
+          '\ngeneration:no-specify\nout:/out.vvp\niwidth:32\nwidthcap:65536\n' +
+          'functor:cprop\nfunctor:nodangle\nflag:DLL=vvp.tgt\n',
+        'src.v': src
+      }, ['-C/ivl.conf', '--', '/src.v'], { keep: /^out\.vvp$/ });
+      return { vvp: r.files['out.vvp'] || null, err: hdlFilterNoise(r.err.join('\n')) };
     }
 
     // ---- stage 3: run ------------------------------------------------
     // The plusargs are how a run is configured without recompiling: cycle
     // budget, trace level, switch positions and the sizes of the stimulus
-    // files are all read by the testbench at $value$plusargs time.
+    // files are all read by the testbench at $value$plusargs time. The
+    // checkpoints a run writes come back as { cycle: { txt, mem: [] } }.
     async function hdlSimulate(vvpBytes, memFiles, plusargs) {
-      const out = [];
-      const m = await hdlEngine.vvp({ print: s => out.push(s), printErr: s => out.push(s) });
-      m.FS.writeFile('/sim.vvp', vvpBytes);
-      // $readmemh in the Wrapper and the testbench opens these by bare name.
-      for (const name of Object.keys(memFiles)) m.FS.writeFile('/' + name, memFiles[name]);
-      m.callMain(['/sim.vvp'].concat(plusargs || []));
-      let vcd = null;
-      try { vcd = m.FS.readFile('/dump.vcd', { encoding: 'utf8' }); } catch (e) { /* not requested */ }
-      return { out: out.join('\n'), vcd };
+      const files = Object.assign({ 'sim.vvp': vvpBytes }, memFiles);
+      const r = await hdlTool('vvp', files, ['/sim.vvp'].concat(plusargs || []),
+        { merge: true, keep: /^(dump\.vcd|ck_\d+(_m\d+\.mem|\.txt))$/ });
+      const dec = new TextDecoder();
+      const ck = {};
+      for (const name in r.files) {
+        const m = /^ck_(\d+)(?:_m(\d+)\.mem|\.txt)$/.exec(name);
+        if (!m) continue;
+        const c = ck[m[1]] || (ck[m[1]] = { txt: '', mem: [] });
+        if (m[2] === undefined) c.txt = dec.decode(r.files[name]);
+        else c.mem[+m[2]] = dec.decode(r.files[name]);
+      }
+      return { out: r.out.join('\n'), vcd: r.files['dump.vcd'] ? dec.decode(r.files['dump.vcd']) : null, ck };
     }
 
     // Drop diagnostics that are artefacts of the WASM build rather than
@@ -16129,6 +16190,350 @@ endmodule
     }
 
     // ================================================================
+    // Checkpoints
+    // ================================================================
+    // vvp cannot save its own state ($save is not implemented in Icarus), so
+    // a second top-level module does it: every so many cycles it writes
+    // every reg and memory of the design, and the testbench's own, to files,
+    // and +CKLOAD starts a run from one of them instead of from reset. An
+    // input change then replays from the checkpoint before it, and extending
+    // the recording carries on from the last one.
+    //
+    // The state is found by reading the sources, so a design could hold some
+    // the reading misses. A run from a checkpoint therefore first replays a
+    // stretch the old recording already covers and must reproduce it
+    // exactly; if it does not, the run is repeated from reset and checkpoints
+    // stay off for those sources.
+    const HDL_CK_EVERY = 1024;    // cycles between checkpoints, to start with
+    const HDL_CK_KEEP = 40;       // past this many the spacing doubles
+    const HDL_CK_VERIFY = 16;     // fewest cycles of the old recording a replay must reproduce
+    let hdlCk = null;             // { key, every, at: Map<cycle, { txt, mem }> } for the current recording
+    let hdlCkOff = null;          // { key, why } - sources whose checkpoints are off
+    let hdlEpoch = 0;             // bumped whenever the recording is discarded
+
+    // The testbench's own state, beside the design's.
+    function hdlCkTbState(rb, dbuf) {
+      return {
+        scalars: ['DIP', 'PB', 'UART_RX', 'UART_RX_valid', 'ACCEL_Data', 'ACCEL_DReady', 'RESET',
+                  'cyc', 'stim_i', 'rx_i', 'pc_prev', 'led_prev', 'ss_prev']
+          .concat(dbuf ? ['OLED_Swap_d'] : []),
+        arrays: rb ? ['rf_shadow'] : []
+      };
+    }
+
+    function hdlCkModules() {
+      const mods = new Map();
+      for (const f of hdlFiles) {
+        // Attributes go too, minding that `@(*)` is not one.
+        const src = hdlStripNoise(f.src).replace(/\(\*(?!\s*\))[\s\S]*?\*\)/g, ' ');
+        const re = /\bmodule\s+([A-Za-z_]\w*)/g;
+        let m;
+        while ((m = re.exec(src)) !== null) {
+          const end = src.indexOf('endmodule', m.index);
+          if (!mods.has(m[1])) mods.set(m[1], src.slice(m.index, end < 0 ? src.length : end));
+        }
+      }
+      return mods;
+    }
+
+    // Index just past the parenthesised group that opens at s[i].
+    function hdlCkSkipGroup(s, i) {
+      let depth = 0;
+      for (; i < s.length; i++) {
+        if (s[i] === '(') depth++;
+        else if (s[i] === ')' && --depth === 0) return i + 1;
+      }
+      return s.length;
+    }
+
+    // Split on the commas that are not inside brackets, braces or parentheses.
+    function hdlCkSplit(s) {
+      const parts = [];
+      let depth = 0, from = 0;
+      for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (c === '(' || c === '[' || c === '{') depth++;
+        else if (c === ')' || c === ']' || c === '}') depth--;
+        else if (c === ',' && depth === 0) { parts.push(s.slice(from, i)); from = i + 1; }
+      }
+      parts.push(s.slice(from));
+      return parts;
+    }
+
+    // The names a declaration declares, after its keyword: `[7:0] a, b [0:3] = ...`.
+    function hdlCkDeclarators(text) {
+      let t = text.replace(/^\s*(signed|unsigned)\b/, '');
+      for (let m; (m = /^\s*\[[^\]]*\]/.exec(t)) !== null;) t = t.slice(m[0].length);
+      t = t.replace(/^\s*(signed|unsigned)\b/, '');
+      return hdlCkSplit(t).map(d => {
+        const m = /^\s*(\\\S+|[A-Za-z_][\w$]*)\s*((?:\[[^\]]*\]\s*)*)/.exec(d);
+        return m ? { name: m[1], dims: (m[2].match(/\[/g) || []).length } : null;
+      }).filter(Boolean);
+    }
+
+    // One module's regs and the instances it contains.
+    function hdlCkScan(body, mods) {
+      // A generate block that declares nothing and instantiates none of the
+      // design's modules (a parameter check, say) holds no state; any other
+      // would put regs at names this scan cannot work out.
+      let stateful = false;
+      body = body.replace(/\bgenerate\b([\s\S]*?)\bendgenerate\b/g, (all, inner) => {
+        if (/\b(reg|logic|integer)\b/.test(inner) ||
+            [...mods.keys()].some(n => new RegExp('\\b' + n + '\\b').test(inner))) stateful = true;
+        return ' ';
+      });
+      if (stateful) return { off: 'keeps state in a generate block' };
+      if (/\bgenvar\b/.test(body)) return { off: 'uses a generate loop' };
+      body = body.replace(/\bfunction\b[\s\S]*?\bendfunction\b/g, ' ')
+                 .replace(/\btask\b[\s\S]*?\bendtask\b/g, ' ');
+      const regs = [], insts = [];
+      // The port list, where an ANSI `output reg` is declared.
+      let i = (/^module\s+[A-Za-z_]\w*\s*/.exec(body) || [''])[0].length;
+      if (body[i] === '#') i = hdlCkSkipGroup(body, body.indexOf('(', i));
+      while (/\s/.test(body[i] || '')) i++;
+      if (body[i] === '(') {
+        const end = hdlCkSkipGroup(body, i);
+        let isReg = false;
+        for (const item of hdlCkSplit(body.slice(i + 1, end - 1))) {
+          let t = item.trim();
+          const dir = /^(input|output|inout)\b\s*/.exec(t);
+          if (dir) {
+            const kind = /^(?:wire\s+|var\s+)?(reg|logic|integer)\b/.exec(t.slice(dir[0].length));
+            isReg = dir[1] === 'output' && !!kind;
+            t = kind ? t.slice(dir[0].length + kind.index + kind[0].length) : t.slice(dir[0].length);
+          }
+          if (isReg) regs.push(...hdlCkDeclarators(t));
+        }
+        i = end;
+      }
+      i = body.indexOf(';', i) + 1;
+      // The body, at module level: declarations and instances. Procedural
+      // code is skipped by depth, so a `reg` local to a named block is not
+      // taken for one of the module's.
+      const re = /\\\S+|[A-Za-z_][\w$]*/g;
+      re.lastIndex = i;
+      let depth = 0, m;
+      while ((m = re.exec(body)) !== null) {
+        const w = m[0];
+        if (/^(begin|fork|case|casex|casez)$/.test(w)) { depth++; continue; }
+        if (/^(end|join|join_any|join_none|endcase)$/.test(w)) { depth = Math.max(0, depth - 1); continue; }
+        if (depth) continue;
+        if (w === 'reg' || w === 'logic' || w === 'integer') {
+          const semi = body.indexOf(';', re.lastIndex);
+          regs.push(...hdlCkDeclarators(body.slice(re.lastIndex, semi < 0 ? body.length : semi)));
+          re.lastIndex = semi < 0 ? body.length : semi + 1;
+          continue;
+        }
+        if (!mods.has(w)) continue;
+        let q = re.lastIndex;
+        while (/\s/.test(body[q] || '')) q++;
+        if (body[q] === '#') q = hdlCkSkipGroup(body, body.indexOf('(', q));
+        const nm = /^\s*(\\\S+|[A-Za-z_][\w$]*)\s*/.exec(body.slice(q));
+        if (!nm) continue;
+        q += nm[0].length;
+        if (body[q] === '[') return { off: 'has an array of instances' };
+        if (body[q] !== '(') continue;
+        insts.push({ mod: w, name: nm[1] });
+        re.lastIndex = q;
+      }
+      return { regs, insts };
+    }
+
+    // Whether a memory is ever assigned: its name, then one or more index
+    // groups (which can nest, as in DMEM[ALUResult[9:2]][7:0]), then = or <=.
+    function hdlCkWritten(body, id) {
+      for (let at = body.indexOf(id); at >= 0; at = body.indexOf(id, at + 1)) {
+        if (/[\w$.]/.test(body[at - 1] || '') || /[\w$]/.test(body[at + id.length] || '')) continue;
+        let q = at + id.length, groups = 0;
+        for (;;) {
+          while (/\s/.test(body[q] || '')) q++;
+          if (body[q] !== '[') break;
+          let depth = 0;
+          for (; q < body.length; q++) {
+            if (body[q] === '[') depth++;
+            else if (body[q] === ']' && --depth === 0) { q++; break; }
+          }
+          groups++;
+        }
+        if (groups && (body.startsWith('<=', q) || (body[q] === '=' && body[q + 1] !== '='))) return true;
+      }
+      return false;
+    }
+
+    // Every reg in the design under the Wrapper, by hierarchical name. A
+    // memory that nothing writes is left out: its contents come from
+    // $readmemh in every run, so saving it would only cost time.
+    function hdlCkState() {
+      const mods = hdlCkModules();
+      if (!mods.has('Wrapper')) return { off: 'there is no Wrapper' };
+      const scalars = [], arrays = [];
+      const name = (path, id) => path + '.' + id + (id[0] === '\\' ? ' ' : '');
+      const walk = (mod, path, depth) => {
+        if (depth > 64) throw new Error('its hierarchy is too deep');
+        const body = mods.get(mod);
+        const s = hdlCkScan(body, mods);
+        if (s.off) throw new Error('module ' + mod + ' ' + s.off);
+        const seen = new Set();
+        for (const r of s.regs) {
+          if (seen.has(r.name)) continue;
+          seen.add(r.name);
+          if (r.dims > 1) throw new Error('module ' + mod + ' has a multi-dimensional array');
+          if (!r.dims) { scalars.push(name(path, r.name)); continue; }
+          if (hdlCkWritten(body, r.name)) arrays.push(name(path, r.name));
+        }
+        for (const c of s.insts) walk(c.mod, name(path, c.name), depth + 1);
+      };
+      try {
+        walk('Wrapper', 'cg3207_hdl_tb.dut', 0);
+      } catch (e) {
+        return { off: e.message };
+      }
+      return { scalars, arrays };
+    }
+
+    // The checkpoint module: a separate top level, so it stays out of the
+    // waveform and out of the testbench the Download menu saves. Binary,
+    // because hex cannot say which bits of a digit are x or z.
+    function hdlBuildCkModule(state, rb, dbuf) {
+      const T = 'cg3207_hdl_tb.';
+      const tb = hdlCkTbState(rb, dbuf);
+      const sc = tb.scalars.map(n => T + n).concat(state.scalars);
+      const ar = tb.arrays.map(n => T + n).concat(state.arrays);
+      return `\`timescale 1ns / 1ps
+// Checkpoints for the simulator's replays. Every +CKEVERY cycles, at the
+// falling edge, every reg is written to ck_<cycle>.txt and every written
+// memory to ck_<cycle>_m<i>.mem. +CKLOAD=<cycle> restores ck_load.txt and
+// ck_load_m<i>.mem 1 ns into the run, before the first rising edge, so the
+// run carries on from that cycle; @@K reports a file that did not read back.
+module cg3207_hdl_ck;
+  integer every = 0, from = -1, fd, n;
+  reg [8*48-1:0] name;
+  initial begin
+    if ($value$plusargs("CKEVERY=%d", every)) begin end
+    if ($value$plusargs("CKLOAD=%d", from)) begin
+      #1;
+      n = 0;
+      fd = $fopen("ck_load.txt", "r");
+      if (fd) begin
+${sc.map(p => `        n = n + $fscanf(fd, "%b\\n", ${p});`).join('\n')}
+        $fclose(fd);
+      end
+${ar.map((p, i) => `      $readmemb("ck_load_m${i}.mem", ${p});`).join('\n')}
+      if (n != ${sc.length}) begin
+        $display("@@K %0d", n);
+        $finish;
+      end
+    end
+  end
+  always @(negedge ${T}CLK)
+    if (!${T}RESET && every > 0 && ${T}cyc % every == 0 && ${T}cyc != from) begin
+      #1;
+      $sformat(name, "ck_%0d.txt", ${T}cyc);
+      fd = $fopen(name, "w");
+${sc.map(p => `      $fwrite(fd, "%b\\n", ${p});`).join('\n')}
+      $fclose(fd);
+${ar.map((p, i) => `      $sformat(name, "ck_%0d_m${i}.mem", ${T}cyc);\n      $writememb(name, ${p});`).join('\n')}
+    end
+endmodule
+`;
+    }
+
+    // The first cycle at which two input timelines differ, or Infinity. A
+    // checkpoint taken before it holds for both.
+    function hdlTimelineDiff(a, b) {
+      let diff = Infinity;
+      const walk = (x, y, same) => {
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+          if (i < x.length && i < y.length && same(x[i], y[i])) continue;
+          diff = Math.min(diff, i < x.length ? x[i].cycle : Infinity, i < y.length ? y[i].cycle : Infinity);
+          return;
+        }
+      };
+      const byCycle = l => l.slice().sort((p, q) => p.cycle - q.cycle);
+      walk(byCycle(a.stim), byCycle(b.stim), (p, q) => p.cycle === q.cycle && p.code === q.code && p.value === q.value);
+      walk(a.rx, b.rx, (p, q) => p.cycle === q.cycle && p.byte === q.byte);
+      return diff;
+    }
+
+    // Every record carries the cycle it belongs to, in order, so the old
+    // recording up to cycle k and the new one from k join cleanly. Returns
+    // null when the new run does not reproduce the old one over
+    // [k, verifyTo), the stretch both of them cover.
+    function hdlRecCycle(line) {
+      const m = /^@@([A-Z]) (\d+)/.exec(line);
+      return m ? (m[1] === 'N' || m[1] === 'F' ? Infinity : +m[2]) : null;
+    }
+    function hdlStitch(oldOut, newOut, k, verifyTo) {
+      const a = oldOut.split('\n'), b = newOut.split('\n');
+      if (b.some(l => l.startsWith('@@K'))) return null;
+      let cut = a.findIndex(l => { const c = hdlRecCycle(l); return c !== null && c >= k; });
+      if (cut < 0) cut = a.length;
+      // Whatever the new run printed before its first record, it printed at
+      // time 0, and the old run's copy of that is already kept.
+      const first = b.findIndex(l => hdlRecCycle(l) !== null);
+      const tail = first < 0 ? [] : b.slice(first);
+      const span = lines => lines.filter(l => { const c = hdlRecCycle(l); return c !== null && c >= k && c < verifyTo; });
+      const x = span(a), y = span(tail);
+      if (x.length !== y.length || x.some((l, i) => l !== y[i])) return null;
+      return a.slice(0, cut).concat(tail).join('\n');
+    }
+
+    // The waveform the same way: the old dump up to the checkpoint, then the
+    // new one moved to where it belongs. The restore happens 1 ns into the
+    // new run, against 10 ns per cycle (the testbench's `always #5`) plus
+    // 1 ns in the old one, so its times move by 10k ns.
+    function hdlStitchVcd(a, b, k) {
+      const ts = /\$timescale\s+(\d+)\s*(s|ms|us|ns|ps|fs)\s+\$end/.exec(b);
+      const unit = ts ? +ts[1] * { s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9, ps: 1e-12, fs: 1e-15 }[ts[2]] : 1e-9;
+      const shift = Math.round(10 * k * 1e-9 / unit);
+      // What the testbench reads from its plusargs (the cycle budget, how
+      // many input changes there are) is set at time 0 and can differ
+      // between the two runs; the new run's time-0 values are the ones that
+      // hold for the joined recording.
+      const zero = text => {
+        const from = text.indexOf('\n#0\n', text.indexOf('$enddefinitions'));
+        if (from < 0) return null;
+        const next = text.slice(from + 4).search(/^#\d+$/m);
+        const to = next < 0 ? text.length : from + 4 + next;
+        const ids = new Map();
+        for (const line of text.slice(from + 4, to).split('\n')) {
+          const l = line.trim();
+          if (l && l[0] !== '$') ids.set(/^[bBrR]/.test(l) ? l.slice(l.indexOf(' ') + 1) : l.slice(1), l);
+        }
+        return { from: from + 4, to, ids };
+      };
+      const za = zero(a), zb = zero(b);
+      if (za && zb) {
+        const sec = a.slice(za.from, za.to).split('\n').map(line => {
+          const l = line.trim();
+          if (!l || l[0] === '$') return line;
+          const v = zb.ids.get(/^[bBrR]/.test(l) ? l.slice(l.indexOf(' ') + 1) : l.slice(1));
+          return v === undefined ? line : v;
+        }).join('\n');
+        a = a.slice(0, za.from) + sec + a.slice(za.to);
+      }
+      const cut = new RegExp('^#(\\d+)$', 'gm');
+      let m, keep = a.length;
+      while ((m = cut.exec(a)) !== null) if (+m[1] > shift) { keep = m.index; break; }
+      const body = b.slice(b.indexOf('$end', b.indexOf('$enddefinitions')) + 4);
+      const re = /^#(\d+)$/gm;
+      let from = body.length;
+      while ((m = re.exec(body)) !== null) if (+m[1] > 0) { from = m.index; break; }
+      return a.slice(0, keep) + body.slice(from).replace(/^#(\d+)$/gm, (_, t) => '#' + (+t + shift));
+    }
+
+    // Keep the newest checkpoints at an even spacing that doubles as the
+    // recording grows, plus the last one, which is where an extension starts.
+    function hdlCkAdd(found) {
+      for (const k in found) if (found[k].txt) hdlCk.at.set(+k, found[k]);
+      while (hdlCk.at.size > HDL_CK_KEEP) {
+        hdlCk.every *= 2;
+        const last = Math.max(...hdlCk.at.keys());
+        for (const k of [...hdlCk.at.keys()]) if (k % hdlCk.every && k !== last) hdlCk.at.delete(k);
+      }
+    }
+
+    // ================================================================
     // Runtime environment handed to vvp
     // ================================================================
     // Input codes shared with the testbench's stim.mem decoder.
@@ -16185,17 +16590,28 @@ endmodule
     async function hdlEnsureCompiled() {
       const gen = (document.getElementById('hdlGeneration') || {}).value || '2005';
       let rb = hdlRegBankPath();
-      let tb = hdlBuildTestbench({ regBankPath: rb });
-      const key = hdlHash(gen + ' ' + hdlAllSources() + ' ' + tb);
+      const dbuf = hdlHasDoubleBuffer();
+      const state = hdlCkState();
+      let ck = state.off ? null : state;
+      const build = () => ({
+        tb: hdlBuildTestbench({ regBankPath: rb }),
+        ck: ck ? hdlBuildCkModule(ck, rb, dbuf) : ''
+      });
+      let src = build();
+      const key = hdlHash(gen + ' ' + hdlAllSources() + ' ' + src.tb + ' ' + src.ck);
       if (hdlVvpCache && hdlVvpCache.key === key) {
         hdlLog('Reusing the compiled design (sources unchanged).', 'sys');
         return hdlVvpCache;
       }
+      if (state.off) hdlLog('Checkpoints are off for these sources (' + state.off +
+        '), so an input change replays the run from reset.', 'sys');
 
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (;;) {
         hdlStatus('preprocessing...', 'busy');
         const t0 = performance.now();
-        const pp = await hdlPreprocess(hdlFiles.concat([{ name: 'cg3207_hdl_tb.v', src: tb }]));
+        const files = hdlFiles.concat([{ name: 'cg3207_hdl_tb.v', src: src.tb }]);
+        if (src.ck) files.push({ name: 'cg3207_hdl_ck.v', src: src.ck });
+        const pp = await hdlPreprocess(files);
         if (pp.err && pp.err.trim()) hdlLog(pp.err, 'warn');
         hdlStatus('compiling...', 'busy');
         const t1 = performance.now();
@@ -16204,26 +16620,31 @@ endmodule
         if (c.vvp) {
           if (c.err && c.err.trim()) hdlLog(c.err, 'warn');
           hdlLog('preprocess ' + (t1 - t0).toFixed(0) + ' ms, compile ' + (t2 - t1).toFixed(0) + ' ms', 'sys');
-          hdlVvpCache = { key: key, vvp: c.vvp, regBank: rb };
+          hdlVvpCache = { key: key, vvp: c.vvp, regBank: rb, ck: !!src.ck };
           return hdlVvpCache;
         }
-        // A hierarchical reference into the core is the one part of the
-        // testbench that depends on code we do not control. If that is what
-        // failed, drop it and keep the design runnable without the register
-        // view rather than failing the whole run.
-        if (attempt === 0 && rb) {
+        // The checkpoint module and the register-file path both name things
+        // inside code we do not control. If either is what failed, drop it
+        // and keep the design runnable rather than failing the whole run.
+        if (ck && /cg3207_hdl_ck\.v/.test(c.err || '')) {
+          hdlLog('Checkpoints could not be compiled for these sources, so an input change ' +
+            'replays the run from reset.', 'sys');
+          ck = null;
+          src = build();
+          continue;
+        }
+        if (rb) {
           hdlLog('Could not resolve the register-file path `' + rb + '`. ' +
             'Retrying without the architectural register view - set the path ' +
             'explicitly under Settings > Simulation to restore it.', 'warn');
           rb = null;
-          tb = hdlBuildTestbench({ regBankPath: null });
+          src = build();
           continue;
         }
         hdlLog(c.err || 'Compilation failed.', 'err');
         hdlStatus('compile error', 'err');
         return null;
       }
-      return null;
     }
 
     // ================================================================
@@ -16503,13 +16924,24 @@ endmodule
       return plus;
     }
 
-    async function hdlRunVvp(budget, traceLvl, memFiles) {
+    // With `from` ({ k, txt, mem }), the run starts from that checkpoint.
+    async function hdlRunVvp(budget, traceLvl, memFiles, from) {
       const plus = hdlPlusargs(budget, traceLvl);
       const files = Object.assign({}, memFiles, {
         'stim.mem': hdlStimFile(),
         'uart_rx.mem': hdlRxFile()
       });
-      return hdlSimulate(hdlVvpCache.vvp, files, plus);
+      if (hdlCk) plus.push('+CKEVERY=' + hdlCk.every);
+      if (from) {
+        plus.push('+CKLOAD=' + from.k);
+        files['ck_load.txt'] = from.txt;
+        from.mem.forEach((m, i) => { files['ck_load_m' + i + '.mem'] = m; });
+      }
+      const s = await hdlSimulate(hdlVvpCache.vvp, files, plus);
+      // $writememb warns about every memory declared high-to-low, at every
+      // checkpoint; saving and restoring read it the same way, so it is noise.
+      s.out = s.out.split('\n').filter(l => !/\/cg3207_hdl_ck\.v:\d+:/.test(l)).join('\n');
+      return s;
     }
 
     // Build (or rebuild) the trace for the current program, sources and
@@ -16517,6 +16949,7 @@ endmodule
     // produces, so a run, a step and an input change all funnel through it.
     async function hdlBuildTrace(budget, opts) {
       opts = opts || {};
+      const epoch = hdlEpoch;
       const wrapper = hdlFindWrapper();
       if (!wrapper) throw new Error('No `module Wrapper` found among the loaded sources.');
       if (!machineCode || !machineCode.length)
@@ -16562,22 +16995,71 @@ endmodule
       if (!compiled) return null;
 
       const lvl = hdlTraceEnabled ? 2 : 1;
-      hdlStatus('simulating ' + budget + ' cycles...', 'busy');
+      const timeline = { stim: hdlStim.slice(), rx: hdlRx.slice() };
+      // Checkpoints belong to one compiled design, program, starting inputs
+      // and trace level; anything else starts a new set.
+      const ckKey = compiled.ck && !(hdlCkOff && hdlCkOff.key === compiled.key)
+        ? hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'))
+        : null;
+      if (!ckKey) hdlCk = null;
+      else if (!hdlCk || hdlCk.key !== ckKey) hdlCk = { key: ckKey, every: HDL_CK_EVERY, at: new Map() };
+
+      // Start from the latest checkpoint that the old recording and this
+      // run share, leaving enough of the old recording after it to check
+      // the replay against.
+      const old = ckKey && hdlTrace && hdlTrace.ckKey === ckKey && hdlTrace.raw ? hdlTrace : null;
+      let from = null;
+      if (old && (!hdlDumpVcd || hdlLastVcd)) {
+        const diff = hdlTimelineDiff(old.timeline, timeline);
+        for (const k of [...hdlCk.at.keys()]) if (k >= diff) hdlCk.at.delete(k);
+        const verifyTo = Math.min(diff, old.budget - 1);
+        let best = -1;
+        for (const k of hdlCk.at.keys()) if (k <= verifyTo - HDL_CK_VERIFY && k < budget && k > best) best = k;
+        if (best > 0) from = Object.assign({ k: best, verifyTo }, hdlCk.at.get(best));
+      }
+
+      hdlStatus(from ? 'simulating cycles ' + from.k + ' to ' + budget + '...'
+        : 'simulating ' + budget + ' cycles...', 'busy');
       const t0 = performance.now();
-      const s = await hdlRunVvp(budget, lvl, mem.files);
+      let s = await hdlRunVvp(budget, lvl, mem.files, from);
+      if (epoch !== hdlEpoch) return null;
+      let out = s.out, vcd = s.vcd || null;
+      if (from) {
+        const joined = hdlStitch(old.raw, s.out, from.k, from.verifyTo);
+        if (joined !== null) {
+          out = joined;
+          if (vcd) vcd = hdlStitchVcd(hdlLastVcd, vcd, from.k);
+        } else {
+          hdlCkOff = { key: compiled.key };
+          hdlCk = null;
+          hdlLog('A replay from the checkpoint at cycle ' + from.k + ' did not match the run it ' +
+            'replaced, so this design holds state the checkpoints do not save. Checkpoints are off ' +
+            'for these sources; this run, and every later one, starts from reset.', 'warn');
+          hdlStatus('simulating ' + budget + ' cycles...', 'busy');
+          s = await hdlRunVvp(budget, lvl, mem.files, null);
+          if (epoch !== hdlEpoch) return null;
+          out = s.out;
+          vcd = s.vcd || null;
+          from = null;
+        }
+      }
+      if (hdlCk) hdlCkAdd(s.ck);
       const t1 = performance.now();
 
-      hdlLastRtlOut = s.out;
-      const t = hdlParseTrace(s.out);
+      hdlLastRtlOut = out;
+      const t = hdlParseTrace(out);
       t.budget = budget;
       t.regBank = compiled.regBank;
+      t.raw = out;
+      t.timeline = timeline;
+      t.ckKey = hdlCk ? ckKey : null;
       hdlTrace = t;
-      hdlLastVcd = s.vcd || null;
+      hdlLastVcd = vcd;
       refreshDownloadMenu();
 
       if (hdlSynthEnabled && !opts.quiet) {
         try {
-          await hdlPostSynthCheck(s.out, budget, lvl, mem.files);
+          await hdlPostSynthCheck(out, budget, lvl, mem.files);
         } catch (e) {
           hdlLog(String(e && e.message ? e.message : e), 'err');
           setStatus('Post-synthesis check failed - see the console', 'error');
@@ -16741,6 +17223,10 @@ endmodule
     }
 
     function hdlDiscardTrace() {
+      // A run still in flight was for what is being discarded.
+      if (hdlRunning) hdlStopWorker();
+      hdlEpoch++;
+      hdlCk = null;
       hdlTrace = null;
       hdlLastRtlOut = null;
       hdlIdx = 0;
@@ -16773,9 +17259,11 @@ endmodule
       hdlRunning = true;
       updateHdlReadiness();
       updateToolbarButtonStates();
+      const inputs = hdlCurrentInputs();
       try {
         return await fn();
       } catch (e) {
+        if (e && e.cancelled) { hdlStatus('stopped', 'ok'); return null; }
         hdlLog(String(e && e.message ? e.message : e), 'err');
         hdlStatus('error', 'err');
         setStatus('HDL simulation failed - see the console below the editor', 'error');
@@ -16784,7 +17272,33 @@ endmodule
         hdlRunning = false;
         updateHdlReadiness();
         updateToolbarButtonStates();
+        setTimeout(() => hdlCatchUpInputs(inputs), 0);
       }
+    }
+
+    // The page stays live while the engine runs, so an input can move in the
+    // middle of a run that was given the old one. Once the run is done the
+    // change goes on the timeline where the recording now stands, and the
+    // run is replayed with it.
+    let hdlStimmedInRun = new Set();   // inputs already put on the timeline mid-run
+    function hdlCatchUpInputs(before) {
+      if (simEngineMode !== 'hdl' || hdlRunning) return;
+      let again = hdlPendingResim;
+      hdlPendingResim = false;
+      const stimmed = hdlStimmedInRun;
+      hdlStimmedInRun = new Set();
+      if (hdlTrace) {
+        const now = hdlCurrentInputs(), cyc = hdlCurrentCycle();
+        const moved = [[HDL_STIM_DIP, 'dip'], [HDL_STIM_PB, 'pb'], [HDL_STIM_ACCEL, 'accel'], [HDL_STIM_ADRDY, 'adrdy']]
+          .filter(([code, f]) => now[f] !== before[f] && !stimmed.has(code));
+        for (const [code, f] of moved) {
+          const value = f === 'adrdy' ? (now[f] ? 1 : 0) : now[f] >>> 0;
+          hdlStim = hdlStim.filter(e => !(e.cycle === cyc && e.code === code));
+          hdlStim.push({ cycle: cyc, code: code, value: value });
+        }
+        again = again || moved.length > 0;
+      }
+      if (again && hdlTrace) hdlQueueResim('re-simulated with the inputs changed during the run');
     }
 
     // A fresh trace: the current switch positions become the starting
@@ -17010,10 +17524,14 @@ endmodule
     // Live input changes
     // ================================================================
     // The simulation is deterministic, so a change made while paused can be
-    // stamped at the current cycle and the whole run replayed: everything
-    // before that point comes out bit-identical and you keep your place.
+    // stamped at the current cycle and the run replayed, from the last
+    // checkpoint before it where there is one: everything before that point
+    // comes out bit-identical and you keep your place. What lay beyond the change was recorded with the old input and is
+    // gone either way, so the new recording reaches one Cycles past it
+    // rather than all the way back to where the old one ended.
     async function hdlResimulate(keepIdx) {
-      const t = await hdlBuildTrace(hdlTrace.budget, { quiet: true });
+      const budget = Math.min(hdlTrace.budget, hdlCurrentCycle() + hdlCycleBudget);
+      const t = await hdlBuildTrace(budget, { quiet: true });
       if (!t) return;
       hdlSeek(Math.min(keepIdx, t.steps.length));
     }
@@ -17040,6 +17558,7 @@ endmodule
     function hdlOnInputChanged(code, value) {
       if (simEngineMode !== 'hdl' || !hdlTrace) return;
       const cyc = hdlCurrentCycle();
+      if (hdlRunning) hdlStimmedInRun.add(code);
       // One change per input per cycle; a later edit at the same point
       // replaces the earlier one rather than stacking up.
       hdlStim = hdlStim.filter(e => !(e.cycle === cyc && e.code === code));
@@ -18158,9 +18677,9 @@ endmodule
       const want = (mode === 'hdl') ? 'hdl' : 'js';
       if (want === simEngineMode) return;
 
-      // An HDL run is a single uninterruptible call into vvp - a second or
-      // two - so the switch waits rather than landing the result in the
-      // wrong engine. The toggle is disabled while this is true.
+      // An HDL run cannot be paused, so the switch waits rather than landing
+      // the result in the wrong engine. The toggle is disabled while this
+      // is true.
       if (hdlRunning) {
         setStatus('Wait for the HDL simulation to finish before switching engines', 'warn');
         return;
@@ -18445,6 +18964,7 @@ endmodule
                         : 'Stepping needs the Trace option under Settings > Simulation');
       set('btnBack', ready && hdlTraceEnabled && !!hdlTrace && hdlIdx > 0,
         'Step back - possible because the run is a recording, not a live simulation');
+      if (hdlRunning) set('btnReset', true, 'Stop this simulation and discard the recording');
       updateFloatSteps();
     };
 

@@ -74,13 +74,14 @@ const win = dom.window, doc = win.document;
 // compile once, then run the SAME binary many times with different
 // plusargs and different files in the working directory.
 // --------------------------------------------------------------------
-async function makeIcarus(testbench) {
+async function makeIcarus(testbench, extra) {
   const initIvlpp = (await import('file://' + path.join(ENGINE, 'ivlpp.js'))).default;
   const initIvl   = (await import('file://' + path.join(ENGINE, 'ivl.js'))).default;
   const initVvp   = (await import('file://' + path.join(ENGINE, 'vvp.js'))).default;
 
   const files = DESIGN.map(n => ({ name: n, src: fs.readFileSync(path.join(RV, n), 'utf8') }));
   files.push({ name: 'cg3207_hdl_tb.v', src: testbench });
+  for (const f of extra || []) files.push(f);
 
   const ppOut = [];
   const pp = await initIvlpp({ print: s => ppOut.push(s), printErr: () => {} });
@@ -110,6 +111,17 @@ async function makeIcarus(testbench) {
       for (const name of Object.keys(memFiles)) vvp.FS.writeFile('/' + name, memFiles[name]);
       vvp.callMain(['/sim.vvp'].concat(plusargs || []));
       return out.join('\n');
+    },
+    // The same, also returning the files the run wrote that match `keep`.
+    async runWith(plusargs, memFiles, keep) {
+      const out = [];
+      const vvp = await initVvp({ print: s => out.push(s), printErr: s => out.push(s) });
+      vvp.FS.writeFile('/sim.vvp', vvpBytes);
+      for (const name of Object.keys(memFiles)) vvp.FS.writeFile('/' + name, memFiles[name]);
+      vvp.callMain(['/sim.vvp'].concat(plusargs || []));
+      const files = {};
+      for (const name of vvp.FS.readdir('/')) if (keep.test(name)) files[name] = vvp.FS.readFile('/' + name, { encoding: 'utf8' });
+      return { out: out.join('\n'), files };
     }
   };
 }
@@ -946,6 +958,122 @@ setTimeout(async () => {
           check('Off: Back is one machine instruction',
             win.hdlStatementBackTarget(target) === target - 1);
         }
+
+        // --- 15. Checkpoints -------------------------------------------
+        // A replay starts from the design state saved at a checkpoint
+        // instead of from reset, and is joined onto the recording it
+        // replaces. The joined recording has to be exactly the one a run
+        // from reset would have made.
+        console.log('\n[15] A run from a checkpoint is the run from reset');
+        await win.loadExample('dip_led');
+        const st = win.hdlCkState();
+        check('Every reg under the Wrapper is found (' + (st.off || st.scalars.length + ' regs, ' +
+          st.arrays.length + ' written memories') + ')',
+          !st.off && st.scalars.some(p => /\.PC$/.test(p)));
+        check('The register file and data memory are saved, the instruction ROM is not',
+          !st.off && st.arrays.some(p => /RegBank$/.test(p)) && st.arrays.some(p => /\.DMEM$/.test(p)) &&
+          !st.arrays.some(p => /\.IROM$/.test(p)));
+        const ckSrc = win.hdlBuildCkModule(st, regPath, win.hdlHasDoubleBuffer());
+        const icarusCk = await makeIcarus(tb, [{ name: 'cg3207_hdl_ck.v', src: ckSrc }]);
+        check('The design compiles with the checkpoint module', icarusCk.ok);
+        if (icarusCk.ok) {
+          const memC = win.hdlMemFiles(wrapperSrc);
+          const files = stim => ({
+            'AA_IROM.mem': memC.files['AA_IROM.mem'], 'AA_DMEM.mem': memC.files['AA_DMEM.mem'],
+            'stim.mem': stim, 'uart_rx.mem': ''
+          });
+          const KEEP = /^(ck_\d+.*|dump\.vcd)$/;
+          const args = (cycles, nstim) => ['+CYCLES=' + cycles, '+TRACE=2', '+DIP=bead', '+NSTIM=' + nstim,
+            '+CKEVERY=1024', '+VCD'];
+          win.hdlSetStim([{ cycle: 3000, code: 1, value: 0x0072 }]);
+          const stimC = win.hdlStimFile();
+          win.hdlSetStim([]);
+          const records = out => out.split('\n').filter(l => /^@@/.test(l));
+          const sameRecords = (a, b) => { const x = records(a), y = records(b);
+            return x.length === y.length && x.every((l, i) => l === y[i]); };
+          const loadFrom = (ckFiles, k) => {
+            const f = { 'ck_load.txt': ckFiles['ck_' + k + '.txt'] };
+            for (const n in ckFiles) {
+              const m = new RegExp('^ck_' + k + '_m(\\d+)\\.mem$').exec(n);
+              if (m) f['ck_load_m' + m[1] + '.mem'] = ckFiles[n];
+            }
+            return f;
+          };
+          const sameVcd = (a, b) => {
+            const p = win.parseVcd(a), q = win.parseVcd(b);
+            return p.vars.length === q.vars.length && p.vars.every(v => {
+              const c = p.changes.get(v.id) || { times: [], values: [] };
+              const d = q.changes.get(v.id) || { times: [], values: [] };
+              const same = c.times.join() === d.times.join() && c.values.join() === d.values.join();
+              if (!same) {
+                const i = c.times.findIndex((t, j) => t !== d.times[j] || c.values[j] !== d.values[j]);
+                console.log('    first difference: ' + v.path + ' at ' + c.times[i] + '=' + c.values[i] +
+                  ' against ' + d.times[i] + '=' + d.values[i]);
+              }
+              return same;
+            });
+          };
+
+          // The old recording, the switches changed at cycle 3000, and what
+          // a run from reset with that change records.
+          const old = await icarusCk.runWith(args(4000, 0), files(''), KEEP);
+          const full = await icarusCk.runWith(args(4000, 1), files(stimC), KEEP);
+          check('A checkpoint is written every 1024 cycles',
+            ['ck_1024.txt', 'ck_2048.txt', 'ck_3072.txt'].every(n => n in old.files) &&
+            Object.keys(old.files).some(n => /^ck_1024_m\d+\.mem$/.test(n)));
+          check('The change shows: LED 0xad, then 0x72',
+            lastLed(old.out) === 0xad && lastLed(full.out) === 0x72);
+
+          // The replay from the checkpoint before the change.
+          const rep = await icarusCk.runWith(args(4000, 1).concat('+CKLOAD=2048'),
+            Object.assign(files(stimC), loadFrom(old.files, 2048)), KEEP);
+          const joined = win.hdlStitch(old.out, rep.out, 2048, 3000);
+          check('The replay reproduces the old recording from the checkpoint to the change', joined !== null);
+          check('Joined onto it, it is record for record the run from reset (' +
+            records(full.out).length + ' records)', joined !== null && sameRecords(joined, full.out));
+          check('…and so is the waveform',
+            sameVcd(win.hdlStitchVcd(old.files['dump.vcd'], rep.files['dump.vcd'], 2048), full.files['dump.vcd']));
+          check('The replay writes the checkpoints after its start, not the one it started from',
+            !('ck_2048.txt' in rep.files) && 'ck_3072.txt' in rep.files);
+
+          // Extending a recording starts from its last checkpoint.
+          const short = await icarusCk.runWith(args(2000, 0), files(''), KEEP);
+          const longer = await icarusCk.runWith(args(4000, 0).concat('+CKLOAD=1024'),
+            Object.assign(files(''), loadFrom(short.files, 1024)), KEEP);
+          const grown = win.hdlStitch(short.out, longer.out, 1024, 1999);
+          check('A recording extended from its last checkpoint is the longer run from reset',
+            grown !== null && sameRecords(grown, old.out) &&
+            sameVcd(win.hdlStitchVcd(short.files['dump.vcd'], longer.files['dump.vcd'], 1024), old.files['dump.vcd']));
+
+          // State the checkpoint did not carry is caught, not passed off.
+          const bad = loadFrom(old.files, 2048);
+          const lines = bad['ck_load.txt'].split('\n');
+          const pcAt = st.scalars.findIndex(p => /\.PC$/.test(p)) + win.hdlCkTbState(regPath, win.hdlHasDoubleBuffer()).scalars.length;
+          lines[pcAt] = lines[pcAt].replace(/.$/, c => c === '0' ? '1' : '0');
+          bad['ck_load.txt'] = lines.join('\n');
+          const wrong = await icarusCk.runWith(args(4000, 1).concat('+CKLOAD=2048'),
+            Object.assign(files(stimC), bad), KEEP);
+          check('A replay from a checkpoint that does not match is refused',
+            win.hdlStitch(old.out, wrong.out, 2048, 3000) === null);
+          const short2 = { 'ck_load.txt': '0\n' };
+          const unread = await icarusCk.runWith(args(4000, 0).concat('+CKLOAD=2048'),
+            Object.assign(files(''), short2), KEEP);
+          check('A checkpoint file that does not read back stops the run with @@K',
+            /^@@K /m.test(unread.out) && win.hdlStitch(old.out, unread.out, 2048, 3000) === null);
+        }
+
+        // What the checkpoints cannot cover is said, and the page replays
+        // from reset instead.
+        const withGen = DESIGN.map(n => ({ name: n, src: fs.readFileSync(path.join(RV, n), 'utf8')
+          .replace(/endmodule/, 'genvar gg;\nendmodule') }));
+        win.hdlSetSources(withGen);
+        check('A design with a generate block has no checkpoints, and says why',
+          /generate/.test(win.hdlCkState().off || ''));
+        win.hdlSetSources(DESIGN.map(n => ({ name: n, src: fs.readFileSync(path.join(RV, n), 'utf8') })));
+        check('Two timelines differ from the first cycle where their inputs do',
+          win.hdlTimelineDiff({ stim: [{ cycle: 5, code: 1, value: 1 }], rx: [] },
+            { stim: [{ cycle: 5, code: 1, value: 1 }, { cycle: 900, code: 2, value: 1 }], rx: [] }) === 900 &&
+          win.hdlTimelineDiff({ stim: [], rx: [{ cycle: 40, byte: 65 }] }, { stim: [], rx: [{ cycle: 40, byte: 65 }] }) === Infinity);
       }
     }
 

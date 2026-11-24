@@ -147,12 +147,19 @@ at a time. Icarus Verilog cannot be paused, so each Run simulates a fixed number
 (*Cycles per Run/Resume*) from start to finish and records the result. Step, Back and
 breakpoints then move through that recording.
 
-- **The page is unresponsive while a simulation runs**, for a time proportional to the
-  number of cycles.
-- **Changing an input re-runs the simulation** from reset, with the change applied at the
-  current cycle, and then returns to that cycle. The page is again unresponsive while this
-  happens. Inputs cannot change during a run.
-- Resuming, or stepping past the end of the recording, simulates further cycles.
+- A simulation takes time in proportion to the number of cycles. It runs in the background,
+  and **Reset** stops it.
+- **Changing an input re-runs the simulation** with the change applied at the current cycle,
+  and then returns to that cycle. The re-run starts from the last checkpoint before that
+  cycle and records *Cycles per Run/Resume* past it; what had been recorded after the
+  change is discarded. An input changed while a simulation is running takes effect at the
+  cycle where that simulation stops.
+- Resuming, or stepping past the end of the recording, simulates further cycles, starting
+  from the last checkpoint.
+- Checkpoints are taken every 1024 cycles or more and hold every `reg` and memory the
+  simulator finds in your sources. A design that keeps state in a `generate` block re-runs
+  from reset instead, and so does one whose re-run does not reproduce the recording it
+  replaces. The console says when either applies.
 - Registers and memory cannot be edited, since what is shown is a recording.
 - Registers that have not been written show `xxxxxxxx`.
 - Step, Back and breakpoints follow the Wrapper's `PC` output, which is the fetch address.
