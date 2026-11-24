@@ -4120,8 +4120,8 @@
           <!-- The Verilog engine's setup, done once per session. -->
           <div id="simGroupHdl">
           <div class="cycle-hint" style="margin-bottom:12px;">
-            Your Verilog is compiled inside your browser and is never uploaded anywhere,
-            so it has to be loaded once per session.
+            Your Verilog is compiled on this computer and never uploaded. Files you drop
+            here last for this session; a folder is remembered.
           </div>
 
           <div class="sim-group">
@@ -4133,6 +4133,9 @@
                 browse…
                 <input type="file" id="hdlFileInput" multiple accept=".v,.sv,.vh,.svh" style="display:none;">
               </label>
+              <button type="button" class="hdl-btn" id="hdlFolderBtn" style="display:none;padding:2px 8px;"
+                onclick="hdlPickFolder()">folder…</button>
+              <input type="file" id="hdlFolderInput" webkitdirectory multiple style="display:none;">
               <br>Include <b>Wrapper.v</b>, <b>RV.v</b> and every submodule.
               <br><span style="color:#6c7086;">You can also drop them anywhere on the page, or open them with 📂 Open.</span>
             </div>
@@ -15149,6 +15152,14 @@ int main()
       'verisim/'
     ];
 
+    // In the desktop app (electron/) Icarus runs natively, and the stages get
+    // the same files and arguments the WASM build would.
+    const hdlNative = (window.rvNative && window.rvNative.icarus) ? window.rvNative : null;
+    // The app carries vendor/ beside the page, so the local copies come first.
+    if (window.rvNative) {
+      HDL_ENGINE_SOURCES.sort((a, b) => /^https?:/.test(a) - /^https?:/.test(b));
+    }
+    const hdlNativeJobs = new Set();
     let hdlEngine = null;         // { ivlpp, ivl, vvp } module factories
     let hdlEngineBase = null;     // the base URL that actually loaded
     let hdlEngineLoading = null;  // in-flight promise (de-dupes concurrent loads)
@@ -15194,6 +15205,7 @@ int main()
     // Load the three Emscripten module factories, trying each base URL in
     // turn. Cached after the first success — the wasm is ~2.7 MB total.
     async function loadHdlEngine() {
+      if (hdlNative) return null;
       if (hdlEngine) return hdlEngine;
       if (hdlEngineLoading) return hdlEngineLoading;
       hdlEngineLoading = (async () => {
@@ -15283,6 +15295,7 @@ self.onmessage = async ({ data: job }) => {
     // Ends the worker and fails whatever it was running. With no error
     // given, that is a cancellation: the run was discarded mid-flight.
     function hdlStopWorker(err) {
+      if (hdlNative) for (const id of hdlNativeJobs) hdlNative.hdlKill(id);
       if (hdlWorker) hdlWorker.terminate();
       if (hdlWorkerUrl) URL.revokeObjectURL(hdlWorkerUrl);
       hdlWorker = null;
@@ -15296,6 +15309,18 @@ self.onmessage = async ({ data: job }) => {
     // `args`, and return its output lines and the files matching `keep`.
     async function hdlTool(tool, files, args, opts) {
       opts = opts || {};
+      if (hdlNative) {
+        const id = ++hdlWorkerSeq;
+        hdlNativeJobs.add(id);
+        try {
+          const r = await hdlNative.hdlRun(id, tool, files, args,
+            { merge: !!opts.merge, keep: opts.keep ? opts.keep.source : null });
+          if (r.cancelled) throw Object.assign(new Error('cancelled'), { cancelled: true });
+          return r;
+        } finally {
+          hdlNativeJobs.delete(id);
+        }
+      }
       await loadHdlEngine();
       if (!hdlWorkerFailed) {
         try {
@@ -15423,6 +15448,7 @@ self.onmessage = async ({ data: job }) => {
           return { name: name, src: await resp.text() };
         }));
         for (const f of loaded) if (/^\s*module\s+Wrapper\b/m.test(f.src)) f.isPrebuilt = true;
+        hdlForgetFolder();
         hdlFiles = loaded;
         renderHdlFileList();
         hdlSyncReferenceWrapperDepths();
@@ -15441,14 +15467,293 @@ self.onmessage = async ({ data: job }) => {
     }
 
     function hdlRemoveFile(name) {
+      const gone = hdlFiles.find(f => f.name === name);
+      if (gone && gone.folderPath && hdlFolder) hdlFolder.excluded.add(gone.folderPath);
       hdlFiles = hdlFiles.filter(f => f.name !== name);
       renderHdlFileList();
     }
 
     function hdlClearFiles() {
+      hdlForgetFolder();
       hdlFiles = [];
       renderHdlFileList();
       hdlLog('Cleared all Verilog sources.', 'sys');
+    }
+
+    // ================================================================
+    // A source folder
+    // ================================================================
+    // The folder is read again when the window regains focus and before each
+    // fresh run, so edits made in another editor are picked up. Three ways
+    // in: the desktop app's bridge (remembered across restarts), the File
+    // System Access API in Chromium (remembered, though a later visit may
+    // need the permission granted again), and elsewhere a one-off
+    // <input webkitdirectory> snapshot that is never re-read.
+    let hdlFolder = null;  // { kind: 'native'|'handle'|'snapshot', name, path, handle, pending, excluded }
+
+    // Vivado's output folders hold generated copies of the sources.
+    const HDL_FOLDER_SKIP = /^\.|\.(cache|runs|sim|hw|ip_user_files|gen)$|^(node_modules|xsim\.dir)$/;
+    const HDL_SOURCE_RE = /\.(v|sv|vh|svh)$/i;
+    const HDL_FOLDER_MAX = 500;
+
+    function hdlFolderMakeState(kind, name, extra) {
+      return Object.assign({ kind, name, pending: false, excluded: new Set() }, extra);
+    }
+
+    async function hdlWalkHandle(dir, rel, out) {
+      for await (const [name, entry] of dir.entries()) {
+        if (out.length >= HDL_FOLDER_MAX) break;
+        const r = rel ? rel + '/' + name : name;
+        if (entry.kind === 'directory') {
+          if (!HDL_FOLDER_SKIP.test(name)) await hdlWalkHandle(entry, r, out);
+        } else if (HDL_SOURCE_RE.test(name)) {
+          out.push({ path: r, src: await (await entry.getFile()).text() });
+        }
+      }
+      return out;
+    }
+
+    // Of a folder's sources, the ones to load: every file declaring a module
+    // that sits under the Wrapper, so that a testbench or an old copy beside
+    // them does not become a second top level. Headers stay, since any of
+    // them may be included. With no Wrapper in the folder, everything stays.
+    function hdlFolderSelect(all) {
+      const files = all.filter(f => !f.path.split('/').slice(0, -1).some(d => HDL_FOLDER_SKIP.test(d)))
+        .sort((a, b) => a.path.localeCompare(b.path));
+      const defs = new Map();
+      const stripped = new Map();
+      for (const f of files) {
+        const src = hdlStripNoise(f.src);
+        stripped.set(f, src);
+        for (const m of src.matchAll(/\bmodule\s+([A-Za-z_]\w*)/g)) {
+          if (!defs.has(m[1])) defs.set(m[1], []);
+          defs.get(m[1]).push(f);
+        }
+      }
+      if (!defs.has('Wrapper')) return { files, skipped: [], dups: [] };
+      const reached = new Set(['Wrapper']);
+      const queue = ['Wrapper'];
+      while (queue.length) {
+        const mod = queue.shift();
+        for (const f of defs.get(mod)) {
+          const src = stripped.get(f);
+          const at = src.search(new RegExp('\\bmodule\\s+' + mod + '\\b'));
+          const end = src.indexOf('endmodule', at);
+          const body = src.slice(at, end < 0 ? src.length : end);
+          for (const name of defs.keys()) {
+            if (reached.has(name)) continue;
+            if (new RegExp('\\b' + name + '\\s*(#|[A-Za-z_]\\w*\\s*[(\\[])').test(body)) {
+              reached.add(name);
+              queue.push(name);
+            }
+          }
+        }
+      }
+      const keep = [], skipped = [];
+      for (const f of files) {
+        const mods = [...stripped.get(f).matchAll(/\bmodule\s+([A-Za-z_]\w*)/g)].map(m => m[1]);
+        if (!mods.length || /\.(vh|svh)$/i.test(f.path) || mods.some(m => reached.has(m))) keep.push(f);
+        else skipped.push(f);
+      }
+      const dups = [...reached].filter(m => defs.get(m).length > 1)
+        .map(m => m + ' (' + defs.get(m).map(f => f.path).join(', ') + ')');
+      return { files: keep, skipped, dups };
+    }
+
+    // Files are named by their base name, which is what error messages and
+    // the file list show; two of the same name in different subfolders get
+    // their paths instead.
+    function hdlFolderName(list) {
+      const count = new Map();
+      for (const f of list) {
+        const base = f.path.split('/').pop();
+        count.set(base, (count.get(base) || 0) + 1);
+      }
+      return list.map(f => {
+        const base = f.path.split('/').pop();
+        return { name: count.get(base) > 1 ? f.path.replace(/\//g, '__') : base, src: f.src, folderPath: f.path };
+      });
+    }
+
+    // Puts a folder's sources in place of the folder files loaded before,
+    // keeping any file dropped in by hand, which also wins over a folder
+    // file of the same name. Returns whether anything changed.
+    function hdlApplyFolderFiles(list, first) {
+      const f = hdlFolder;
+      const sel = hdlFolderSelect(list.filter(x => !f.excluded.has(x.path)));
+      const own = first ? [] : hdlFiles.filter(x => !x.folderPath);
+      const incoming = hdlFolderName(sel.files).filter(x => !own.some(o => o.name === x.name));
+      const before = hdlFiles.filter(x => x.folderPath);
+      const same = before.length === incoming.length &&
+        before.every((x, i) => x.name === incoming[i].name && x.src === incoming[i].src);
+      if (same && !first) return false;
+      hdlFiles = own.concat(incoming);
+      renderHdlFileList();
+      if (first) {
+        hdlLog('Loaded ' + incoming.length + ' file(s) from the folder ' + f.name + ': ' +
+          incoming.map(x => x.name).join(', '), 'sys');
+      } else {
+        const was = new Map(before.map(x => [x.name, x.src]));
+        const changes = [];
+        for (const x of incoming) {
+          if (!was.has(x.name)) changes.push(x.name + ' added');
+          else if (was.get(x.name) !== x.src) changes.push(x.name + ' changed');
+          was.delete(x.name);
+        }
+        for (const name of was.keys()) changes.push(name + ' removed');
+        hdlLog('Reloaded from ' + f.name + ': ' + changes.join(', '), 'sys');
+      }
+      if (sel.skipped.length && (first || !same)) {
+        hdlLog('Left out ' + sel.skipped.length + ' file(s) that nothing under Wrapper instantiates: ' +
+          sel.skipped.map(x => x.path).join(', '), 'sys');
+      }
+      if (sel.dups.length) {
+        hdlLog('More than one file in ' + f.name + ' declares ' + sel.dups.join('; ') +
+          '. Remove the copy that should not be compiled (×), or delete it from the folder.', 'warn');
+      }
+      if (!incoming.length) hdlLog('The folder ' + f.name + ' holds no Verilog sources.', 'warn');
+      return true;
+    }
+
+    // Reads the folder again if there is one. A folder that has gone, or can
+    // no longer be read, leaves the loaded files as they were.
+    let hdlFolderReading = null;
+    function hdlReadFolder(first) {
+      if (!hdlFolder || hdlFolder.pending || hdlFolder.kind === 'snapshot') return Promise.resolve(false);
+      if (hdlFolderReading) return hdlFolderReading;
+      const f = hdlFolder;
+      hdlFolderReading = (async () => {
+        try {
+          let list;
+          if (f.kind === 'native') {
+            list = await window.rvNative.readFolder(f.path);
+          } else {
+            if ((await f.handle.queryPermission({ mode: 'read' })) !== 'granted') {
+              f.pending = true;
+              renderHdlFileList();
+              return false;
+            }
+            list = await hdlWalkHandle(f.handle, '', []);
+          }
+          if (f !== hdlFolder) return false;
+          return hdlApplyFolderFiles(list, first);
+        } catch (e) {
+          hdlLog('Could not read the folder ' + f.name + ' (' + (e && e.message || e) +
+            '); the files loaded from it are unchanged.', 'warn');
+          return false;
+        } finally {
+          hdlFolderReading = null;
+        }
+      })();
+      return hdlFolderReading;
+    }
+
+    async function hdlPickFolder() {
+      try {
+        if (window.rvNative) {
+          const dir = await window.rvNative.pickFolder();
+          if (!dir) return;
+          hdlFolder = hdlFolderMakeState('native', dir.split(/[\\/]/).filter(Boolean).pop() || dir, { path: dir });
+        } else if (window.showDirectoryPicker) {
+          if (hdlFolder && hdlFolder.pending) {
+            if ((await hdlFolder.handle.requestPermission({ mode: 'read' })) !== 'granted') return;
+            hdlFolder.pending = false;
+          } else {
+            const handle = await window.showDirectoryPicker({ id: 'hdl-sources', mode: 'read' });
+            hdlFolder = hdlFolderMakeState('handle', handle.name, { handle });
+            hdlFolderStore('put', handle).catch(() => {});
+          }
+        } else {
+          document.getElementById('hdlFolderInput').click();
+          return;
+        }
+        if (await hdlReadFolder(true) && simEngineMode !== 'hdl') setSimEngineMode('hdl');
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        hdlLog('Could not open the folder (' + (e && e.message || e) + ').', 'err');
+      }
+    }
+
+    function hdlForgetFolder() {
+      if (!hdlFolder) return;
+      hdlFolder = null;
+      if (window.rvNative) window.rvNative.forgetFolder();
+      else hdlFolderStore('delete').catch(() => {});
+      for (const f of hdlFiles) delete f.folderPath;
+    }
+
+    function hdlRenderFolderButton() {
+      const btn = document.getElementById('hdlFolderBtn');
+      if (!btn) return;
+      const input = document.getElementById('hdlFolderInput');
+      const can = window.rvNative || window.showDirectoryPicker || (input && 'webkitdirectory' in input);
+      btn.style.display = can ? '' : 'none';
+      if (hdlFolder && hdlFolder.pending) {
+        btn.textContent = '↻ ' + hdlFolder.name;
+        btn.title = 'Read the folder ' + hdlFolder.name + ' again. The browser asks for permission first.';
+      } else {
+        btn.textContent = 'folder…';
+        btn.title = (window.rvNative || window.showDirectoryPicker)
+          ? 'Load every Verilog file in a folder and its subfolders that sits under Wrapper. ' +
+            'The folder is read again before each run, so edits made in another editor are picked up.'
+          : 'Load every Verilog file in a folder and its subfolders that sits under Wrapper. ' +
+            'This browser hands over a copy, so pick the folder again after editing.';
+      }
+    }
+
+    // One IndexedDB record holds the browser's folder handle, which
+    // localStorage cannot store.
+    function hdlFolderStore(op, value) {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { resolve(null); return; }
+        const open = indexedDB.open('rvsim', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('kv');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const store = open.result.transaction('kv', op === 'get' ? 'readonly' : 'readwrite').objectStore('kv');
+          const req = op === 'get' ? store.get('hdlFolder')
+            : op === 'put' ? store.put(value, 'hdlFolder') : store.delete('hdlFolder');
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        };
+      });
+    }
+
+    function hdlInitFolder() {
+      const input = document.getElementById('hdlFolderInput');
+      if (input) input.addEventListener('change', e => {
+        const picked = Array.from(e.target.files || []);
+        e.target.value = '';
+        if (!picked.length) return;
+        const root = (picked[0].webkitRelativePath || '').split('/')[0] || 'folder';
+        Promise.all(picked
+          .filter(f => HDL_SOURCE_RE.test(f.name))
+          .slice(0, HDL_FOLDER_MAX)
+          .map(f => f.text().then(src => ({ path: (f.webkitRelativePath || f.name).split('/').slice(1).join('/') || f.name, src }))))
+          .then(list => {
+            hdlForgetFolder();
+            hdlFolder = hdlFolderMakeState('snapshot', root);
+            hdlApplyFolderFiles(list, true);
+            if (simEngineMode !== 'hdl') setSimEngineMode('hdl');
+          });
+      });
+      window.addEventListener('focus', () => {
+        if (hdlFolder && !hdlRunning) hdlReadFolder();
+      });
+      hdlRenderFolderButton();
+      if (window.rvNative) {
+        if (window.rvNative.rememberedFolder) {
+          const dir = window.rvNative.rememberedFolder;
+          hdlFolder = hdlFolderMakeState('native', dir.split(/[\\/]/).filter(Boolean).pop() || dir, { path: dir });
+          hdlReadFolder(true);
+        }
+      } else if (window.showDirectoryPicker) {
+        hdlFolderStore('get').then(handle => {
+          if (!handle || hdlFolder || hdlFiles.length) return;
+          hdlFolder = hdlFolderMakeState('handle', handle.name, { handle });
+          hdlReadFolder(true);
+        }).catch(() => {});
+      }
     }
 
     // Which uploaded file declares `module Wrapper`? Everything hinges on
@@ -15518,8 +15823,10 @@ self.onmessage = async ({ data: job }) => {
       }
       const note = document.getElementById('hdlSourcesNote');
       if (note) note.textContent = hdlFiles.length
-        ? hdlFiles.length + ' loaded' + (wrapper ? ', Wrapper found' : ', no Wrapper')
+        ? hdlFiles.length + ' loaded' + (hdlFolder && !hdlFolder.pending ? ' from ' + hdlFolder.name : '') +
+          (wrapper ? ', Wrapper found' : ', no Wrapper')
         : 'none loaded';
+      hdlRenderFolderButton();
       // The toolbar's Run/Step buttons gate on the same conditions, so they
       // have to be refreshed here too - loading the sources is exactly the
       // moment they become usable.
@@ -17304,6 +17611,7 @@ endmodule
     // A fresh trace: the current switch positions become the starting
     // environment and the timeline of later changes starts empty.
     async function hdlStartTrace(budget, opts) {
+      await hdlReadFolder();
       hdlStim = [];
       hdlRx = [];
       hdlIdx = 0;
@@ -18715,7 +19023,8 @@ endmodule
           hdlSeek(Math.min(instructionCount, hdlTrace.steps.length));
           setStatus('HDL mode - resumed the recording at instruction ' + hdlIdx, 'info');
         } else {
-          setStatus('HDL mode - Run and Step execute your Verilog through Icarus/WASM', 'info');
+          setStatus('HDL mode - Run and Step execute your Verilog through ' +
+            (hdlNative ? 'Icarus Verilog' : 'Icarus/WASM'), 'info');
         }
         loadHdlEngine().catch(e => hdlLog(String(e.message || e), 'err'));
       } else {
@@ -18807,6 +19116,7 @@ endmodule
         hdlAddFiles(e.target.files);
         e.target.value = '';
       });
+      hdlInitFolder();
       if (drop) {
         ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
           e.preventDefault(); e.stopPropagation();

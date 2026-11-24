@@ -10,6 +10,7 @@
 | [`riscv_simulator.html`](riscv_simulator.html) | The simulator. Single file, no build step. Assembling, simulating and the HDL engine all run in the browser with nothing fetched; **DIP to LED** (both languages) is baked in for the same reason. Every other example, and C compilation, need the page served over `http://` — see below. |
 | [`examples/`](examples/) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
 | [`vendor/`](vendor/README.md) | Local copies of the three external engines (CodeMirror, Icarus Verilog, Yosys), used only when the CDN cannot be reached. |
+| [`electron/`](electron/README.md) | The desktop app: this page in an Electron window, with Icarus Verilog built natively for each platform. See [§5.18](#518-the-desktop-app). |
 
 **Live:** <https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/> · Vibe coded by Rajesh Panicker.
 
@@ -494,7 +495,8 @@ panels.
    WASM) begins loading, and with no sources yet loaded the **🔌 HDL Simulation**
    settings tab opens by itself, because nothing else can happen until it has them.
 2. **Load your Verilog** — drop `.v` files **anywhere on the page**, open them with
-   **📂 Open**, or use *browse…* on that tab. Include `Wrapper.v`, `RV.v` and **every**
+   **📂 Open**, use *browse…* on that tab, or pick the folder they are in with
+   *folder…* ([§5.17](#517-loading-a-folder)). Include `Wrapper.v`, `RV.v` and **every**
    submodule (`ALU.v`, `Decoder.v`, `Extend.v`, `MCycle.v`, `PC_Logic.v`,
    `ProgramCounter.v`, `RegFile.v`, `Shifter.v`). The file holding `module Wrapper` is
    tagged in the list, and a chip next to the `JS | HDL` pill shows the count — turning
@@ -537,7 +539,8 @@ Two readouts worth naming, because they look identical and are not: the toolbar'
 `hw` in HDL mode (real clock edges counted by your simulation). The cycles table
 affects only the first.
 
-Nothing is bundled: the Verilog is always yours, uploaded per session.
+Nothing is bundled: the Verilog is always yours, loaded per session or read from a
+folder.
 
 ### 5.3 The Wrapper is never modified
 
@@ -881,6 +884,11 @@ one.
 
 ---
 
+In the desktop app none of this applies: the page finds `window.rvNative` with
+`icarus` set, and `hdlTool()` hands each stage's files and arguments to the native
+build through it instead ([§5.18](#518-the-desktop-app)). Nothing above `hdlTool()`
+knows which engine ran.
+
 ### 5.16 Limitations
 
 - **A step is a recording, not a live simulation.** Editing a register value by hand,
@@ -893,10 +901,82 @@ one.
   come from the fixed Wrapper and keep working.
 - **Long runs are slow**: measured in Chrome with the trace and the waveform on, about
   8,000 cycles a second for the `RV/` RTL and 2,000 to 4,000 for the prebuilt gate-level
-  core. A program that needs millions of cycles is better run in JS mode.
+  core. A program that needs millions of cycles is better run in JS mode. Native Icarus
+  in the desktop app is only about 1.7× faster (§5.18): the time is Icarus's own.
 - **First run downloads ~2.7 MB** of WASM (cached afterwards).
 - Requires a browser context that allows cross-origin `import()` — serve over `http://`
   rather than opening the file with `file://`, or host the engine locally.
+
+### 5.17 Loading a folder
+
+*folder…*, beside *browse…*, loads every `.v`, `.sv`, `.vh` and `.svh` file in a folder
+and its subfolders, keeping only what belongs to the design:
+
+- **Only files under the Wrapper.** Starting from `module Wrapper`, the module bodies are
+  scanned for instantiations of the other modules found (comments and strings blanked
+  first), and a file is loaded if it declares any module reached that way. A file that
+  declares no module, and every header, is loaded too. The course's
+  `test_Wrapper_*.v` testbenches and an old copy of a module beside the real one are
+  left out, and the console lists them; they would otherwise become a second top level.
+  With no Wrapper in the folder, everything is loaded and the usual *no Wrapper* warning
+  shows.
+- **Not Vivado's output.** Folders whose names start with `.`, `node_modules`,
+  `xsim.dir` and anything ending `.cache`, `.runs`, `.sim`, `.hw`, `.ip_user_files`
+  or `.gen` are skipped: they hold generated copies (`*_stub.v`, simulation netlists).
+- **Two files declaring one module** are both loaded and named in a warning; the
+  compile then fails until one is removed with × (which also keeps it out of later
+  reads) or deleted.
+- **Names.** Files are listed and reported by base name; two with the same base name in
+  different subfolders take their relative path with `/` replaced by `__`.
+- At most 500 files are read.
+
+**Read again** whenever the window regains focus and before each run from reset (the
+Run that follows Reset, or the first Step), so an edit saved in Vivado or VS Code is
+picked up when you come back. If any file changed, appeared or disappeared, the folder's
+files are replaced, the console says which, and the recording of the old sources is
+discarded. Files dropped in by hand stay, and win over a folder file of the same name.
+A folder that can no longer be read leaves the loaded files as they were.
+
+**How it reaches the disk**, best first:
+
+| Where | How | Remembered | Read again |
+|---|---|---|---|
+| Desktop app | `rvNative.pickFolder()` / `readFolder()`; main may only read a folder the user chose | across restarts, in the app's `settings.json` | yes |
+| Chromium browsers | `showDirectoryPicker()`; the handle is kept in IndexedDB (`rvsim` / `kv` / `hdlFolder`) | across reloads; a later visit may need the permission again, and the button then reads *↻ name* | yes |
+| Firefox, Safari | `<input webkitdirectory>` | no | no: the browser hands over a copy, so the folder is picked again after editing |
+
+*Clear files* and *Prebuilt processor* forget the folder.
+
+### 5.18 The desktop app
+
+[`electron/`](electron/README.md) packages this page with Electron and a native build
+of Icarus Verilog for each platform (Linux AppImage, Windows NSIS installer, macOS dmg
+for arm64 and x64). The page is the same file, served from the app's resources over an
+`app://` scheme, since a `file://` page cannot fetch its own `.wasm` or examples. It
+looks and behaves as it does in a browser; what differs:
+
+- **Icarus runs natively.** `electron/hdl_native.js` writes the files a stage would have
+  had in the Emscripten file system into a temporary directory, rewrites `ivl.conf` to
+  point at the bundled `vvp.tgt` and VPI modules, runs `ivlpp`, `ivl` or `vvp` there
+  with the same arguments, and returns the output and the files the page asked to keep.
+  Reset kills the process. The build is pinned to the commit the WASM engine was built
+  from (`c7530db`, 14.0-devel), and `test_hdl_native.js` checks that both record the
+  same instructions, the same waveform and the same checkpoint replay.
+- **Speed.** For 40,000 cycles of DIP to LED on the `RV/` RTL (trace, VCD and
+  checkpoints on): preprocess and compile 40 ms native against 180 ms WASM, simulation
+  5.2 s against 8.6 s. With trace, VCD and checkpoints all off native `vvp` still takes
+  2.2 s, about 18,000 cycles a second, so the time is Icarus's event-driven evaluation
+  and not the browser. Replaying an input change near the end takes 0.65 s.
+- **Offline.** Local copies of CodeMirror, Icarus and Yosys are tried before the CDN.
+- **The bridge** (`electron/preload.js`, `window.rvNative`) is the page's only way to
+  the machine: run one of the three Icarus tools in a fresh temporary directory, pick a
+  folder, and read a folder the user picked. The page has no Node access
+  (`contextIsolation`, `sandbox`), and links leave for the system browser.
+- **No menu bar** on Windows and Linux; macOS keeps the standard menu, without which
+  copy and paste stop working.
+
+Building, packaging and signing are described in
+[`electron/README.md`](electron/README.md).
 
 ---
 
@@ -1226,8 +1306,10 @@ No `0x` prefix on Content (Hex) — the header already says it's hex; Memory's A
 
 A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests). Every
 suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file
-rather than a copy of its logic. `npm test` runs all **18** of them — every `test_*.js`
-file in the directory is one of the 18, there is no build step and nothing else to run.
+rather than a copy of its logic. `npm test` runs **18** of them, there is no build step
+and nothing else to run. Three more need things `npm test` cannot assume and are run on
+their own: `test_hdl_native.js` a native Icarus build, `test_hdl_folder_browser.js`
+Chrome, and `test_electron_app.js` the desktop app and a display.
 The remaining files there are shared test infrastructure, not suites of their own:
 `godbolt_cache.js`/`.json` mock Godbolt's response for C compilation, and
 `examples_fetch.js` serves `examples/` from disk — both stand in for network access
@@ -1254,6 +1336,9 @@ jsdom does not have.
 | `test_mobile_keyboard_focus.js` | On-screen-keyboard focus preservation across panel relayout. |
 | `test_m_extension.js` | **RV32M, three ways (21 assertions).** All eight M instructions over six operand pairs, on the JS engine, on `RV/*.v` through Icarus, and against a BigInt reference; plus the stall, and the pre-synthesised `examples/hdl/RV_reference.v`. |
 | `test_jsdom.js` | Boot smoke test under jsdom. |
+| `test_hdl_native.js` | **Native Icarus against WASM (21 assertions).** Two pages, one bridged to `electron/iverilog/<os>-<arch>` (or `HDL_NATIVE_DIR`), one to `vendor/verisim/` run in Node, each load a copy of `RV/` as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also the folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. Not in `npm test`: build Icarus first (`npm run build:iverilog` in `electron/`). |
+| `test_hdl_folder_browser.js` | **The folder picker in headless Chrome (11 assertions).** An origin-private folder stands in for a picked one; checks what loads, re-reading on focus, the handle surviving a reload, *Clear files* forgetting it, and the `webkitdirectory` fallback. Not in `npm test`: needs Chrome (`CHROME_CHANNEL` to choose another). |
+| `test_electron_app.js` | **The desktop app (12 assertions).** Launches `electron/` through Playwright, or a packaged build given by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run from the toolbar lighting the LEDs, nothing fetched for the engines, and the folder remembered across a restart. Not in `npm test`: opens a window. |
 
 ### 12.1 Instruction semantics, and why assembling is not enough
 
@@ -1341,6 +1426,7 @@ Newest first. Versions before v15.0 are grouped.
 
 | Version | Milestone description & features implemented |
 |---------|----------------------------------------------|
+| **v24.128 (A Desktop App With Native Icarus; HDL Sources From a Folder)** | **Desktop app** (§5.18): `electron/` packages the unchanged page with Electron 45 and a native Icarus Verilog for each platform, built from source at the commit the WASM engine came from (`c7530db`) by `electron/scripts/build-iverilog.sh` and stripped to 8 MB. `hdlTool()` gains one branch: given `window.rvNative.icarus`, it sends the stage's files and arguments over IPC to `electron/hdl_native.js`, which runs the tool in a temporary directory, and a Reset kills the process. Measured on 40,000 cycles of the `RV/` RTL: compile 40 ms against 180 ms, simulation 5.2 s against 8.6 s, so native Icarus is 1.7× the WASM build; with trace, VCD and checkpoints off it is still 18,000 cycles a second, which puts the remaining time in Icarus itself and makes Verilator, not native Icarus, the route to a faster engine. `.github/workflows/desktop.yml` builds Icarus and the installers on Linux, Windows (MSYS2) and macOS (arm64, x64), runs `test_hdl_native.js` against each build, and attaches the installers to the run, or to a draft release for a `desktop-v*` tag; signing and notarization happen only when the secrets are set. Only the Linux build has been run so far. The app's icon is the page's favicon rendered at 1024 px (`electron/build/icon.png`). **Folder** (§5.17): *folder…* beside *browse…* loads a folder's Verilog, keeping the files whose modules sit under the Wrapper and skipping Vivado's output folders, so testbenches and stale copies are not compiled as extra top levels. It is read again on window focus and before each run from reset, with changes named in the console, and remembered across restarts in the app and across reloads in Chromium (an IndexedDB handle); Firefox and Safari get a one-off `webkitdirectory` copy. The HDL settings note that files are compiled in the browser and must be loaded once per session now says they are compiled on this computer and that a folder is remembered. **Testing.** `test_hdl_native.js` (21), `test_hdl_folder_browser.js` (11) and `test_electron_app.js` (12, also run against the packaged AppImage's contents) are new and outside `npm test`, since each needs a native build, Chrome or a display. `playwright-core` joins the test dependencies. `test_hdl_mode`, `test_waveform`, `test_m_extension`, `test_comprehensive_suite` and `test_jsdom` pass unchanged. |
 | **v24.127 (HDL Replays From Checkpoints; the Engine Off the Page's Thread)** | An input change, or extending the recording, re-simulated from reset to the end of the recording, and the page froze for all of it: a 40,000-cycle recording of the `RV/` RTL took about 5 s each time, the prebuilt core about 3 s per 10,000 cycles. **Checkpoints** (§5.11): a generated `cg3207_hdl_ck` module saves every reg and written memory of the design and the testbench every 1024+ cycles and restores one with `+CKLOAD`; the state is found by walking the sources from the Wrapper. A replay starts from the latest checkpoint before the input timeline changed, is joined onto the old recording and VCD, and must reproduce the old recording over at least 16 cycles first, or the run is repeated from reset and checkpoints stay off for those sources. After an input change the recording now reaches one *Cycles* past it rather than back to its old end. Measured: a DIP change at cycle 38,000 of 40,000 takes 1.4 s instead of 5.3 s (RTL), at 8,500 of 10,000 on the prebuilt core 0.8 s instead of 2.8 s, both joined recordings identical to the run from reset. **The worker**: preprocess, compile and simulate run in a module worker (§5.15), falling back to the page; during a 6 s simulation the page's longest stall was 21 ms. Reset now stops a running simulation, and an input moved during a run is applied where the run stops. HDL test section 15 covers the join, the waveform, an extension, a corrupted checkpoint and the `generate` refusal. |
 | **v24.126 (User Guide: CPI, Multi-Cycle Cycle Counts, Tone)** | `riscv_simulator.md` says that CPI is reported (multi-cycle and pipelined; mispredictions too with prediction on), and describes the multi-cycle model as having a user-configurable cycle count for each instruction type, naming the types (ALU, multiply/divide, load, store, branch, jump, floating point, system) instead of "the cycles set in its table". Remaining advisory and conversational phrasing was made neutral: "as they would in any Verilog simulation", "is a good first step", "which is useful for trying HDL mode", "can be designed as you like", "use the Memory panel for them", and the `ecall` explanation of what an FPGA lacks. |
 | **v24.125 (User Guide Without Course Context, in a Manual's Tone)** | `riscv_simulator.md` is public, so it no longer assumes the reader is taking CG3207: "the board" is introduced as a simulated Digilent Nexys 4 / Nexys 4 DDR / Nexys A7 with a Pmod OLED; `Wrapper` and `RV` are said to be the processor with its memories and memory-mapped I/O, and the processor; `CLK_DIV_BITS` is described as the board template's top-level divider of the 100 MHz clock; the datapath's values are said to come from the drawn datapath's decoder and control logic rather than "the reference design"; the hazard switches are named by what they forward (Writeback to Decode, Writeback to Memory) instead of "W→D" and "the mem-mem copy", and the branch predictor's entries hold a predicted direction rather than "PCSrc". Phrasing throughout is a user manual's: "a lint for constructs that won't synthesise" became a description of what the synthesis checks flag and that they appear in the console as warnings; punchy fragments ("It isn't.", "Start there.", "What catches people out") became plain sentences. One correction: *Typed* UART input arrives much more slowly than *Paste*, not at the same rate. CLAUDE.md's guide rule now says to avoid course context and to keep a manual's tone. |
@@ -1499,7 +1585,10 @@ The Verilog engine used by HDL mode consists of builds of **Icarus Verilog**, wh
 derivative works under the **GPL**. They are *loaded at runtime from an external URL*,
 not bundled into `riscv_simulator.html`. If you plan to redistribute a copy with the
 binaries alongside it, check that this is compatible with your own licensing terms
-first.
+first. The desktop app does bundle them, as separate programs it runs, and ships
+Icarus's `COPYING` beside them in `resources/iverilog/`; its source is the pinned commit
+of <https://github.com/steveicarus/iverilog>.
 
 Your Verilog sources are never bundled with the page and are never uploaded anywhere —
-they are compiled inside your browser and live only in that tab.
+they are compiled on your computer and live only in that tab, or in the folder they
+were read from.

@@ -136,9 +136,19 @@ simulation follows the hardware closely, including its limitations. In particula
 ## 5. Simulating your own Verilog (HDL mode)
 
 In HDL mode, load the file that declares `module Wrapper`, your processor and all of its
-submodules in **Settings → Simulation**. The files are compiled in the browser by Icarus
-Verilog, not uploaded anywhere, and have to be loaded again in each new browser tab.
+submodules in **Settings → Simulation**, as files or as the folder they are in. The files
+are compiled on your computer by Icarus Verilog, not uploaded anywhere. Files have to be
+loaded again in each new browser tab; a folder is remembered.
 **Prebuilt processor** loads a working RV32I+M processor and Wrapper for comparison.
+
+From a folder, only files declaring modules that are instantiated under `Wrapper` are
+loaded, so testbenches and unused copies beside your design are left out; the console
+lists them. Vivado's output folders (`*.runs`, `*.sim`, `*.cache` and so on) are skipped.
+If two files declare the same module, both are loaded and the compilation fails; remove
+one with ×. The folder is read again whenever the simulator window regains focus and
+before each run after **Reset**, so changes saved in another editor are picked up, and a
+recording of the old sources is discarded. Firefox and Safari hand the page a copy of the
+folder instead, which is not read again, so pick the folder again after editing.
 
 ### How HDL simulation runs
 
