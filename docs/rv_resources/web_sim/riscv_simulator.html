@@ -4192,6 +4192,12 @@
               <span style="font-size:11.5px;color:#a6adc8;line-height:1.4;">
                 Clock cycles a fresh Run records, and how many more each Resume adds.
               </span>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:#cba6f7;cursor:pointer;font-size:13px;margin-top:10px;"
+                title="Record only the testbench's and the Wrapper's own signals in the waveform (CLK, PC, Instr, the peripherals and the x0..x31 registers), not those inside RV. Runs take about a quarter less time. To see a signal inside RV, turn this off and Reset.">
+                <input type="checkbox" id="hdlWaveTop" onchange="setHdlWaveTop(this.checked)"
+                  style="accent-color:#cba6f7;width:16px;height:16px;cursor:pointer;">
+                Waveform: Wrapper signals only
+              </label>
             </div>
 
           </div>
@@ -13053,11 +13059,13 @@ int main()
         set('hdlCycles', '2000', 'value');
         set('hdlGeneration', '2005', 'value');
         set('hdlVcd', true, 'checked');
+        set('hdlWaveTop', false, 'checked');
         set('hdlCompare', false, 'checked');
         set('hdlTrace', true, 'checked');
         set('hdlRegPath', '', 'value');
         setHdlCycles(2000);
         setHdlDumpVcd(true);
+        setHdlWaveTop(false);
         setHdlCompare(false);
         setHdlTrace(true);
         setHdlRegPath();
@@ -15168,6 +15176,7 @@ int main()
     let hdlRunning = false;
     let hdlCycleBudget = 2000;    // cycles recorded per run, grown on demand
     let hdlDumpVcd = true;
+    let hdlWaveTop = false;       // dump only the testbench's and the Wrapper's own signals
     let hdlTraceEnabled = true;   // record the architectural trace (needed to step)
     let hdlCompareEnabled = false;// cross-check against the JS functional model
     let hdlSynthEnabled = false;  // synthesise with Yosys and check the netlist
@@ -16279,6 +16288,7 @@ ${about}
 //
 //   plusargs     +CYCLES=<d> +TRACE=<d> +DIP=<h> +PB=<h> +ACCEL=<h>
 //                +ADRDY=<h> +NSTIM=<d> +NRX=<d> +VCD
+//                +VCDTOP (with +VCD: the testbench and Wrapper levels only)
 //   stim.mem     timed input changes : <cycle> <code> <value> triples,
 //                codes 1=DIP 2=PB 3=ACCEL_Data 4=ACCEL_DReady
 //   uart_rx.mem  timed UART input    : <cycle> <byte> pairs
@@ -16360,7 +16370,11 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
     if ($value\$plusargs("ADRDY=%h", argv)) ACCEL_DReady = argv[0];
     if ($test\$plusargs("VCD")) begin
       $dumpfile("dump.vcd");
-      $dumpvars(0, cg3207_hdl_tb);
+      if ($test\$plusargs("VCDTOP")) begin
+        $dumpvars(1, cg3207_hdl_tb);
+        $dumpvars(1, cg3207_hdl_tb.dut);
+      end else
+        $dumpvars(0, cg3207_hdl_tb);
     end
   end
 
@@ -16707,16 +16721,17 @@ endmodule
       const sc = tb.scalars.map(n => T + n).concat(state.scalars);
       const ar = tb.arrays.map(n => T + n).concat(state.arrays);
       return `\`timescale 1ns / 1ps
-// Checkpoints for the simulator's replays. Every +CKEVERY cycles, at the
-// falling edge, every reg is written to ck_<cycle>.txt and every written
-// memory to ck_<cycle>_m<i>.mem. +CKLOAD=<cycle> restores ck_load.txt and
+// Checkpoints for the simulator's replays. Every +CKEVERY cycles, and at
+// cycle +CKAT, at the falling edge, every reg is written to ck_<cycle>.txt
+// and every written memory to ck_<cycle>_m<i>.mem. +CKLOAD=<cycle> restores ck_load.txt and
 // ck_load_m<i>.mem 1 ns into the run, before the first rising edge, so the
 // run carries on from that cycle; @@K reports a file that did not read back.
 module cg3207_hdl_ck;
-  integer every = 0, from = -1, fd, n;
+  integer every = 0, at = -1, from = -1, fd, n;
   reg [8*48-1:0] name;
   initial begin
     if ($value$plusargs("CKEVERY=%d", every)) begin end
+    if ($value$plusargs("CKAT=%d", at)) begin end
     if ($value$plusargs("CKLOAD=%d", from)) begin
       #1;
       n = 0;
@@ -16733,7 +16748,8 @@ ${ar.map((p, i) => `      $readmemb("ck_load_m${i}.mem", ${p});`).join('\n')}
     end
   end
   always @(negedge ${T}CLK)
-    if (!${T}RESET && every > 0 && ${T}cyc % every == 0 && ${T}cyc != from) begin
+    if (!${T}RESET && ${T}cyc != from &&
+        ((every > 0 && ${T}cyc % every == 0) || ${T}cyc == at)) begin
       #1;
       $sformat(name, "ck_%0d.txt", ${T}cyc);
       fd = $fopen(name, "w");
@@ -17228,6 +17244,7 @@ endmodule
         '+NRX=' + hdlRx.length
       ];
       if (hdlDumpVcd) plus.push('+VCD');
+      if (hdlDumpVcd && hdlWaveTop) plus.push('+VCDTOP');
       return plus;
     }
 
@@ -17238,7 +17255,10 @@ endmodule
         'stim.mem': hdlStimFile(),
         'uart_rx.mem': hdlRxFile()
       });
-      if (hdlCk) plus.push('+CKEVERY=' + hdlCk.every);
+      // One more checkpoint near the end, where a Resume starts: the replay
+      // has to reproduce HDL_CK_VERIFY cycles of the old recording, which
+      // ends at budget - 1, before it is joined on.
+      if (hdlCk) plus.push('+CKEVERY=' + hdlCk.every, '+CKAT=' + (budget - HDL_CK_VERIFY - 1));
       if (from) {
         plus.push('+CKLOAD=' + from.k);
         files['ck_load.txt'] = from.txt;
@@ -17315,8 +17335,9 @@ endmodule
       // run share, leaving enough of the old recording after it to check
       // the replay against.
       const old = ckKey && hdlTrace && hdlTrace.ckKey === ckKey && hdlTrace.raw ? hdlTrace : null;
+      const vcdScope = hdlDumpVcd ? (hdlWaveTop ? 'top' : 'all') : null;
       let from = null;
-      if (old && (!hdlDumpVcd || hdlLastVcd)) {
+      if (old && (!hdlDumpVcd || (hdlLastVcd && old.vcdScope === vcdScope))) {
         const diff = hdlTimelineDiff(old.timeline, timeline);
         for (const k of [...hdlCk.at.keys()]) if (k >= diff) hdlCk.at.delete(k);
         const verifyTo = Math.min(diff, old.budget - 1);
@@ -17360,6 +17381,7 @@ endmodule
       t.raw = out;
       t.timeline = timeline;
       t.ckKey = hdlCk ? ckKey : null;
+      t.vcdScope = vcd ? vcdScope : null;
       hdlTrace = t;
       hdlLastVcd = vcd;
       refreshDownloadMenu();
@@ -18924,6 +18946,7 @@ endmodule
       hdlDumpVcd = !!on;
       updateWaveView();
     }
+    function setHdlWaveTop(on) { hdlWaveTop = !!on; }
     function setHdlTrace(on) {
       hdlTraceEnabled = !!on;
       hdlDiscardTrace();
@@ -19411,6 +19434,7 @@ endmodule
     window.hdlDownloadTestbench = hdlDownloadTestbench;
     window.setHdlCycles = setHdlCycles;
     window.setHdlDumpVcd = setHdlDumpVcd;
+    window.setHdlWaveTop = setHdlWaveTop;
     window.setHdlTrace = setHdlTrace;
     window.setHdlCompare = setHdlCompare;
     window.setHdlSynth = setHdlSynth;

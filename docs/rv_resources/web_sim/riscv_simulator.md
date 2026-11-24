@@ -165,7 +165,7 @@ breakpoints then move through that recording.
   change is discarded. An input changed while a simulation is running takes effect at the
   cycle where that simulation stops.
 - Resuming, or stepping past the end of the recording, simulates further cycles, starting
-  from the last checkpoint.
+  from a checkpoint taken just before the end of the recording.
 - Checkpoints are taken every 1024 cycles or more and hold every `reg` and memory the
   simulator finds in your sources. A design that keeps state in a `generate` block re-runs
   from reset instead, and so does one whose re-run does not reproduce the recording it
@@ -211,6 +211,8 @@ compilation error.
   unintended latches and races between blocking assignments. The first use downloads about
   13 MB, and each synthesis takes 20 to 35 seconds.
 - **The waveform** includes internal signals, with registers named `x5_t0` and so on.
+  **Waveform: Wrapper signals only** leaves out everything inside `RV`, which makes runs
+  about a quarter faster; to see an internal signal, turn it off and run again from Reset.
   Memories are not recorded in a VCD; their contents are shown in the Memory panel. Clicking
   a cycle in the waveform moves the whole simulator to that cycle. The VCD can be downloaded for
   GTKWave or [Surfer](https://surfer-project.org/).

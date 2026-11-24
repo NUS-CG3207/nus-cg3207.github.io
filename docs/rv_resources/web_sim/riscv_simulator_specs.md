@@ -748,14 +748,19 @@ testbench reads, not something baked into it.
 compiled in beside the testbench, does it: every `+CKEVERY` cycles, 1 ns after the
 falling edge, it writes every `reg` of the design and of the testbench to
 `ck_<cycle>.txt` and every memory that something assigns to `ck_<cycle>_m<i>.mem`, in
-binary so that x and z bits survive. `+CKLOAD=<cycle>` loads one back 1 ns into a run,
-before the first rising edge, and the run carries on from that cycle. The page keeps up
-to 40 checkpoints, 1024 cycles apart to start with, the spacing doubling as the recording
-grows. A replay starts from the latest one before the first cycle at which the input
-timeline changed; extending the recording starts from the last one.
+binary so that x and z bits survive. `+CKAT=<cycle>` adds one more, which the page
+places 17 cycles before the end of every run. `+CKLOAD=<cycle>` loads one back 1 ns into
+a run, before the first rising edge, and the run carries on from that cycle. The page
+keeps up to 40 checkpoints, 1024 cycles apart to start with, the spacing doubling as the
+recording grows. A replay starts from the latest one before the first cycle at which the
+input timeline changed; extending the recording (Resume, or stepping off its end) starts
+from the one near the end, so it re-runs only the 16 cycles it has to verify, whatever
+*Cycles per Run / Resume* is.
 
 The new run's records are joined onto the old recording's up to the checkpoint, and its
-VCD onto the old VCD, moved 10 ns per cycle later. That join is only right if the
+VCD onto the old VCD, moved 10 ns per cycle later. Both VCDs must hold the same
+signals, so a recording made with the other *Waveform: Wrapper signals only* setting is
+replayed from reset instead. That join is only right if the
 checkpoint held all of the design's state, and the state is found by reading the
 sources (regs, `integer`s, ANSI `output reg` ports, instances, through the hierarchy
 under the Wrapper). So the replay always starts at least 16 cycles before the change and
@@ -1012,13 +1017,22 @@ the engine they configure, so a setting's scope is visible from where it sits.
 |   BOTH ENGINES     [x] Statement Stepping (Fast Mode)                                             |
 |   PROCESSOR SOURCES   drop .v files / browse…   [Wrapper.v ▸ WRAPPER] [RV.v] [ALU.v] …            |
 |                       [ Clear files ] [ Save testbench ]                                          |
-|   RECORDING        Cycles per Run / Resume [ 2000 ]   [x] Record the architectural trace          |
+|   RECORDING        Cycles per Run / Resume [ 2000 ]   [ ] Waveform: Wrapper signals only          |
+|                    [x] Record the architectural trace                                             |
 |   COMPILER&OUTPUT  Verilog standard [ Verilog-2005 ]  [ ] VCD   [ ] Cross-check vs JS model       |
 |   REGISTER FILE    [ dut.RV1.RegFile1.RegBank ]  (detected automatically)                         |
 +---------------------------------------------------------------------------------------------------+
 | [ Reset Defaults ]                                                               [ Apply & Close ] |
 +---------------------------------------------------------------------------------------------------+
 ```
+
+**Waveform: Wrapper signals only** (off by default) passes `+VCDTOP`, and the testbench
+then calls `$dumpvars(1, cg3207_hdl_tb)` and `$dumpvars(1, cg3207_hdl_tb.dut)` instead of
+`$dumpvars(0, cg3207_hdl_tb)`: the testbench's nets (CLK, RESET, the peripherals, the
+`x<n>_<abi>` register aliases) and the Wrapper's own signals (PC, Instr, MemWrite_out, …),
+nothing inside `RV`. Every default waveform row is in that set. For 40,000 cycles of DIP
+to LED on the `RV/` RTL the VCD goes from 47.8 MB to 9.7 MB and the run from 9.3 s to
+6.6 s in WASM, 5.6 s to 4.3 s native.
 
 **Statement Stepping applies to both engines**, so it appears at the top of both
 simulation tabs — one setting with two controls, kept in step: ticking it on either
@@ -1336,7 +1350,7 @@ jsdom does not have.
 | `test_mobile_keyboard_focus.js` | On-screen-keyboard focus preservation across panel relayout. |
 | `test_m_extension.js` | **RV32M, three ways (21 assertions).** All eight M instructions over six operand pairs, on the JS engine, on `RV/*.v` through Icarus, and against a BigInt reference; plus the stall, and the pre-synthesised `examples/hdl/RV_reference.v`. |
 | `test_jsdom.js` | Boot smoke test under jsdom. |
-| `test_hdl_native.js` | **Native Icarus against WASM (21 assertions).** Two pages, one bridged to `electron/iverilog/<os>-<arch>` (or `HDL_NATIVE_DIR`), one to `vendor/verisim/` run in Node, each load a copy of `RV/` as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also the folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. Not in `npm test`: build Icarus first (`npm run build:iverilog` in `electron/`). |
+| `test_hdl_native.js` | **Native Icarus against WASM (26 assertions).** Two pages, one bridged to `electron/iverilog/<os>-<arch>` (or `HDL_NATIVE_DIR`), one to `vendor/verisim/` run in Node, each load a copy of `RV/` as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also the folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. Not in `npm test`: build Icarus first (`npm run build:iverilog` in `electron/`). |
 | `test_hdl_folder_browser.js` | **The folder picker in headless Chrome (11 assertions).** An origin-private folder stands in for a picked one; checks what loads, re-reading on focus, the handle surviving a reload, *Clear files* forgetting it, and the `webkitdirectory` fallback. Not in `npm test`: needs Chrome (`CHROME_CHANNEL` to choose another). |
 | `test_electron_app.js` | **The desktop app (12 assertions).** Launches `electron/` through Playwright, or a packaged build given by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run from the toolbar lighting the LEDs, nothing fetched for the engines, and the folder remembered across a restart. Not in `npm test`: opens a window. |
 
@@ -1426,6 +1440,7 @@ Newest first. Versions before v15.0 are grouped.
 
 | Version | Milestone description & features implemented |
 |---------|----------------------------------------------|
+| **v24.129 (Resume Re-runs 16 Cycles; a Wrapper-Only Waveform)** | **Resume.** Checkpoints fell every 1024 cycles, and an extension has to start at least 16 cycles before the old recording's end so the replay can be checked against it, so with the default 2000 *Cycles per Run / Resume* every Resume re-simulated from cycle 1024: 976 cycles of the old recording again before any new ones, and more as the spacing doubled. Choosing a multiple of 1024 would not help, because of those 16 cycles. The checkpoint module now also takes one at `+CKAT`, which the page sets 17 cycles before the end of each run, so an extension starts there whatever the setting: 40,000 to 42,000 cycles takes 0.42 s native. **Waveform: Wrapper signals only**, under *Cycles per Run / Resume* and off by default, limits `$dumpvars` to the testbench and Wrapper levels (§6): the VCD of a 40,000-cycle run drops from 47.8 MB to 9.7 MB and the run takes 23 to 29 % less time on either engine. A replay joins only onto a VCD of the same scope; the trace records which. **Testing.** `test_hdl_native.js` section 6 (now 26 assertions) checks the signals the reduced waveform keeps and drops, that a Resume loads the checkpoint 17 cycles before the old end, and that the resumed recording and waveform equal a run from reset of the same length on both engines. `test_hdl_mode` (191), `test_waveform` (98), `test_comprehensive_suite` and `test_jsdom` pass. |
 | **v24.128 (A Desktop App With Native Icarus; HDL Sources From a Folder)** | **Desktop app** (§5.18): `electron/` packages the unchanged page with Electron 45 and a native Icarus Verilog for each platform, built from source at the commit the WASM engine came from (`c7530db`) by `electron/scripts/build-iverilog.sh` and stripped to 8 MB. `hdlTool()` gains one branch: given `window.rvNative.icarus`, it sends the stage's files and arguments over IPC to `electron/hdl_native.js`, which runs the tool in a temporary directory, and a Reset kills the process. Measured on 40,000 cycles of the `RV/` RTL: compile 40 ms against 180 ms, simulation 5.2 s against 8.6 s, so native Icarus is 1.7× the WASM build; with trace, VCD and checkpoints off it is still 18,000 cycles a second, which puts the remaining time in Icarus itself and makes Verilator, not native Icarus, the route to a faster engine. `.github/workflows/desktop.yml` builds Icarus and the installers on Linux, Windows (MSYS2) and macOS (arm64, x64), runs `test_hdl_native.js` against each build, and attaches the installers to the run, or to a draft release for a `desktop-v*` tag; signing and notarization happen only when the secrets are set. Only the Linux build has been run so far. The app's icon is the page's favicon rendered at 1024 px (`electron/build/icon.png`). **Folder** (§5.17): *folder…* beside *browse…* loads a folder's Verilog, keeping the files whose modules sit under the Wrapper and skipping Vivado's output folders, so testbenches and stale copies are not compiled as extra top levels. It is read again on window focus and before each run from reset, with changes named in the console, and remembered across restarts in the app and across reloads in Chromium (an IndexedDB handle); Firefox and Safari get a one-off `webkitdirectory` copy. The HDL settings note that files are compiled in the browser and must be loaded once per session now says they are compiled on this computer and that a folder is remembered. **Testing.** `test_hdl_native.js` (21), `test_hdl_folder_browser.js` (11) and `test_electron_app.js` (12, also run against the packaged AppImage's contents) are new and outside `npm test`, since each needs a native build, Chrome or a display. `playwright-core` joins the test dependencies. `test_hdl_mode`, `test_waveform`, `test_m_extension`, `test_comprehensive_suite` and `test_jsdom` pass unchanged. |
 | **v24.127 (HDL Replays From Checkpoints; the Engine Off the Page's Thread)** | An input change, or extending the recording, re-simulated from reset to the end of the recording, and the page froze for all of it: a 40,000-cycle recording of the `RV/` RTL took about 5 s each time, the prebuilt core about 3 s per 10,000 cycles. **Checkpoints** (§5.11): a generated `cg3207_hdl_ck` module saves every reg and written memory of the design and the testbench every 1024+ cycles and restores one with `+CKLOAD`; the state is found by walking the sources from the Wrapper. A replay starts from the latest checkpoint before the input timeline changed, is joined onto the old recording and VCD, and must reproduce the old recording over at least 16 cycles first, or the run is repeated from reset and checkpoints stay off for those sources. After an input change the recording now reaches one *Cycles* past it rather than back to its old end. Measured: a DIP change at cycle 38,000 of 40,000 takes 1.4 s instead of 5.3 s (RTL), at 8,500 of 10,000 on the prebuilt core 0.8 s instead of 2.8 s, both joined recordings identical to the run from reset. **The worker**: preprocess, compile and simulate run in a module worker (§5.15), falling back to the page; during a 6 s simulation the page's longest stall was 21 ms. Reset now stops a running simulation, and an input moved during a run is applied where the run stops. HDL test section 15 covers the join, the waveform, an extension, a corrupted checkpoint and the `generate` refusal. |
 | **v24.126 (User Guide: CPI, Multi-Cycle Cycle Counts, Tone)** | `riscv_simulator.md` says that CPI is reported (multi-cycle and pipelined; mispredictions too with prediction on), and describes the multi-cycle model as having a user-configurable cycle count for each instruction type, naming the types (ALU, multiply/divide, load, store, branch, jump, floating point, system) instead of "the cycles set in its table". Remaining advisory and conversational phrasing was made neutral: "as they would in any Verilog simulation", "is a good first step", "which is useful for trying HDL mode", "can be designed as you like", "use the Memory panel for them", and the `ecall` explanation of what an FPGA lacks. |

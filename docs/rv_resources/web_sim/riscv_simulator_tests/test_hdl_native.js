@@ -250,6 +250,52 @@ setTimeout(async () => {
       check('…and leaves no vvp process behind', left.length === 0);
     }
 
+    // --- 6. Resume, and the Wrapper-only waveform ----------------------
+    // A checkpoint is taken 17 cycles before the end of every run, so a
+    // Resume re-runs only the stretch it has to verify.
+    console.log('\n[6] Resume from the checkpoint at the end; the Wrapper-only waveform');
+    const vcdSame = (win, a, b) => {
+      const p = win.parseVcd(a), q = win.parseVcd(b);
+      return p.vars.length === q.vars.length && p.vars.every(v => {
+        const c = p.changes.get(v.id) || { times: [], values: [] }, d = q.changes.get(v.id) || { times: [], values: [] };
+        return c.times.join() === d.times.join() && c.values.join() === d.values.join();
+      });
+    };
+    fs.rmSync(path.join(dir, 'old'), { recursive: true, force: true });
+    const resumed = {};
+    for (const [name, p] of [['native', nat], ['wasm', wasm]]) {
+      p.win.setHdlWaveTop(true);
+      p.win.hdlDiscardTrace();
+      await p.win.hdlStartTrace(8000);
+      const vars = p.win.parseVcd(p.win.getHdlLastVcd()).vars.map(v => v.path);
+      if (name === 'native') {
+        check('The Wrapper-only waveform keeps CLK, PC, Instr, LED_OUT and the register aliases',
+          ['CLK', 'dut.PC', 'dut.Instr', 'LED_OUT', 'x5_t0'].every(s => vars.some(v => v === s || v.endsWith('.' + s))));
+        check('…and nothing inside RV', !vars.some(v => /\.RV1\./.test(v)));
+      }
+      p.doc.getElementById('console').innerHTML = '';
+      p.doc.getElementById('statusBar').textContent = '';
+      const calls = [];
+      const orig = p.win.rvNative.hdlRun;
+      p.win.rvNative.hdlRun = (...a) => { calls.push(a); return orig(...a); };
+      await p.win.hdlGrowTrace(10000);
+      p.win.rvNative.hdlRun = orig;
+      if (name === 'native') {
+        const load = calls.filter(c => c[1] === 'vvp').map(c => c[3].find(x => /^\+CKLOAD=/.test(x)))[0];
+        check('The Resume starts 17 cycles before the old end (' + load + ')', load === '+CKLOAD=7983');
+      }
+      const grown = { steps: JSON.stringify(p.win.getHdlTrace().steps), vcd: p.win.getHdlLastVcd() };
+      p.win.hdlDiscardTrace();
+      await p.win.hdlStartTrace(10000);
+      resumed[name] = grown;
+      if (name === 'native') {
+        check('A Resume is the longer run from reset, recording and waveform',
+          grown.steps === JSON.stringify(p.win.getHdlTrace().steps) && vcdSame(p.win, grown.vcd, p.win.getHdlLastVcd()));
+      }
+      p.win.setHdlWaveTop(false);
+    }
+    check('Both engines resume to the same recording', resumed.native.steps === resumed.wasm.steps);
+
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {
     console.error(e);
