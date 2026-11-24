@@ -56,7 +56,7 @@ OLED_CTRL[3:0] : Change that triggers write. We can vary one of them (e.g., colu
 * 0x4: autoadvance_col (row major)
 * 0x5: autoadvance_row (column major)
 
-Autoadvance mode is similar to vary_pixel_data_mode, but automatically increments row/column indices in a row-major/column-major manner with appropriate wrapping of row/column boundaries and incrementing to the next column/row in hardware. It can accelerate the loading of raster images - the data can simply be streamed in; one write per pixel will suffice. We can feed data from a C array in a 1-D manner without maintaining separate row/column indices. Please note that this feature is experimental, the implementation/code isn't that structured.
+Autoadvance mode is similar to vary_pixel_data_mode, but automatically increments row/column indices in a row-major/column-major manner with appropriate wrapping of row/column boundaries and incrementing to the next column/row in hardware. It can accelerate the loading of raster images - the data can simply be streamed in; one write per pixel will suffice. We can feed data from a C array in a 1-D manner without maintaining separate row/column indices. Writing OLED_COL or OLED_ROW sets where the next pixel goes, so a frame can be redrawn by setting both to 0 and streaming the data again. Please note that this feature is experimental, the implementation/code isn't that structured.
 
 OLED_CTRL[3] : Present the frame. 
 
