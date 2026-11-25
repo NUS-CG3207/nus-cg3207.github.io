@@ -46,7 +46,7 @@ nav = [
 ]
 
 [project.theme]
-# "classic" keeps the Material for MkDocs look; "modern" is Zensical's own.
+# "classic" is the original Zensical look; "modern" is the newer default.
 variant = "classic"
 custom_dir = "overrides"
 features = [
@@ -72,7 +72,7 @@ icon = "fontawesome/solid/envelope"
 link = "mailto:neil@nus.edu.sg"
 
 # Setting markdown_extensions replaces Zensical's defaults, so only these load
-# (the same set the site used under MkDocs).
+# (the set this site has always used).
 [project.markdown_extensions]
 admonition = {}
 footnotes = {}
