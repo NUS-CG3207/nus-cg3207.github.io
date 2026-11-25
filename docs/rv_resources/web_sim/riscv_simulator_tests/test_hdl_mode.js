@@ -349,6 +349,29 @@ setTimeout(async () => {
       !!doc.getElementById('hdlSynth') && doc.getElementById('hdlSynth').checked === false);
     check('It sits in the Simulation tab\'s HDL group',
       doc.getElementById('hdlSynth').closest('#simGroupHdl') !== null);
+    {
+      // Cycles per Run is kept apart for post-synthesis runs, which are
+      // recorded in one go; the download is stubbed out.
+      const load = win.loadYosysEngine;
+      win.loadYosysEngine = () => Promise.resolve();
+      const cyc = () => doc.getElementById('hdlCycles').value;
+      const icarus = cyc();
+      win.setHdlSynth(true);
+      const on = cyc();
+      win.setHdlCycles(60000);
+      win.setHdlSynth(false);
+      const off = cyc();
+      win.setHdlSynth(true);
+      const back = cyc();
+      win.setHdlSynth(false);
+      win.loadYosysEngine = load;
+      check('Post-synthesis runs default to 50,000 cycles, remembered apart from Icarus\'s (' +
+        [icarus, on, off, back].join(', ') + ')',
+        icarus === '200000' && on === '50000' && off === '200000' && back === '60000');
+      check('…and the setting says a run with it cannot be paused, with the reason in its tooltip',
+        /cannot be paused/.test(doc.getElementById('hdlSynthCard').textContent) &&
+        /no checkpoints/.test(doc.getElementById('hdlSynth').closest('label').title));
+    }
     check('Only the core is synthesised — the fixed Wrapper is excluded',
       win.hdlCoreFiles().length === 9 &&
       !win.hdlCoreFiles().some(f => /Wrapper/.test(f.name)));
@@ -1016,8 +1039,21 @@ setTimeout(async () => {
           const stimC = win.hdlStimFile();
           win.hdlSetStim([]);
           const records = out => out.split('\n').filter(l => /^@@/.test(l));
-          const sameRecords = (a, b) => { const x = records(a), y = records(b);
-            return x.length === y.length && x.every((l, i) => l === y[i]); };
+          // The page's join: what the replay printed before the join point is
+          // checked against the old recording, and what it printed from there
+          // on is parsed onto it.
+          const join = (oldOut, newOut, k, at) => {
+            const old = win.hdlParseTrace(oldOut);
+            const a = win.hdlJoinSplit(at).feed(newOut + '\n');
+            if (!win.hdlJoinCheck(win.hdlRecordList(old, k, at - 2), a.over, k, at - 2)) return null;
+            const p = win.hdlTraceParser(win.hdlCutTrace(old, at));
+            p.feed(a.main);
+            return p.finish();
+          };
+          const sameRun = (t, out) => {
+            const all = x => JSON.stringify([win.hdlRecordList(x, 0, Infinity), x.final]);
+            return all(t) === all(win.hdlParseTrace(out));
+          };
           const loadFrom = (ckFiles, k) => {
             const f = { 'ck_load.txt': ckFiles['ck_' + k + '.txt'] };
             for (const n in ckFiles) {
@@ -1054,10 +1090,10 @@ setTimeout(async () => {
           // The replay from the checkpoint before the change.
           const rep = await icarusCk.runWith(args(4000, 1).concat('+CKLOAD=2048'),
             Object.assign(files(stimC), loadFrom(old.files, 2048)), KEEP);
-          const joined = win.hdlStitch(old.out, rep.out, 2048, 3000);
+          const joined = join(old.out, rep.out, 2048, 3000);
           check('The replay reproduces the old recording from the checkpoint to the change', joined !== null);
           check('Joined onto it, it is record for record the run from reset (' +
-            records(full.out).length + ' records)', joined !== null && sameRecords(joined, full.out));
+            records(full.out).length + ' records)', joined !== null && sameRun(joined, full.out));
           check('…and so is the waveform',
             sameVcd(win.hdlStitchVcd(old.files['dump.vcd'], rep.files['dump.vcd'], 2048), full.files['dump.vcd']));
           check('The replay writes the checkpoints after its start, not the one it started from',
@@ -1067,9 +1103,9 @@ setTimeout(async () => {
           const short = await icarusCk.runWith(args(2000, 0), files(''), KEEP);
           const longer = await icarusCk.runWith(args(4000, 0).concat('+CKLOAD=1024'),
             Object.assign(files(''), loadFrom(short.files, 1024)), KEEP);
-          const grown = win.hdlStitch(short.out, longer.out, 1024, 1999);
+          const grown = join(short.out, longer.out, 1024, 2000);
           check('A recording extended from its last checkpoint is the longer run from reset',
-            grown !== null && sameRecords(grown, old.out) &&
+            grown !== null && sameRun(grown, old.out) &&
             sameVcd(win.hdlStitchVcd(short.files['dump.vcd'], longer.files['dump.vcd'], 1024), old.files['dump.vcd']));
 
           // State the checkpoint did not carry is caught, not passed off.
@@ -1081,12 +1117,12 @@ setTimeout(async () => {
           const wrong = await icarusCk.runWith(args(4000, 1).concat('+CKLOAD=2048'),
             Object.assign(files(stimC), bad), KEEP);
           check('A replay from a checkpoint that does not match is refused',
-            win.hdlStitch(old.out, wrong.out, 2048, 3000) === null);
+            join(old.out, wrong.out, 2048, 3000) === null);
           const short2 = { 'ck_load.txt': '0\n' };
           const unread = await icarusCk.runWith(args(4000, 0).concat('+CKLOAD=2048'),
             Object.assign(files(''), short2), KEEP);
           check('A checkpoint file that does not read back stops the run with @@K',
-            /^@@K /m.test(unread.out) && win.hdlStitch(old.out, unread.out, 2048, 3000) === null);
+            /^@@K /m.test(unread.out) && join(old.out, unread.out, 2048, 3000) === null);
         }
 
         // What the checkpoints cannot cover is said, and the page replays

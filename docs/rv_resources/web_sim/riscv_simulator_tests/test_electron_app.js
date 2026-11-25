@@ -78,6 +78,24 @@ async function launch(userData) {
     check('The console carries no engine error', !/\[HDL\].*(error|failed)/i.test(log));
     await page.screenshot({ path: path.join(SHOT, 'rvsim_app_run.png') });
 
+    console.log('\n[3a] An Icarus run takes a switch while it runs');
+    await page.evaluate(() => { resetAll(); setDipSwitches(0x00ad); setHdlCycles(200000); });
+    await page.click('#runPauseBtn');
+    await page.waitForFunction(() => /running - cycle/.test(document.getElementById('statusBar').textContent), null, { timeout: 60000 });
+    check('The Run button reads Pause while it runs', /Pause/.test(await page.textContent('#runPauseBtn')));
+    await page.click('text=Peripherals');
+    await page.click('#dip0');
+    const icFollowed = await page.waitForFunction(() => getLedState() !== 0xad, null, { timeout: 10000 }).then(() => true, () => false);
+    const icStill = await page.evaluate(() => /running - cycle/.test(document.getElementById('statusBar').textContent));
+    await page.screenshot({ path: path.join(SHOT, 'rvsim_app_icarus_chunks.png') });
+    check('A switch clicked during the run shows on the LEDs while it runs (LED 0x' +
+      (await page.evaluate(() => getLedState().toString(16))) + ')', icFollowed && icStill);
+    await page.click('#runPauseBtn');
+    const icPaused = await page.waitForFunction(() => /HDL paused/.test(document.getElementById('statusBar').textContent), null, { timeout: 10000 }).then(() => true, () => false);
+    const icAfter = await page.evaluate(() => [document.getElementById('statusBar').textContent, getHdlTrace().budget]);
+    check('Pause stops it part-way (' + icAfter.join(', ') + ')', icPaused && icAfter[1] < 200000);
+    await page.evaluate(() => resetAll());
+
     console.log('\n[3b] Verilator, chosen in Settings');
     await page.evaluate(() => openSettingsModal('simulator'));
     check('The Simulator setting can be changed', !(await page.isDisabled('#hdlSimulator')));

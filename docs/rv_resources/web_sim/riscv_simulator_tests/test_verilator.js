@@ -387,7 +387,7 @@ if (process.argv[2] === '--checkpoints') {
     console.log('\n[6] Live runs');
     const steps2arch = t => arch(t);
     win.setHdlSimulator('icarus');
-    check('Icarus keeps 2,000 cycles per run', doc.getElementById('hdlCycles').value === '2000');
+    check('Icarus keeps 200,000 cycles per run', doc.getElementById('hdlCycles').value === '200000');
     win.setHdlSimulator('verilator');
     check('Verilator defaults to 20,000,000', doc.getElementById('hdlCycles').value === '20000000');
     check('The waveform setting shows with Verilator', doc.getElementById('hdlLiveWaveRow').style.display === 'flex');
@@ -417,6 +417,26 @@ if (process.argv[2] === '--checkpoints') {
       consoleText(doc).some(l => /too fast to follow/.test(l)));
     check('The waveform was built on Pause and covers the last 50,000 cycles',
       !!win.getHdlLastVcd() && /#2500000\b|#25000\d{2}/.test(win.getHdlLastVcd().slice(0, 200000)) && win.parseVcd(win.getHdlLastVcd()).vars.length > 50);
+    {
+      // The model must stop writing it, not only the page stop reading it:
+      // a dump left running fills /tmp at about 150 MB a second.
+      const said = () => consoleText(doc).some(l => /too fast to follow/.test(l));
+      win.setHdlCycles(20000000);
+      win.resetAll();
+      doc.getElementById('console').innerHTML = '';
+      const flat = win.runHdlSimulation();
+      await until(said, 60000);
+      await sleep(500);                 // the model closes it at its next edge
+      const id = win.eval('hdlLive && hdlLive.id');
+      const size = async () => { const b = id && await win.rvNative.vlLiveRead(id, 'dump.vcd', 1); return b ? b.size : -1; };
+      const s1 = await size();
+      await sleep(1500);
+      const s2 = await size();
+      win.toggleRunPause();
+      await flat;
+      check('…and the model stops writing it (' + s1 + ' bytes, then ' + s2 + ')', s1 > 0 && s2 === s1 && s1 < 100e6);
+      win.setHdlCycles(300000);
+    }
 
     // Pause, paced to a slow clock.
     win.resetAll();
@@ -454,6 +474,17 @@ if (process.argv[2] === '--checkpoints') {
     check('With Detail Fastest (no trace) a live run still shows a switch change while it runs', ledLive);
     check('…and its fraction of real time is not stuck at 0 (' + (/×[\d.]+ real time/.exec(statsNt) || ['none'])[0] + ')',
       !/×0\.00 real time/.test(statsNt) && /Cycles: [1-9]/.test(statsNt));
+    const ntEnd = win.getHdlTrace().budget;
+    win.setHdlCycles(300000);
+    const ntSeen = [];
+    const ntWatch = setInterval(() => ntSeen.push(doc.getElementById('statusBar').textContent), 5);
+    await win.runHdlSimulation();
+    clearInterval(ntWatch);
+    win.hdlSeek(0);
+    check('Without the trace, Run carries on from where it paused (' + ntEnd + ' to ' + win.getHdlTrace().budget + ')',
+      win.getHdlTrace().budget === ntEnd + 300000 && win.getLedState() === 0x22);
+    check('…from a checkpoint', ntEnd < 400000 || ntSeen.some(s => /replaying cycles [\d,]+ to /.test(s)));
+    win.setHdlCycles(50000000);
     win.setHdlDetail('full', true);
 
     // Paced to a clock it cannot reach, the stats say how far behind it is.

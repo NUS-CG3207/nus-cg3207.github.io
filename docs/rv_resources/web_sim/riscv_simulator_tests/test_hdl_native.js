@@ -8,7 +8,8 @@
  * worker does. Both pages then do the same things - load the RV/ folder,
  * run, change a switch mid-recording - and their recordings and waveforms
  * must be identical. The folder picker's selection and re-reading are
- * checked on the native page.
+ * checked on the native page, and so are runs recorded in chunks, which
+ * take input while they run.
  *
  * Needs a native build: cd electron && npm run build:iverilog
  * (or HDL_NATIVE_DIR pointing at one).
@@ -296,6 +297,132 @@ setTimeout(async () => {
       p.win.setHdlWaveTop(false);
     }
     check('Both engines resume to the same recording', resumed.native.steps === resumed.wasm.steps);
+
+    // --- 7. Run in chunks, taking input while it runs ---------------------
+    console.log('\n[7] Run records in chunks and takes input while it runs');
+    {
+      const { win, doc } = nat;
+      const st = () => doc.getElementById('statusBar').textContent;
+      const archOf = t => JSON.stringify(t.steps.map(s => [s.cyc, s.pc, s.instr, s.regw, s.memw, s.per]));
+      const fresh = async () => { win.resetAll(); await win.loadExample('dip_led'); win.setDipSwitches(0xad); };
+      win.setHdlDumpVcd(false);
+      win.setHdlWaveTop(false);
+      win.setHdlCycles(100000);
+      await fresh();
+      const run = win.runHdlSimulation();
+      check('Run shows its progress chunk by chunk', await until(() => /running - cycle/.test(st()), 60000));
+      await until(() => win.getHdlTrace() && win.getHdlTrace().budget > 33000, 60000);
+      win.setDipSwitches(0x72);
+      const ledSoon = await until(() => win.getLedState() === 0x72, 5000);
+      await run;
+      let t = win.getHdlTrace();
+      check('A switch moved while it runs takes effect while it runs', ledSoon);
+      check('…and is on the timeline at the cycle shown (' + JSON.stringify(t.timeline.stim) + ')',
+        t.timeline.stim.length === 1 && t.timeline.stim[0].cycle > 30000 && t.budget === 100000);
+      const arch = archOf(t), stim = t.timeline.stim.slice();
+      win.hdlDiscardTrace();
+      win.hdlSetStim(stim);
+      check('…and the recording is the one a run from reset with that timeline makes',
+        archOf(await win.hdlBuildTrace(100000, { quiet: true })) === arch);
+
+      await fresh();
+      const r2 = win.runHdlSimulation();
+      await until(() => win.getHdlTrace() && win.getHdlTrace().budget > 25000, 60000);
+      win.toggleRunPause();
+      await r2;
+      const b1 = win.getHdlTrace().budget;
+      check('Pause stops it part-way (' + b1 + ')', b1 < 100000 && /paused/.test(st()));
+      await win.runHdlSimulation();
+      check('Run then carries on for another Cycles per Run', win.getHdlTrace().budget === b1 + 100000);
+
+      await fresh();
+      const bpLine = win.editor.value.split('\n').findIndex(l => /^\s*sw\s+s4/.test(l)) + 1;
+      win.toggleBreakpoint(bpLine);
+      await win.runHdlSimulation();
+      await sleep(300);
+      t = win.getHdlTrace();
+      check('A breakpoint stops it on its line, in the first chunk (' + t.budget + ' cycles)',
+        bpLine > 0 && win.sourceLineForPc(t.steps[win.getHdlIndex()].pc) === bpLine && t.budget < 100000);
+      win.toggleBreakpoint(bpLine);
+
+      await fresh();
+      win.setClkDivBits(16);                         // 1.53 kHz
+      win.setRunPace('real');
+      const r3 = win.runHdlSimulation();
+      await until(() => /running - cycle/.test(st()), 60000);
+      await sleep(1500);
+      const shownAt = win.getHdlTrace().steps[win.getHdlIndex()].cyc;
+      win.setDipSwitches(0x5a);
+      const ledRt = await until(() => win.getLedState() === 0x5a, 3000);
+      win.toggleRunPause();
+      await r3;
+      check('At Real time it is shown at the clock (cycle ' + shownAt + ' after about 1.5 s)', shownAt > 1000 && shownAt < 5000);
+      check('…and a switch moved then shows within 3 s', ledRt);
+      win.setRunPace('max');
+      win.setClkDivBits(5);
+
+      await fresh();
+      win.setHdlTrace(false);
+      const r4 = win.runHdlSimulation();
+      await until(() => win.getHdlTrace() && win.getHdlTrace().budget > 33000, 60000);
+      win.setDipSwitches(0x33);
+      const ledNt = await until(() => win.getLedState() === 0x33, 5000);
+      await r4;
+      check('Without the trace too', ledNt);
+      check('…and the summary leaves out an instruction count it does not have', !/0 instructions/.test(st()) && /100,000 cycles/.test(doc.body.textContent));
+      win.setHdlTrace(true);
+
+      await fresh();
+      win.setHdlDumpVcd(true);
+      win.setHdlWaveTop(true);
+      win.setHdlCycles(20000);
+      await win.runHdlSimulation();
+      const wv = win.getHdlLastVcd(), wa = archOf(win.getHdlTrace());
+      win.hdlDiscardTrace();
+      await win.hdlBuildTrace(20000, { quiet: true });
+      check('With the waveform on, a run in chunks records the waveform and recording one run would',
+        wa === archOf(win.getHdlTrace()) && vcdSame(win, wv, win.getHdlLastVcd()));
+
+      // A longer run keeps only about the last 50,000 cycles of the
+      // waveform, and what it keeps is what a run from reset records there.
+      // What the page shows while it runs is carried on from one chunk to the
+      // next; it must be what showing that point from scratch shows.
+      await fresh();
+      win.setHdlCycles(90000);
+      const seen = [];
+      const r5 = win.runHdlSimulation();
+      await until(() => {
+        const t = win.getHdlTrace();
+        if (t && win.getHdlIndex() > 0 && t.budget > 25000 * (seen.length + 1))
+          seen.push({ i: win.getHdlIndex(), regs: Array.from(win.getRegs()).join(), led: win.getLedState() });
+        return seen.length >= 3;
+      }, 120000);
+      await r5;
+      const again = seen.map(s => { win.hdlSeek(s.i); return Array.from(win.getRegs()).join() === s.regs && win.getLedState() === s.led; });
+      check('What it shows while it runs is that point of the recording (' + seen.map(s => s.i).join(', ') + ')',
+        seen.length === 3 && again.every(Boolean));
+      const span = v => {
+        const p = win.parseVcd(v), tick = win.waveTicksPerCycle(p);
+        const at = +/\$enddefinitions[\s\S]*?^#(\d+)$/m.exec(v)[1];
+        return { p, at, cycles: (p.endTime - at) / tick };
+      };
+      const ch = span(win.getHdlLastVcd());
+      win.hdlDiscardTrace();
+      await win.hdlBuildTrace(90000, { quiet: true });
+      const rs = span(win.getHdlLastVcd());
+      const from = Math.max(ch.at, rs.at);
+      const tailOf = (p, id) => {
+        const c = p.changes.get(id) || { times: [], values: [] };
+        let k = 0;
+        while (k < c.times.length && c.times[k] <= from) k++;
+        return (k ? c.values[k - 1] : '') + '|' + c.times.slice(k).join() + '|' + c.values.slice(k).join();
+      };
+      check('A 90,000-cycle run keeps the waveform of its last ' + Math.round(ch.cycles) + ' cycles',
+        ch.cycles >= 50000 && ch.cycles <= 62500 && rs.cycles >= 50000 && rs.cycles <= 62500);
+      check('…the same as a run from reset over the cycles both keep',
+        ch.p.vars.length === rs.p.vars.length && ch.p.vars.every(v => tailOf(ch.p, v.id) === tailOf(rs.p, v.id)));
+      win.setHdlWaveTop(false);
+    }
 
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {

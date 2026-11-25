@@ -153,17 +153,21 @@ folder instead, which is not read again, so pick the folder again after editing.
 ### How HDL simulation runs
 
 Although stepping looks the same as in JavaScript mode, the design is not simulated one step
-at a time. Icarus Verilog cannot be paused, so each Run simulates a fixed number of cycles
-(*Cycles per Run/Resume*) from start to finish and records the result. Step, Back and
-breakpoints then move through that recording.
+at a time. Icarus Verilog cannot take input while it runs, so Run simulates *Cycles per
+Run/Resume* in stretches of a fraction of a second, each starting from a checkpoint at the end
+of the last, and records them; the page shows each stretch as it arrives. Step, Back and
+breakpoints move through that recording.
 
-- A simulation takes time in proportion to the number of cycles. It runs in the background,
-  and **Reset** stops it.
-- **Changing an input re-runs the simulation** with the change applied at the current cycle,
-  and then returns to that cycle. The re-run starts from the last checkpoint before that
-  cycle and records *Cycles per Run/Resume* past it; what had been recorded after the
-  change is discarded. An input changed while a simulation is running takes effect at the
-  cycle where that simulation stops.
+- A simulation takes time in proportion to the number of cycles. A Run with Icarus records
+  *Cycles per Run / Resume* (200,000 by default, about 11 s in the desktop app and a few times
+  that in a browser; 50,000 with post-synthesis simulation on). **Pause** stops it after the
+  current stretch, and **Reset** stops it at once.
+- **Changing an input** applies it at the cycle shown, whether the simulation is running or
+  paused. What had been recorded past that cycle is simulated again with the change, from the
+  last checkpoint before it; while running, the change shows within a fraction of a second,
+  and while paused the re-run records *Cycles per Run/Resume* past it. With post-synthesis
+  simulation on, a Run is recorded in one go and cannot be paused, since the netlist can only be
+  simulated from reset; an input changed while it runs takes effect where it stops.
 - Resuming, or stepping past the end of the recording, simulates further cycles, starting
   from a checkpoint taken just before the end of the recording.
 - Checkpoints are taken every 1024 cycles or more (every 200,000 with Verilator in the
@@ -235,7 +239,8 @@ compilation error.
   *Signals: Wrapper only* leaves out everything inside `RV`, which makes runs about a
   quarter faster; to see an internal signal, choose *All* and run again from Reset.
   Memories are not recorded in a VCD; their contents are shown in the Memory panel. Clicking
-  a cycle in the waveform moves the whole simulator to that cycle. The VCD can be downloaded for
+  a cycle in the waveform moves the whole simulator to that cycle. The waveform covers about the
+  last 50,000 cycles of a longer run. The VCD can be downloaded for
   GTKWave or [Surfer](https://surfer-project.org/).
 - If every register shows `xxxxxxxx`, either none has been written yet or the register file
   was not found; the Registers panel indicates which.
@@ -260,8 +265,7 @@ looks and behaves like the page, with these differences:
   effect while it runs, and it continues until **Pause**, a breakpoint or *Cycles per Run /
   Resume* (20,000,000 by default). Back reaches only the last 2,000,000 cycles of a longer
   run. *Real time* slows the simulation to the set clock, and with the waveform *Built: While
-  running* it follows the simulation, which is useful at a slow clock. The waveform covers at most the
-  last 50,000 cycles.
+  running* it follows the simulation, which is useful at a slow clock.
 - Verilator needs a C++ compiler. On a computer without one (`g++` on Linux, the Xcode
   command line tools on macOS), the first build downloads one, about 60 MB (100 MB on
   Windows), and takes about a minute. Later builds use it offline.

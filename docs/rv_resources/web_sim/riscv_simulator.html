@@ -4170,7 +4170,7 @@
             <div class="sim-card">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
                 <label for="hdlCycles" style="font-weight:600;color:#cba6f7;font-size:13px;">Cycles per Run / Resume</label>
-                <input type="number" id="hdlCycles" value="2000" min="1" max="2000000"
+                <input type="number" id="hdlCycles" value="200000" min="1" max="2000000"
                   onchange="setHdlCycles(this.value)"
                   style="width:110px;padding:4px 8px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-family:inherit;font-size:12px;text-align:right;">
               </div>
@@ -4256,7 +4256,8 @@
             </div>
 
             <div class="sim-card" id="hdlSynthCard">
-              <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:#cba6f7;cursor:pointer;font-size:13px;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:#cba6f7;cursor:pointer;font-size:13px;"
+                title="The netlist has no checkpoints to continue from, and is checked against one RTL run of the same length from reset, so a Run with this on is simulated in one go: it cannot be paused (Reset stops it), and an input changed meanwhile takes effect where it ends. Cycles per Run is 50,000 by default while it is on.">
                 <input type="checkbox" id="hdlSynth" onchange="setHdlSynth(this.checked)"
                   style="accent-color:#cba6f7;width:16px;height:16px;cursor:pointer;">
                 Post-synthesis functional simulation
@@ -4264,6 +4265,7 @@
               <span style="font-size:11.5px;color:#a6adc8;line-height:1.4;">
                 Synthesises your core with Yosys and checks the netlist against your RTL.
                 Slow: 20–35 s each time the Verilog changes, then a second, slower run.
+                A Run is simulated in one go and cannot be paused.
               </span>
               <details class="hdl-note">
                 <summary>What this does, and the one-off download</summary>
@@ -13109,9 +13111,8 @@ int main()
         set('hdlGeneration', '2005', 'value');
         set('hdlRegPath', '', 'value');
         setHdlSimulator('icarus');
-        setHdlCycles(HDL_CYCLES_DEFAULT[hdlSimulator]);
-        set('hdlCycles', String(hdlCycleBudget), 'value');
         setHdlDetail('full', true);
+        hdlShowCycles();
         setHdlRegPath();
         hdlRefreshRegPathHint();
         setStatus('HDL settings reset to defaults (sources kept)', 'info');
@@ -14502,11 +14503,11 @@ int main()
 
     function toggleRunPause() {
       // In HDL mode the Run button drives the Verilog engine instead of the
-      // JavaScript model. vvp cannot be paused mid-run, so Run records the
-      // whole simulation in one go; Step and Back then move through that
-      // recording, which is why there is no pause to mirror here.
+      // JavaScript model. Pause ends a live Verilator run, or a chunked Icarus
+      // run after its current chunk, or else playback of the recording.
       if (simEngineMode === 'hdl') {
         if (hdlLive) { hdlLiveStop(); return; }
+        if (hdlChunkedStop()) return;
         if (hdlStopPlay()) {
           setStatus('HDL playback paused at cycle ' + totalCycles + ' - Run carries on', 'info');
           return;
@@ -15217,16 +15218,20 @@ int main()
     let hdlEngineBase = null;     // the base URL that actually loaded
     let hdlEngineLoading = null;  // in-flight promise (de-dupes concurrent loads)
     let hdlFiles = [];            // [{ name, src }] uploaded Verilog sources
-    let hdlLastVcd = null;        // most recent VCD text, for download
+    let hdlMemCache = null;       // { key, mem }: the memory images hdlPrepareRun last built
+    let hdlLastVcd = null;        // the waveform: VCD text (Verilator) or an hdlVcdDoc (Icarus)
     let hdlRunning = false;
-    // Cycles a run records, per simulator: Verilator's live runs are the
-    // point of choosing it, and 2000 cycles would be over before they began.
-    const HDL_CYCLES_DEFAULT = { icarus: 2000, verilator: 20000000 };
+    // Cycles a run records, per simulator: long enough to use the inputs
+    // while it runs (about 11 s natively with Icarus).
+    // A post-synthesis run is recorded in one go, and the netlist simulates
+    // several times slower, so it has a shorter one.
+    const HDL_CYCLES_DEFAULT = { icarus: 200000, synth: 50000, verilator: 20000000 };
     const HDL_MAX_CYCLES = 2000000;      // Icarus: the whole recording is kept
     const HDL_VL_MAX_RUN = 1000000000;   // Verilator: one run; the recording is trimmed (HDL_VL_KEEP)
-    // A waveform of a long Verilator run is the last this many cycles of it;
-    // the whole run would be hundreds of megabytes.
-    const HDL_VL_VCD_WINDOW = 50000;
+    // A waveform of a long run is the last this many cycles of it (Icarus
+    // drops the oldest in steps, so up to a quarter more); the whole run
+    // would be hundreds of megabytes.
+    const HDL_VCD_WINDOW = 50000;
     // A waveform followed during a live run is dropped past this size.
     const HDL_LIVE_VCD_MAX = 20e6;
     // Without the architectural trace, a live run folds its peripheral
@@ -16602,6 +16607,9 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
   //------------------------------------------------------------------
   import "DPI-C" function int cg3207_live_poll(input int cycle, input int from,
                                                output int code, output int value);
+  // $dumpflush and $dumpoff compile to nothing in Verilator; the helper
+  // flushes (1) or closes (0) the dump instead.
+  import "DPI-C" context function void cg3207_vcd(input int op);
   integer live = 0, live_from = 0, live_code, live_value, live_at;
   initial if ($test\$plusargs("LIVE")) begin
     live = 1;
@@ -16625,8 +16633,8 @@ ${dbufPorts}    .ACCEL_Data(ACCEL_Data), .ACCEL_DReady(ACCEL_DReady),
                $display("@@U %0d %0h", live_at, live_value & 32'hFF);
              end
           6: max_cycles = cyc + 1;
-          7: $dumpflush;
-          8: $dumpoff;
+          7: cg3207_vcd(1);
+          8: cg3207_vcd(0);
           default: ;
         endcase
         if (live_code >= 1 && live_code <= 4) $display("@@V %0d %0d %0h", cyc + 1, live_code, live_value);
@@ -16767,7 +16775,7 @@ endmodule
     // Verilator runs fast enough to need checkpoints only far apart, and only
     // near the end of the recording: Resume starts there, an input change
     // while paused is usually made there, and the waveform built on Pause
-    // covers the last HDL_VL_VCD_WINDOW cycles. A recording keeps the two
+    // covers the last HDL_VCD_WINDOW cycles. A recording keeps the two
     // newest (t.vlCks, newest first); one checked the same way as above that
     // does not reproduce the recording turns them off for those sources.
     const HDL_VL_CK_EVERY = 200000;
@@ -16786,7 +16794,7 @@ endmodule
     const HDL_CK_CYC_LINE = hdlCkTbState(null, false).scalars.indexOf('cyc');
 
     function hdlVlCkPick(t, key, limit) {
-      if (!t || t.vlKey !== key || !t.vlCks) return null;
+      if (!t || t.joinKey !== key || !t.vlCks) return null;
       return t.vlCks.find(c => c.k > 0 && c.k <= limit) || null;
     }
     function hdlVlCkFailed(k, key) {
@@ -16807,7 +16815,7 @@ endmodule
     // on at `from`; what it printed before that goes aside, to be checked
     // against the recording. Records are routed by their own cycle, which can
     // trail the order they are printed in by one.
-    function hdlVlSplit(from) {
+    function hdlJoinSplit(from) {
       let partial = '', past = false, seen = 0;
       const route = parts => {
         const main = [], over = [];
@@ -16836,7 +16844,7 @@ endmodule
     // The records of a recording from cycle lo up to hi, each with its own
     // cycle, in an order that does not depend on how they were grouped into
     // steps. UART acknowledgements carry no cycle once parsed, and are left out.
-    function hdlVlRecords(t, lo, hi) {
+    function hdlRecordList(t, lo, hi) {
       const out = [];
       const add = r => { if (r[1] >= lo && r[1] < hi) out.push(JSON.stringify(r)); };
       const per = list => { for (const [k, f] of list) add([k, parseInt(f[0], 10)].concat(f.slice(1))); };
@@ -16855,12 +16863,12 @@ endmodule
     }
     // Where a check against recording t can start: a recording folded into a
     // snapshot no longer holds what came before it.
-    function hdlVlCheckFrom(t, k) { return Math.max(k, t.base ? t.base.cyc + 2 : 0); }
-    function hdlVlVerify(oldRecs, overText, lo, hi) {
+    function hdlCheckFrom(t, k) { return Math.max(k, t.base ? t.base.cyc + 2 : 0); }
+    function hdlJoinCheck(oldRecs, overText, lo, hi) {
       if (/^@@K/m.test(overText)) return false;
       const p = hdlTraceParser();
       p.feed(overText);
-      const got = hdlVlRecords(p.finish(), lo, hi);
+      const got = hdlRecordList(p.finish(), lo, hi);
       return got.length === oldRecs.length && got.every((r, i) => r === oldRecs[i]);
     }
 
@@ -17196,72 +17204,141 @@ endmodule
       return diff;
     }
 
-    // Every record carries the cycle it belongs to, in order, so the old
-    // recording up to cycle k and the new one from k join cleanly. Returns
-    // null when the new run does not reproduce the old one over
-    // [k, verifyTo), the stretch both of them cover.
+    // The cycle a record belongs to; @@N and @@F, which close a run, come
+    // after every cycle of it.
     function hdlRecCycle(line) {
       const m = /^@@([A-Z]) (\d+)/.exec(line);
       return m ? (m[1] === 'N' || m[1] === 'F' ? Infinity : +m[2]) : null;
     }
-    function hdlStitch(oldOut, newOut, k, verifyTo) {
-      const a = oldOut.split('\n'), b = newOut.split('\n');
-      if (b.some(l => l.startsWith('@@K'))) return null;
-      let cut = a.findIndex(l => { const c = hdlRecCycle(l); return c !== null && c >= k; });
-      if (cut < 0) cut = a.length;
-      // Whatever the new run printed before its first record, it printed at
-      // time 0, and the old run's copy of that is already kept.
-      const first = b.findIndex(l => hdlRecCycle(l) !== null);
-      const tail = first < 0 ? [] : b.slice(first);
-      const span = lines => lines.filter(l => { const c = hdlRecCycle(l); return c !== null && c >= k && c < verifyTo; });
-      const x = span(a), y = span(tail);
-      if (x.length !== y.length || x.some((l, i) => l !== y[i])) return null;
-      return a.slice(0, cut).concat(tail).join('\n');
+
+    // An Icarus waveform as it is kept between runs: the declarations, the
+    // values at time `at` (0, or the start of the window), and the changes
+    // after it in pieces, one per run joined on. A join costs the length of
+    // what it adds rather than of the whole waveform, and the window drops
+    // the oldest changes by folding them into the starting values.
+    // `fixed` holds the ids whose starting value is still the one set at
+    // time 0: what the testbench reads from its plusargs (the cycle budget,
+    // how many input changes there are) can differ between runs, and the
+    // newest run's time-0 values are the ones that hold for the whole.
+    function hdlVcdId(l) { return /^[bBrR]/.test(l) ? l.slice(l.indexOf(' ') + 1) : l.slice(1); }
+
+    function hdlVcdFold(s, end, vals, fixed) {
+      for (let i = 0; i < end;) {
+        let j = s.indexOf('\n', i);
+        if (j < 0 || j > end) j = end;
+        const l = s.slice(i, j).trim();
+        if (l && l[0] !== '$' && l[0] !== '#') {
+          const id = hdlVcdId(l);
+          vals.set(id, l);
+          if (fixed) fixed.delete(id);
+        }
+        i = j + 1;
+      }
     }
 
-    // The waveform the same way: the old dump up to the checkpoint, then the
-    // new one moved to where it belongs. The restore happens 1 ns into the
-    // new run, against 10 ns per cycle (the testbench's `always #5`) plus
-    // 1 ns in the old one, so its times move by 10k ns.
-    function hdlStitchVcd(a, b, k) {
-      const ts = /\$timescale\s+(\d+)\s*(s|ms|us|ns|ps|fs)\s+\$end/.exec(b);
-      const unit = ts ? +ts[1] * { s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9, ps: 1e-12, fs: 1e-15 }[ts[2]] : 1e-9;
-      const shift = Math.round(10 * k * 1e-9 / unit);
-      // What the testbench reads from its plusargs (the cycle budget, how
-      // many input changes there are) is set at time 0 and can differ
-      // between the two runs; the new run's time-0 values are the ones that
-      // hold for the joined recording.
-      const zero = text => {
-        const from = text.indexOf('\n#0\n', text.indexOf('$enddefinitions'));
-        if (from < 0) return null;
-        const next = text.slice(from + 4).search(/^#\d+$/m);
-        const to = next < 0 ? text.length : from + 4 + next;
-        const ids = new Map();
-        for (const line of text.slice(from + 4, to).split('\n')) {
-          const l = line.trim();
-          if (l && l[0] !== '$') ids.set(/^[bBrR]/.test(l) ? l.slice(l.indexOf(' ') + 1) : l.slice(1), l);
-        }
-        return { from: from + 4, to, ids };
-      };
-      const za = zero(a), zb = zero(b);
-      if (za && zb) {
-        const sec = a.slice(za.from, za.to).split('\n').map(line => {
-          const l = line.trim();
-          if (!l || l[0] === '$') return line;
-          const v = zb.ids.get(/^[bBrR]/.test(l) ? l.slice(l.indexOf(' ') + 1) : l.slice(1));
-          return v === undefined ? line : v;
-        }).join('\n');
-        a = a.slice(0, za.from) + sec + a.slice(za.to);
-      }
-      const cut = new RegExp('^#(\\d+)$', 'gm');
-      let m, keep = a.length;
-      while ((m = cut.exec(a)) !== null) if (+m[1] > shift) { keep = m.index; break; }
-      const body = b.slice(b.indexOf('$end', b.indexOf('$enddefinitions')) + 4);
+    // Where the first timestamp after `t` starts, searching forward or back.
+    function hdlVcdAfter(s, t) {
       const re = /^#(\d+)$/gm;
-      let from = body.length;
-      while ((m = re.exec(body)) !== null) if (+m[1] > 0) { from = m.index; break; }
-      return a.slice(0, keep) + body.slice(from).replace(/^#(\d+)$/gm, (_, t) => '#' + (+t + shift));
+      let m;
+      while ((m = re.exec(s)) !== null) if (+m[1] > t) return m.index;
+      return s.length;
     }
+    function hdlVcdCut(s, t) {
+      let keep = s.length;
+      for (let p = s.length; p > 0;) {
+        const i = s.lastIndexOf('\n#', p - 1), at = i + 1;
+        const nl = s.indexOf('\n', at + 1);
+        const v = s.slice(at + 1, nl < 0 ? s.length : nl);
+        if (s[at] === '#' && /^\d+$/.test(v)) { if (+v > t) keep = at; else break; }
+        if (i < 0) break;
+        p = i;
+      }
+      return keep;
+    }
+    function hdlVcdLast(s) {
+      const i = s.lastIndexOf('\n#');
+      const m = i < 0 ? null : /^#(\d+)$/m.exec(s.slice(i + 1, s.indexOf('\n', i + 1) < 0 ? s.length : s.indexOf('\n', i + 1)));
+      return m ? +m[1] : 0;
+    }
+
+    function hdlVcdDoc(text, raw) {
+      if (!text || typeof text !== 'string') return text || null;
+      const d = text.indexOf('$enddefinitions');
+      if (d < 0) return text;
+      const defsEnd = text.indexOf('$end', d + 15) + 4;
+      const ts = /\$timescale\s+(\d+)\s*(s|ms|us|ns|ps|fs)\s+\$end/.exec(text);
+      const unit = ts ? +ts[1] * { s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9, ps: 1e-12, fs: 1e-15 }[ts[2]] : 1e-9;
+      const fi = defsEnd + hdlVcdAfter(text.slice(defsEnd), -1);
+      const first = fi < text.length ? /^#(\d+)/.exec(text.slice(fi, fi + 32)) : null;
+      // Everything before the first timestamp stays as it is: Icarus puts the
+      // parameters' values there, in a $dumpall.
+      const doc = { defs: text.slice(0, fi), unit, at: first ? +first[1] : 0,
+                    vals: new Map(), fixed: new Set(), parts: [], end: 0 };
+      if (first) {
+        const from = fi + first[0].length;
+        const rest = hdlVcdAfter(text.slice(from), -1);
+        hdlVcdFold(text.slice(from, from + rest), rest, doc.vals, null);
+        if (doc.at === 0) doc.fixed = new Set(doc.vals.keys());
+        if (from + rest < text.length) {
+          const body = text.slice(from + rest);
+          doc.parts.push({ t: +/^#(\d+)/.exec(body)[1], text: body });
+        }
+        doc.end = Math.max(doc.at, hdlVcdLast(text));
+      }
+      return raw ? doc : hdlVcdWindow(doc);
+    }
+
+    function hdlVcdText(v) {
+      if (!v || typeof v === 'string') return v || null;
+      const init = [...v.vals.values()];
+      return v.defs + (/\n$/.test(v.defs) ? '' : '\n') + '#' + v.at + '\n$dumpvars\n' + init.join('\n') + (init.length ? '\n' : '') +
+        '$end\n' + v.parts.map(p => p.text).join('');
+    }
+
+    function hdlVcdWindow(v) {
+      const span = Math.round(HDL_VCD_WINDOW * 10e-9 / v.unit);
+      if (v.end - v.at <= span * 1.25) return v;
+      const to = v.end - span;
+      while (v.parts.length) {
+        const p = v.parts[0], i = hdlVcdAfter(p.text, to);
+        hdlVcdFold(p.text, i, v.vals, v.fixed);
+        if (i < p.text.length) { v.parts[0] = { t: +/^#(\d+)/.exec(p.text.slice(i, i + 32))[1], text: p.text.slice(i) }; break; }
+        v.parts.shift();
+      }
+      v.at = to;
+      return v;
+    }
+
+    // A run from the checkpoint at cycle k joined onto the waveform: the old
+    // one up to the checkpoint, then the new one moved to where it belongs.
+    // The restore happens 1 ns into the new run, against 10 ns per cycle (the
+    // testbench's `always #5`) plus 1 ns in the old one, so its times move
+    // by 10k ns.
+    function hdlVcdJoin(a, b, k) {
+      const nb = hdlVcdDoc(b, true);
+      if (!nb || typeof nb === 'string') return nb;
+      const shift = Math.round(10 * k * 1e-9 / nb.unit);
+      const moved = nb.parts.map(p => ({ t: p.t + shift, text: p.text.replace(/^#(\d+)$/gm, (_, t) => '#' + (+t + shift)) }));
+      a = hdlVcdDoc(a, true);
+      // A join before the window's start has nothing left to join onto; the
+      // new run alone covers the window.
+      if (!a || typeof a === 'string' || shift < a.at) {
+        return hdlVcdWindow({ defs: nb.defs, unit: nb.unit, at: nb.at + shift, vals: nb.vals, fixed: nb.fixed,
+                              parts: moved, end: nb.end + shift });
+      }
+      const vals = new Map(a.vals), fixed = new Set(a.fixed);
+      for (const id of fixed) if (nb.vals.has(id)) vals.set(id, nb.vals.get(id));
+      const parts = a.parts.slice();
+      while (parts.length && parts[parts.length - 1].t > shift) parts.pop();
+      if (parts.length) {
+        const p = parts[parts.length - 1], i = hdlVcdCut(p.text, shift);
+        if (i < p.text.length) parts[parts.length - 1] = { t: p.t, text: p.text.slice(0, i) };
+      }
+      return hdlVcdWindow({ defs: a.defs, unit: a.unit, at: a.at, vals, fixed, parts: parts.concat(moved),
+                            end: moved.length ? nb.end + shift : Math.min(a.end, shift) });
+    }
+
+    function hdlStitchVcd(a, b, k) { return hdlVcdText(hdlVcdJoin(a, b, k)); }
 
     // Keep the newest checkpoints at an even spacing that doubles as the
     // recording grows, plus the last one, which is where an extension starts.
@@ -17328,7 +17405,7 @@ endmodule
     // Because nothing program-specific reaches the Verilog any more, the
     // compiled binary only has to be rebuilt when the sources themselves
     // change. Runs, steps and input edits all reuse it.
-    async function hdlEnsureCompiled() {
+    async function hdlEnsureCompiled(quiet) {
       const gen = (document.getElementById('hdlGeneration') || {}).value || '2005';
       let rb = hdlRegBankPath();
       const dbuf = hdlHasDoubleBuffer();
@@ -17342,7 +17419,7 @@ endmodule
       let src = build();
       const key = hdlHash(hdlSimulator + (vl && hdlWaveTop ? ' top ' : ' ') + gen + ' ' + hdlAllSources() + ' ' + src.tb + ' ' + src.ck);
       if (hdlVvpCache && hdlVvpCache.key === key) {
-        hdlLog('Reusing the compiled design (sources unchanged).', 'sys');
+        if (!quiet) hdlLog('Reusing the compiled design (sources unchanged).', 'sys');
         return hdlVvpCache;
       }
       if (state.off) hdlLog('Checkpoints are off for these sources (' + state.off +
@@ -17737,8 +17814,8 @@ endmodule
       ];
       if (hdlDumpVcd) plus.push('+VCD');
       if (hdlDumpVcd && hdlWaveTop) plus.push('+VCDTOP');
-      if (hdlDumpVcd && hdlSimulator === 'verilator' && budget > HDL_VL_VCD_WINDOW)
-        plus.push('+VCDFROM=' + (budget - HDL_VL_VCD_WINDOW));
+      if (hdlDumpVcd && hdlSimulator === 'verilator' && budget > HDL_VCD_WINDOW)
+        plus.push('+VCDFROM=' + (budget - HDL_VCD_WINDOW));
       return plus;
     }
 
@@ -17764,7 +17841,8 @@ endmodule
       // $writememb warns about every memory declared high-to-low, at every
       // checkpoint; saving and restoring read it the same way, so it is noise.
       s.out = s.out.split('\n').filter(l => !/\/cg3207_hdl_ck\.v:\d+:/.test(l) &&
-        !/^- (cg3207_hdl_tb\.v:\d+: Verilog \$finish|S i m u l a t i o n|Verilator: )/.test(l)).join('\n');
+        !/^- (cg3207_hdl_tb\.v:\d+: Verilog \$finish|S i m u l a t i o n|Verilator: )/.test(l) &&
+        !/^(\S*\/)?cg3207_hdl_tb\.v:\d+: \$finish called at /.test(l)).join('\n');
       return s;
     }
 
@@ -17785,10 +17863,19 @@ endmodule
       // been writing into `memory`, and those writes must not be handed back
       // to the hardware as if they were initial contents. Done before the
       // engine loads, so a program that cannot fit is refused in a moment
-      // rather than after a minute of compiling.
-      loadProgram(machineCode);
+      // rather than after a minute of compiling. Loading the image resets
+      // what the page shows, so it is done once per program and Wrapper: a
+      // run recorded in chunks carries on from what it last showed.
       hdlSyncReferenceWrapperDepths();
-      const mem = hdlMemFiles(wrapper.src);
+      const memKey = [machineCode, baseAddress, dataBase, wrapper.src];
+      let mem;
+      if (hdlMemCache && hdlMemCache.key.every((v, i) => v === memKey[i])) {
+        mem = hdlMemCache.mem;
+      } else {
+        loadProgram(machineCode);
+        mem = hdlMemFiles(wrapper.src);
+        hdlMemCache = { key: memKey, mem };
+      }
       hdlDmemBytes = Math.pow(2, mem.dmemBits);
       if (!opts.quiet) {
         hdlLog('Program image: ' + mem.codeWords + ' instruction words into an IROM of ' +
@@ -17817,9 +17904,16 @@ endmodule
       }
 
       await loadHdlEngine();
-      const compiled = await hdlEnsureCompiled();
+      const compiled = await hdlEnsureCompiled(opts.chunk && opts.quiet);
       if (!compiled) return null;
       return { mem, compiled };
+    }
+
+    // Counted from reset, a trimmed recording included. Without the
+    // architectural trace nothing counts instructions, so only cycles are said.
+    function hdlRunSummary(t, cycles) {
+      const n = (t.offset || 0) + t.steps.length;
+      return (n ? n.toLocaleString() + ' instructions in ' : '') + Number(cycles).toLocaleString() + ' cycles';
     }
 
     async function hdlBuildTrace(budget, opts) {
@@ -17828,115 +17922,110 @@ endmodule
       const prep = await hdlPrepareRun(opts);
       if (!prep) return null;
       const { mem, compiled } = prep;
+      const vl = hdlSimulator === 'verilator';
 
       const lvl = hdlTraceEnabled ? 2 : 1;
       const timeline = { stim: hdlStim.slice(), rx: hdlRx.slice() };
-      // Checkpoints belong to one compiled design, program, starting inputs
-      // and trace level; anything else starts a new set.
-      const ckKey = compiled.ck && !(hdlCkOff && hdlCkOff.key === compiled.key)
-        ? hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'))
-        : null;
+      // A recording belongs to one compiled design, program, starting inputs
+      // and trace level; another run of the same can be joined onto it.
+      const joinKey = hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'));
+      // Icarus's checkpoints belong to the same; anything else starts a new set.
+      const ckKey = !vl && compiled.ck && !(hdlCkOff && hdlCkOff.key === compiled.key) ? joinKey : null;
       if (!ckKey) hdlCk = null;
       else if (!hdlCk || hdlCk.key !== ckKey) hdlCk = { key: ckKey, every: HDL_CK_EVERY, at: new Map() };
 
-      // Start from the latest checkpoint that the old recording and this
-      // run share, leaving enough of the old recording after it to check
-      // the replay against.
-      const old = ckKey && hdlTrace && hdlTrace.ckKey === ckKey && hdlTrace.raw ? hdlTrace : null;
+      // A replay prints only from the first cycle its inputs differ from the
+      // recording's (+TRACEFROM), and is joined on there, so only what is new
+      // is parsed. Icarus's waveform is joined too, which needs the old one in
+      // the same scope; Verilator's covers its own window.
       const vcdScope = hdlDumpVcd ? (hdlWaveTop ? 'top' : 'all') : null;
-      let from = null;
-      if (old && (!hdlDumpVcd || (hdlLastVcd && old.vcdScope === vcdScope))) {
-        const diff = hdlTimelineDiff(old.timeline, timeline);
-        for (const k of [...hdlCk.at.keys()]) if (k >= diff) hdlCk.at.delete(k);
-        const verifyTo = Math.min(diff, old.budget - 1);
+      let joinAt = 0;
+      if (!opts.fresh && hdlTrace && hdlTrace.joinKey === joinKey && hdlTrace.timeline &&
+          (vl || !hdlDumpVcd || (hdlLastVcd && hdlTrace.vcdScope === vcdScope))) {
+        const diff = hdlTimelineDiff(hdlTrace.timeline, timeline);
+        if (hdlCk) for (const k of [...hdlCk.at.keys()]) if (k >= diff) hdlCk.at.delete(k);
+        const c = Math.min(diff, hdlTrace.budget, budget);
+        if (c > (hdlTrace.base ? hdlTrace.base.cyc : 0)) joinAt = c;
+      }
+      // It starts from the newest checkpoint that leaves some of the recording
+      // before the join to check the replay against, or from reset.
+      const vlCkOn = () => !!(vl && compiled.vlCk && hdlVlCkOff !== compiled.key);
+      let ck = null;
+      if (joinAt && vl && vlCkOn()) {
+        ck = hdlVlCkPick(hdlTrace, joinKey, Math.min(joinAt - HDL_CK_VERIFY,
+          hdlDumpVcd && budget > HDL_VCD_WINDOW ? budget - HDL_VCD_WINDOW : Infinity));
+      } else if (joinAt && hdlCk) {
         let best = -1;
-        for (const k of hdlCk.at.keys()) if (k <= verifyTo - HDL_CK_VERIFY && k < budget && k > best) best = k;
-        if (best > 0) from = Object.assign({ k: best, verifyTo }, hdlCk.at.get(best));
+        for (const k of hdlCk.at.keys()) if (k <= joinAt - HDL_CK_VERIFY && k < budget && k > best) best = k;
+        if (best > 0) ck = Object.assign({ k: best }, hdlCk.at.get(best));
       }
+      const vlKept = joinAt && vlCkOn() && hdlTrace.vlCks ? hdlTrace.vlCks.filter(c => c.k <= joinAt - HDL_CK_VERIFY) : [];
+      // A run from a checkpoint prints nothing before it anyway.
+      const args = c => (joinAt && !c ? ['+TRACEFROM=' + joinAt] : [])
+        .concat(vlCkOn() ? ['+CKEVERY=' + HDL_VL_CK_EVERY] : []);
 
-      // Verilator: a replay prints only from the first cycle its inputs
-      // differ from the recording's, and is joined on there. It starts from
-      // the newest checkpoint before that, or from reset.
-      const vlKey = hdlSimulator === 'verilator'
-        ? hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|')) : null;
-      let vlFrom = 0;
-      if (vlKey && hdlTrace && hdlTrace.vlKey === vlKey && hdlTrace.timeline) {
-        const c = Math.min(hdlTimelineDiff(hdlTrace.timeline, timeline), hdlTrace.budget);
-        if (c > (hdlTrace.base ? hdlTrace.base.cyc : 0)) vlFrom = c;
-      }
-      const vlCkOn = () => !!(vlKey && compiled.vlCk && hdlVlCkOff !== compiled.key);
-      let vlCk = vlFrom && vlCkOn() ? hdlVlCkPick(hdlTrace, vlKey, Math.min(vlFrom - HDL_CK_VERIFY,
-        hdlDumpVcd && budget > HDL_VL_VCD_WINDOW ? budget - HDL_VL_VCD_WINDOW : Infinity)) : null;
-      const vlKept = vlFrom && vlCkOn() && hdlTrace.vlCks ? hdlTrace.vlCks.filter(c => c.k <= vlFrom - HDL_CK_VERIFY) : [];
-      const vlArgs = c => vlKey ? (vlFrom ? ['+TRACEFROM=' + (c ? c.k : vlFrom)] : [])
-        .concat(vlCkOn() ? ['+CKEVERY=' + HDL_VL_CK_EVERY] : []) : null;
-
-      const startAt = from || vlCk;
-      hdlStatus(startAt ? 'simulating cycles ' + startAt.k + ' to ' + budget + '...'
+      if (!opts.chunk) hdlStatus(ck ? 'simulating cycles ' + ck.k + ' to ' + budget + '...'
         : 'simulating ' + budget + ' cycles...', 'busy');
       const t0 = performance.now();
-      let s = await hdlRunVvp(budget, lvl, mem.files, startAt, vlArgs(vlCk));
+      let s = await hdlRunVvp(budget, lvl, mem.files, ck, args(ck));
       if (epoch !== hdlEpoch) return null;
-      if (vlCk) {
-        const lo = hdlVlCheckFrom(hdlTrace, vlCk.k), hi = vlFrom - 2;
-        const sp = hdlVlSplit(vlFrom), a = sp.feed(s.out + '\n');
-        if (hdlVlVerify(hdlVlRecords(hdlTrace, lo, hi), a.over, lo, hi)) {
+      if (ck) {
+        const lo = hdlCheckFrom(hdlTrace, ck.k), hi = joinAt - 2;
+        const a = hdlJoinSplit(joinAt).feed(s.out + '\n');
+        if (hdlJoinCheck(hdlRecordList(hdlTrace, lo, hi), a.over, lo, hi)) {
           s.out = a.main;
-          s.vcd = hdlShiftVcd(s.vcd, vlCk.k);
+          s.vcd = !s.vcd ? null : vl ? hdlShiftVcd(s.vcd, ck.k) : hdlVcdJoin(hdlLastVcd, s.vcd, ck.k);
         } else {
-          hdlVlCkFailed(vlCk.k, compiled.key);
+          if (vl) hdlVlCkFailed(ck.k, compiled.key);
+          else {
+            hdlCkOff = { key: compiled.key };
+            hdlCk = null;
+            hdlLog('A replay from the checkpoint at cycle ' + ck.k + ' did not match the run it ' +
+              'replaced, so this design holds state the checkpoints do not save. Checkpoints are off ' +
+              'for these sources; this run, and every later one, starts from reset.', 'warn');
+          }
           hdlStatus('simulating ' + budget + ' cycles...', 'busy');
-          vlCk = null;
-          s = await hdlRunVvp(budget, lvl, mem.files, null, vlArgs(null));
+          ck = null;
+          s = await hdlRunVvp(budget, lvl, mem.files, null, args(null));
           if (epoch !== hdlEpoch) return null;
-        }
-      }
-      let out = s.out, vcd = s.vcd || null;
-      if (from) {
-        const joined = hdlStitch(old.raw, s.out, from.k, from.verifyTo);
-        if (joined !== null) {
-          out = joined;
-          if (vcd) vcd = hdlStitchVcd(hdlLastVcd, vcd, from.k);
-        } else {
-          hdlCkOff = { key: compiled.key };
-          hdlCk = null;
-          hdlLog('A replay from the checkpoint at cycle ' + from.k + ' did not match the run it ' +
-            'replaced, so this design holds state the checkpoints do not save. Checkpoints are off ' +
-            'for these sources; this run, and every later one, starts from reset.', 'warn');
-          hdlStatus('simulating ' + budget + ' cycles...', 'busy');
-          s = await hdlRunVvp(budget, lvl, mem.files, null);
-          if (epoch !== hdlEpoch) return null;
-          out = s.out;
-          vcd = s.vcd || null;
-          from = null;
         }
       }
       if (hdlCk) hdlCkAdd(s.ck);
+      const out = s.out, vcd = s.vcd || null;
       const t1 = performance.now();
 
-      hdlLastRtlOut = out;
+      // The post-synthesis check compares a whole run from reset.
+      hdlLastRtlOut = joinAt ? null : out;
       let t;
-      if (vlFrom) {
-        const p = hdlTraceParser(hdlCutTrace(hdlTrace, vlFrom));
+      if (joinAt) {
+        // A run following its own end goes on from where the page last
+        // showed it, when that is before the join.
+        const mark = hdlSeekMark && hdlSeekMark.trace === hdlTrace ? hdlSeekMark : null;
+        const pre = hdlTrace.pre.length;
+        const cut = hdlCutTrace(hdlTrace, joinAt);
+        const ls = mark && cut.steps[mark.idx - 1];
+        const keep = mark && cut.steps.length && mark.idx <= cut.steps.length && cut.pre.length === pre &&
+          (!ls || !mark.tail || (ls.regw.length >= mark.tail[0] && ls.memw.length >= mark.tail[1] &&
+                                 ls.per.length >= mark.tail[2] && (ls.acks || 0) >= mark.tail[3]));
+        const p = hdlTraceParser(cut);
         p.feed(out);
         t = p.finish();
+        if (keep) hdlSeekMark = Object.assign({}, mark, { trace: t });
       } else {
         t = hdlParseTrace(out);
       }
       t.budget = budget;
       t.regBank = compiled.regBank;
-      t.raw = vlKey ? null : out;
       t.timeline = timeline;
-      t.ckKey = hdlCk ? ckKey : null;
-      t.vlKey = vlKey;
+      t.joinKey = joinKey;
       t.vlCks = vlCkOn() ? hdlVlCkMerge(vlKept, s.ck) : null;
       t.vcdScope = vcd ? vcdScope : null;
       hdlTrace = t;
-      if (vlKey) hdlTrimTrace(t);
-      hdlLastVcd = vcd;
+      if (vl) hdlTrimTrace(t);
+      hdlLastVcd = vl ? vcd : hdlVcdDoc(vcd);
       refreshDownloadMenu();
 
-      if (hdlSynthEnabled && !opts.quiet) {
+      if (hdlSynthEnabled && !opts.quiet && hdlLastRtlOut) {
         try {
           await hdlPostSynthCheck(out, budget, lvl, mem.files);
         } catch (e) {
@@ -17949,8 +18038,7 @@ endmodule
         const noise = /\$readmemh\(AA_(IROM|DMEM)\.mem\): Not enough words/;
         const filtered = String(t.newOutput || '').split('\n').filter(l => l.trim() && !noise.test(l)).join('\n');
         if (filtered.trim()) hdlLog(filtered, 'out');
-        hdlLog('simulate ' + (t1 - t0).toFixed(0) + ' ms, ' + t.steps.length +
-          ' instructions in ' + budget + ' cycles' +
+        hdlLog('simulate ' + (t1 - t0).toFixed(0) + ' ms, ' + hdlRunSummary(t, budget) +
           (t.regBank ? ', registers via ' + t.regBank : ', registers unavailable'), 'sys');
       }
       return t;
@@ -18066,6 +18154,16 @@ endmodule
       let k = t.steps.length;
       while (k > 0 && t.steps[k - 1].cyc >= c) k--;
       t.steps.length = k;
+      // The last step kept can hold what a long instruction did in later
+      // cycles, which the run joined on prints again.
+      const before = (list, at) => list === HDL_NONE ? list : list.filter(e => at(e) < c);
+      const last = t.steps[k - 1];
+      if (last) {
+        last.per = before(last.per, e => parseInt(e[1][0], 10));
+        last.regw = before(last.regw, e => e[2]);
+        last.memw = before(last.memw, e => e[3]);
+      }
+      t.pre = before(t.pre, e => parseInt(e[1][0], 10));
       t.final = null;
       t.next = null;
       hdlSeekMark = null;
@@ -18104,6 +18202,15 @@ endmodule
       if (forward && mark && mark.trace === hdlTrace && mark.idx === hdlIdx && idx >= hdlIdx) {
         k0 = hdlIdx;
         acks = mark.acks;
+        // The last step shown can have gained what the run joined on added
+        // to it.
+        const ls = mark.tail && steps[k0 - 1];
+        if (ls) {
+          for (const w of ls.regw.slice(mark.tail[0])) { regs[w[0]] = w[1] | 0; hdlRegKnown[w[0]] = 1; }
+          for (const w of ls.memw.slice(mark.tail[1])) hdlApplyMemWrite(w[0], w[1], w[2]);
+          for (const e of ls.per.slice(mark.tail[2])) hdlApplyPer(e[0], e[1]);
+          acks += (ls.acks || 0) - mark.tail[3];
+        }
       } else if (hdlTrace.base) {
         // Without the architectural trace, the events after the snapshot
         // are all in pre.
@@ -18129,7 +18236,9 @@ endmodule
       }
 
       hdlIdx = idx;
-      hdlSeekMark = { trace: hdlTrace, idx, acks };
+      const ls = steps[idx - 1];
+      hdlSeekMark = { trace: hdlTrace, idx, acks,
+                      tail: ls ? [ls.regw.length, ls.memw.length, ls.per.length, ls.acks || 0] : null };
       lastChangedReg = changed;
       pc = idx < steps.length ? steps[idx].pc
          : (hdlTrace.next !== null && hdlTrace.next !== undefined ? hdlTrace.next
@@ -18271,7 +18380,7 @@ endmodule
       hdlIdx = 0;
       hdlCaptureBaseInputs();
       hdlSyncRx();
-      return hdlBuildTrace(budget, opts);
+      return hdlBuildTrace(budget, Object.assign({ fresh: true }, opts));
     }
 
     // ================================================================
@@ -18319,7 +18428,10 @@ endmodule
 
     async function hdlRunLive() {
       return hdlWithBusy(async () => {
-        const resume = !!(hdlTrace && hdlTraceEnabled);
+        // Without the architectural trace the recording is the peripheral
+        // events and the snapshot they fold into, which carries on just as well;
+        // one made with the trace, though, is not continued without it.
+        const resume = !!hdlTrace && (hdlTraceEnabled || !hdlTrace.steps.length);
         if (resume) {
           // A breakpoint still ahead in what is already recorded is reached
           // without running anything.
@@ -18348,13 +18460,13 @@ endmodule
 
         const liveWave = hdlDumpVcd && hdlLiveWave === 'live';
         const lvl = hdlTraceEnabled ? 2 : 1;
-        const vlKey = hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'));
+        const joinKey = hdlHash([compiled.key, lvl, JSON.stringify(hdlBase)].concat(Object.values(mem.files)).join('|'));
         const ckOn = () => !!(compiled.vlCk && hdlVlCkOff !== compiled.key);
         const plus = hdlPlusargs(budget, lvl).filter(a => !/^\+VCD/.test(a));
         if (liveWave) {
           plus.push('+VCD', '+LIVEVCD');
           if (hdlWaveTop) plus.push('+VCDTOP');
-          if (from > HDL_VL_VCD_WINDOW) plus.push('+VCDFROM=' + (from - HDL_VL_VCD_WINDOW));
+          if (from > HDL_VCD_WINDOW) plus.push('+VCDFROM=' + (from - HDL_VCD_WINDOW));
         }
         plus.push('+LIVE', '+LIVEFROM=' + from, '+HZ=' + hdlLiveHz());
         const files = Object.assign({}, mem.files, { 'stim.mem': hdlStimFile(), 'uart_rx.mem': hdlRxFile() });
@@ -18362,10 +18474,10 @@ endmodule
         // Resume starts from the newest checkpoint that leaves some of the
         // recording to check the replay against and, with a live waveform,
         // comes before the waveform's window.
-        let ck = resume && ckOn() ? hdlVlCkPick(hdlTrace, vlKey, from - (liveWave ? HDL_VL_VCD_WINDOW : HDL_CK_VERIFY)) : null;
-        const kept = resume && hdlTrace.vlKey === vlKey && hdlTrace.vlCks ? hdlTrace.vlCks : [];
-        const checkLo = ck ? hdlVlCheckFrom(hdlTrace, ck.k) : 0;
-        const oldRecs = ck ? hdlVlRecords(hdlTrace, checkLo, from - 2) : null;
+        let ck = resume && ckOn() ? hdlVlCkPick(hdlTrace, joinKey, from - (liveWave ? HDL_VCD_WINDOW : HDL_CK_VERIFY)) : null;
+        const kept = resume && hdlTrace.joinKey === joinKey && hdlTrace.vlCks ? hdlTrace.vlCks : [];
+        const checkLo = ck ? hdlCheckFrom(hdlTrace, ck.k) : 0;
+        const oldRecs = ck ? hdlRecordList(hdlTrace, checkLo, from - 2) : null;
 
         if (resume) hdlSeek(hdlCutTrace(hdlTrace, from).steps.length);
         const parser = hdlTraceParser(resume ? hdlTrace : null);
@@ -18391,7 +18503,7 @@ endmodule
             c.mem.forEach((m, i) => { f['ck_load_m' + i + '.mem'] = m; });
           }
           live.ck = c;
-          live.split = c ? hdlVlSplit(from) : null;
+          live.split = c ? hdlJoinSplit(from) : null;
           live.over = [];
           live.held = [];
           const run = window.rvNative.vlLive(id, compiled.model, f, p, { keep: HDL_RUN_KEEP.source });
@@ -18399,7 +18511,7 @@ endmodule
           return run.finally(() => hdlNativeJobs.delete(id));
         };
         live.check = () => {
-          const ok = hdlVlVerify(oldRecs, live.over.join(''), checkLo, from - 2);
+          const ok = hdlJoinCheck(oldRecs, live.over.join(''), checkLo, from - 2);
           const held = live.held.join('') + live.split.take();
           live.split = null;
           live.over = live.held = [];
@@ -18482,7 +18594,7 @@ endmodule
                 hdlLiveSend('in 8 0');
                 hdlLiveSend('vcd 0');
                 hdlLog('The waveform passed ' + (HDL_LIVE_VCD_MAX / 1e6) + ' MB, too fast to follow, so it ' +
-                  'stopped; it is built for the last ' + HDL_VL_VCD_WINDOW.toLocaleString() +
+                  'stopped; it is built for the last ' + HDL_VCD_WINDOW.toLocaleString() +
                   ' cycles when the run stops. A slower Real time clock lets it follow.', 'sys');
                 return;
               }
@@ -18525,7 +18637,7 @@ endmodule
         t.regBank = compiled.regBank;
         t.raw = null;
         t.ckKey = null;
-        t.vlKey = vlKey;
+        t.joinKey = joinKey;
         t.vlCks = ckOn() ? hdlVlCkMerge(kept, hdlDecodeCk(r.files)) : null;
         const cutEnd = hdlTrimTrace(t);
         if (cutEnd && live.stopAt >= 0) live.stopAt = Math.max(0, live.stopAt - cutEnd);
@@ -18545,15 +18657,15 @@ endmodule
           const wf = Object.assign({}, mem.files, { 'stim.mem': hdlStimFile(), 'uart_rx.mem': hdlRxFile() });
           // From the newest checkpoint before the window, printing the stretch
           // up to the end, which is checked against the recording.
-          const c = ckOn() && t.budget > HDL_VL_VCD_WINDOW ? hdlVlCkPick(t, vlKey, t.budget - HDL_VL_VCD_WINDOW) : null;
+          const c = ckOn() && t.budget > HDL_VCD_WINDOW ? hdlVlCkPick(t, joinKey, t.budget - HDL_VCD_WINDOW) : null;
           let s = null;
           if (c) {
             c.mem.forEach((m, i) => { wf['ck_load_m' + i + '.mem'] = m; });
             s = await hdlRunModel(compiled.model, Object.assign({ 'ck_load.txt': c.txt }, wf),
               hdlPlusargs(t.budget, lvl).concat('+TRACEFROM=' + c.k, '+CKLOAD=' + c.k));
             if (epoch !== hdlEpoch) return null;
-            const lo = hdlVlCheckFrom(t, c.k), hi = t.budget - 2;
-            if (hdlVlVerify(hdlVlRecords(t, lo, hi), s.out, lo, hi)) s.vcd = hdlShiftVcd(s.vcd, c.k);
+            const lo = hdlCheckFrom(t, c.k), hi = t.budget - 2;
+            if (hdlJoinCheck(hdlRecordList(t, lo, hi), s.out, lo, hi)) s.vcd = hdlShiftVcd(s.vcd, c.k);
             else { hdlVlCkFailed(c.k, compiled.key); t.vlCks = null; s = null; }
           }
           if (!s) s = await hdlRunModel(compiled.model, wf, hdlPlusargs(t.budget, 0));
@@ -18569,10 +18681,10 @@ endmodule
           setStatus('HDL stopped at breakpoint (line ' + currentExecLine + ', instruction ' + live.stopAt + ')', 'warn');
         } else if (live.stopSent) {
           hdlStatus('paused at cycle ' + t.budget.toLocaleString(), 'ok');
-          setStatus('HDL paused - ' + t.steps.length + ' instructions in ' + t.budget + ' cycles', 'info');
+          setStatus('HDL paused - ' + hdlRunSummary(t, t.budget), 'info');
         } else {
           hdlStatus('done - ' + t.budget.toLocaleString() + ' cycles, LED=0x' + ledState.toString(16).padStart(2, '0'), 'ok');
-          setStatus('HDL live run finished - ' + t.steps.length + ' instructions in ' + t.budget + ' cycles', 'success');
+          setStatus('HDL live run finished - ' + hdlRunSummary(t, t.budget), 'success');
         }
         if (hdlCompareEnabled) await hdlCompareWithJs();
         waveRevealForRun();
@@ -18594,8 +18706,147 @@ endmodule
     // The Run button. With a recording already in hand this resumes from the
     // current position rather than throwing the run away - Reset is how you
     // ask for a fresh one, exactly as in the functional engine.
+    // ================================================================
+    // Runs with Icarus, in chunks
+    // ================================================================
+    // vvp takes no input while it runs, so Run records in chunks of about
+    // HDL_CHUNK_MS of simulation, each from the checkpoint at the end of the
+    // last, and the page follows each as it arrives: flat out to its end, at
+    // Real time paced to the clock, with the simulation held at most two
+    // chunks ahead. An input moved meanwhile goes on the timeline at the cycle
+    // shown and the recording is replayed from there before the next chunk,
+    // as when paused; Pause and breakpoints take effect between chunks. The
+    // post-synthesis check compares one whole run from reset, so with it on a
+    // Run is recorded in one go.
+    const HDL_CHUNK_MS = 300;
+    let hdlChunked = null;            // { stop } during a chunked run
+
+    function hdlChunkedStop() {
+      if (!hdlChunked) return false;
+      hdlChunked.stop = true;
+      hdlStopPlay();
+      hdlStatus('pausing...', 'busy');
+      return true;
+    }
+
+    async function hdlRunChunked() {
+      return hdlWithBusy(async () => {
+        const resume = !!hdlTrace && (hdlTraceEnabled || !hdlTrace.steps.length);
+        const report = (stop, t) => {
+          if (stop === 'breakpoint') {
+            hdlStatus('stopped at a breakpoint - line ' + currentExecLine, 'ok');
+            setStatus('HDL (' + hdlModeLabel() + ') stopped at breakpoint (line ' +
+              currentExecLine + ', instruction ' + hdlIdx + ')', 'warn');
+          } else if (stop === 'paused') {
+            hdlStatus('paused at cycle ' + hdlCurrentCycle().toLocaleString(), 'ok');
+            setStatus('HDL paused - ' + hdlRunSummary(t, t.budget) + ' recorded', 'info');
+          } else {
+            hdlStatus('done - ' + t.budget.toLocaleString() + ' cycles, LED=0x' + ledState.toString(16).padStart(2, '0'), 'ok');
+            setStatus('HDL ' + hdlModeLabel() + ' run finished - ' + hdlRunSummary(t, t.budget), 'success');
+          }
+        };
+        if (resume) {
+          // A breakpoint still ahead in what is already recorded is reached
+          // without simulating anything.
+          const hit = hdlBreakAt(hdlIdx + 1);
+          if (hit >= 0) { hdlPlayTo(hit, () => report('breakpoint', hdlTrace)); return hdlTrace; }
+        } else {
+          hdlClearConsole();
+        }
+        const end = Math.min(HDL_MAX_CYCLES, (resume ? hdlTrace.budget : 0) + hdlCycleBudget);
+        if (resume && hdlTrace.budget >= end) {
+          hdlLog('Already recording the maximum of 2,000,000 cycles.', 'warn');
+          hdlPlayTo(hdlTrace.steps.length, () => report('end', hdlTrace));
+          return hdlTrace;
+        }
+        const run = hdlChunked = { stop: false };
+        updateToolbarButtonStates();
+        const noise = /\$readmemh\(AA_(IROM|DMEM)\.mem\): Not enough words/;
+        const said = t => {
+          const text = String(t.newOutput || '').split('\n').filter(l => l.trim() && !noise.test(l)).join('\n');
+          if (text) hdlLog(text, 'out');
+        };
+        let size = 1000, first = !resume, stop = 'end', preApplied = resume ? hdlTrace.pre.length : 0;
+        const wall0 = performance.now(), cyc0 = resume ? hdlCurrentCycle() : 0;
+        // What the page shows follows the recording: the instructions, or
+        // without the trace the peripheral events as they come.
+        const follow = (t, replayed) => {
+          if (t.steps.length) {
+            if (runPace === 'real') hdlPlayTo(t.steps.length);
+            else hdlSeek(t.steps.length, true, true);
+            return;
+          }
+          if (replayed) { hdlSeek(0); preApplied = t.pre.length; return; }
+          for (let i = preApplied; i < t.pre.length; i++) hdlApplyPer(t.pre[i][0], t.pre[i][1]);
+          preApplied = t.pre.length;
+          totalCycles = t.budget;
+          renderUartTerminal();
+          updatePeripherals();
+          if (typeof updateOledCanvas === 'function') updateOledCanvas();
+          updateWaveView();
+          updateStats();
+        };
+        let hit = -1;
+        try {
+          for (;;) {
+            if (run.stop) { stop = 'paused'; break; }
+            if (hdlPendingResim && hdlTrace && !first) {
+              hdlPendingResim = false;
+              // A change at the end of the recording is simply taken by the next chunk.
+              if (hdlTimelineDiff(hdlTrace.timeline, { stim: hdlStim, rx: hdlRx }) < hdlTrace.budget) {
+                const keep = hdlIdx;
+                const t = await hdlBuildTrace(hdlTrace.budget, { quiet: true, chunk: true });
+                if (!t) return null;
+                hdlIdx = Math.min(keep, t.steps.length);
+                follow(t, true);
+              }
+              continue;
+            }
+            const at = first ? 0 : hdlTrace.budget;
+            if (at >= end) break;
+            if (runPace === 'real' && !first) {
+              const shown = hdlTrace.steps.length ? hdlCurrentCycle()
+                : cyc0 + (performance.now() - wall0) / 1000 * cpuHz();
+              if (at - shown > 2 * size) { await new Promise(r => setTimeout(r, 50)); continue; }
+            }
+            const target = Math.min(end, at + size);
+            const from = first ? 0 : hdlTrace.steps.length;
+            const t0 = performance.now();
+            const t = first ? await hdlStartTrace(target, { chunk: true })
+                            : await hdlBuildTrace(target, { quiet: true, chunk: true });
+            if (!t) return null;
+            size = Math.max(200, Math.min(200000, Math.round((target - at) * HDL_CHUNK_MS / Math.max(1, performance.now() - t0))));
+            if (first) { first = false; if (runPace === 'real') hdlSeek(0); }
+            else said(t);
+            hit = hdlBreakAt(Math.max(from, hdlIdx + 1));
+            if (hit >= 0) { stop = 'breakpoint'; break; }
+            follow(t, false);
+            hdlStatus('running - cycle ' + t.budget.toLocaleString() + ' of ' + end.toLocaleString() +
+              (runPace === 'real' ? ', paced to ' + fmtHz(cpuHz()) : ''), 'busy');
+          }
+        } finally {
+          if (hdlChunked === run) hdlChunked = null;
+        }
+        const t = hdlTrace;
+        if (!t) return null;
+        if (!resume) {
+          hdlLog('--- ' + hdlRunSummary(t, t.budget) + ', ' + uartTxBytes.length + ' UART bytes out ---', 'sys');
+          if (hdlLooksPipelined(t))
+            hdlLog('This core writes registers after its PC has moved on, as a pipeline does. Step, Back, ' +
+              'breakpoints and the instruction count follow the fetch PC, so they run ahead of the results; ' +
+              'registers, memory, peripherals and the cross-check are unaffected.', 'warn');
+        }
+        if (stop === 'paused') { hdlSeek(hdlIdx); report('paused', t); }
+        else hdlPlayTo(stop === 'breakpoint' ? hit : t.steps.length, () => report(stop, t));
+        if (hdlCompareEnabled) await hdlCompareWithJs();
+        waveRevealForRun();
+        return t;
+      });
+    }
+
     async function runHdlSimulation() {
       if (hdlLiveCapable()) return hdlRunLive();
+      if (!hdlSynthEnabled) return hdlRunChunked();
       if (hdlTrace && hdlTraceEnabled) {
         return hdlWithBusy(async () => {
           await hdlResumeRun(r => {
@@ -18634,8 +18885,7 @@ endmodule
           } else {
             hdlStatus('done - ' + t.budget + ' cycles, LED=0x' +
               ledState.toString(16).padStart(2, '0'), 'ok');
-            setStatus('HDL ' + hdlModeLabel() + ' run finished - ' + t.steps.length +
-              ' instructions in ' + t.budget + ' cycles', 'success');
+            setStatus('HDL ' + hdlModeLabel() + ' run finished - ' + hdlRunSummary(t, t.budget), 'success');
           }
         });
         if (hdlCompareEnabled) await hdlCompareWithJs();
@@ -18768,9 +19018,9 @@ endmodule
       }
       return hdlWithBusy(async () => {
         if (!hdlTrace) {
-          // A first Step needs a recording to step through, not a whole live
-          // run's worth: Verilator's 20,000,000 would take a minute to record.
-          const t = await hdlStartTrace(hdlSimulator === 'verilator' ? Math.min(hdlCycleBudget, 100000) : hdlCycleBudget);
+          // A first Step needs a recording to step through, not a whole
+          // run's worth, which would take seconds to a minute to record.
+          const t = await hdlStartTrace(Math.min(hdlCycleBudget, hdlSimulator === 'verilator' ? 100000 : 2000));
           if (!t) return null;
           hdlSeek(0);
           setStatus('HDL stepped to line ' + (currentExecLine > 0 ? currentExecLine : '?'), 'info');
@@ -18999,7 +19249,7 @@ endmodule
     // ================================================================
     function hdlDownloadVcd() {
       if (!hdlLastVcd) return;
-      downloadTextFile('cg3207_hdl.vcd', hdlLastVcd);
+      downloadTextFile('cg3207_hdl.vcd', hdlVcdText(hdlLastVcd));
     }
 
     // ================================================================
@@ -19032,7 +19282,8 @@ endmodule
 
     let waveOpen = false;
     let waveParsed = null;       // parseVcd() result
-    let waveParsedFrom = null;   // the hdlLastVcd string it was parsed from
+    let waveParsedFrom = null;   // the hdlLastVcd it was parsed from
+    let waveParsedAt = 0, waveParseMs = 0;
     let waveSignals = [];        // full dotted paths, in display order
     let waveStart = 0;           // leftmost cycle on screen
     let waveSpan = waveDefaultSpan();
@@ -19153,8 +19404,14 @@ endmodule
     function waveEnsureParsed() {
       if (!hdlLastVcd) { waveParsed = null; waveParsedFrom = null; return null; }
       if (waveParsed && waveParsedFrom === hdlLastVcd) return waveParsed;
-      waveParsed = parseVcd(hdlLastVcd);
+      // A run recorded in stretches changes the waveform after each one;
+      // parsing all of it every time would take most of the run's time.
+      if (waveParsed && hdlChunked && performance.now() - waveParsedAt < 10 * waveParseMs) return waveParsed;
+      const t0 = performance.now();
+      waveParsed = parseVcd(hdlVcdText(hdlLastVcd));
       waveParsedFrom = hdlLastVcd;
+      waveParsedAt = performance.now();
+      waveParseMs = waveParsedAt - t0;
       waveApplySignalChoice(waveParsed);
       return waveParsed;
     }
@@ -19896,11 +20153,22 @@ endmodule
       setStatus('Saved the testbench for this run to cg3207_hdl_tb.v; it needs AA_IROM.mem and AA_DMEM.mem beside it', 'success');
     }
 
+    // Cycles per Run is remembered for Verilator, Icarus, and Icarus with
+    // post-synthesis simulation.
+    function hdlCyclesKey() { return hdlSimulator === 'icarus' && hdlSynthEnabled ? 'synth' : hdlSimulator; }
+    function hdlShowCycles() {
+      hdlCycleBudget = hdlCyclesFor[hdlCyclesKey()];
+      const cyc = document.getElementById('hdlCycles');
+      if (cyc) {
+        cyc.max = String(hdlSimulator === 'verilator' ? HDL_VL_MAX_RUN : HDL_MAX_CYCLES);
+        cyc.value = hdlCycleBudget;
+      }
+    }
     function setHdlCycles(v) {
       const n = parseInt(v, 10);
       if (!Number.isFinite(n) || n <= 0) return;
       hdlCycleBudget = Math.min(n, hdlSimulator === 'verilator' ? HDL_VL_MAX_RUN : HDL_MAX_CYCLES);
-      hdlCyclesFor[hdlSimulator] = hdlCycleBudget;
+      hdlCyclesFor[hdlCyclesKey()] = hdlCycleBudget;
       // Keep the field honest when the budget is set from anywhere else,
       // including the automatic extension when stepping off the end.
       const el = document.getElementById('hdlCycles');
@@ -20012,12 +20280,7 @@ endmodule
       if (v !== 'verilator' || !hdlVerilatorAvail) v = 'icarus';
       const changed = v !== hdlSimulator;
       hdlSimulator = v;
-      hdlCycleBudget = hdlCyclesFor[v];
-      const cyc = document.getElementById('hdlCycles');
-      if (cyc) {
-        cyc.max = String(v === 'verilator' ? HDL_VL_MAX_RUN : HDL_MAX_CYCLES);
-        cyc.value = hdlCycleBudget;
-      }
+      hdlShowCycles();
       hdlRefreshDetail();
       const sel = document.getElementById('hdlSimulator');
       if (sel) sel.value = v;
@@ -20047,6 +20310,7 @@ endmodule
     function setHdlSynth(on) {
       const was = hdlSynthEnabled;
       hdlSynthEnabled = !!on;
+      hdlShowCycles();
       updateToolbarButtonStates();
       if (!hdlSynthEnabled || was) return;
       if (!hdlTrace || !hdlLastRtlOut) {
@@ -20320,7 +20584,7 @@ endmodule
       const hdl = simEngineMode === 'hdl';
       const piped = !hdl && pipeMode;
       const multi = !hdl && jsArch === 'multi';
-      const pacing = runPace === 'real' && (hdl ? !!(hdlPlay || hdlLive) : running);
+      const pacing = runPace === 'real' && (hdl ? !!(hdlPlay || hdlLive || hdlChunked) : running);
       const SEP = '&nbsp;|&nbsp; ';
       const lead = [fmtSimTime(totalCycles) +
         (pacing && rtRatio < 0.95 ? ' <span class="stat-lag" title="The browser cannot keep up with this clock">×' +
@@ -20369,16 +20633,18 @@ endmodule
         if (title) b.title = title;
       };
       const resuming = !!(hdlTrace && hdlTraceEnabled);
-      set('runPauseBtn', ready || !!hdlLive, resuming
+      set('runPauseBtn', ready || !!hdlLive || !!hdlChunked, hdlRunning && hdlSynthEnabled && !hdlLive && !hdlChunked
+        ? 'A run with post-synthesis simulation on is simulated in one go and cannot be paused; Reset stops it'
+        : resuming
         ? 'Continue the hardware run to the next breakpoint, recording another ' +
           hdlCycleBudget + ' cycles if it reaches the end (Reset to start over)'
         : 'Simulate your Verilog, stopping at the first breakpoint or after ' +
           hdlCycleBudget + ' cycles');
       const runBtn = document.getElementById('runPauseBtn');
       if (runBtn) {
-        runBtn.innerHTML = (hdlPlay || hdlLive) ? '\u23F8 Pause' : (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
-        runBtn.style.opacity = (ready || hdlLive) ? '1' : '0.45';
-        runBtn.style.cursor = (ready || hdlLive) ? 'pointer' : 'not-allowed';
+        runBtn.innerHTML = (hdlPlay || hdlLive || hdlChunked) ? '\u23F8 Pause' : (resuming && hdlIdx > 0) ? '\u25B6 Resume' : '\u25B6 Run HDL';
+        runBtn.style.opacity = (ready || hdlLive || hdlChunked) ? '1' : '0.45';
+        runBtn.style.cursor = (ready || hdlLive || hdlChunked) ? 'pointer' : 'not-allowed';
       }
       set('btnStep', ready && hdlTraceEnabled,
         hdlTraceEnabled ? 'Advance one instruction through the recorded hardware trace'
@@ -20515,7 +20781,7 @@ endmodule
     window.waveTicksPerCycle = waveTicksPerCycle;
     window.waveValueAt = waveValueAt;
     window.waveFormatValue = waveFormatValue;
-    window.getHdlLastVcd = () => hdlLastVcd;
+    window.getHdlLastVcd = () => hdlVcdText(hdlLastVcd);
     window.getWaveState = () => ({
       parsed: waveParsed,
       signals: waveSignals.slice(),
