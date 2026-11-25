@@ -2,7 +2,9 @@
  * Verilator in the desktop app, through the page's own HDL flow: the
  * Simulator setting, a build (cached by content), runs that record what
  * Icarus records, input changes and Resume, the Wrapper-only waveform, a
- * compile error, Reset during a build, and the status line during a build.
+ * compile error, Reset during a build, the status line during a build, and
+ * checkpoints: Resume and an input change replayed from one, the waveform
+ * built from one, and a checkpoint that does not reproduce the recording.
  * In a browser the setting is shown and disabled. Also times Icarus against
  * Verilator through the page, waveform on and off.
  *
@@ -65,9 +67,9 @@ function wasmRunner() {
 // A page with the bridge preload.js would give it, running its stages on the
 // given runner and reading folders from disk; folder.next is what the folder
 // dialog returns.
-function makePage(runner, folder, vl) {
+function makePage(runner, folder, vl, src) {
   const timing = { ms: {} };
-  const dom = new JSDOM(html, {
+  const dom = new JSDOM(src || html, {
     runScripts: 'dangerously', resources: 'usable',
     url: 'http://localhost:8080/riscv_simulator.html',
     beforeParse(window) {
@@ -109,7 +111,7 @@ function makePage(runner, folder, vl) {
         onVlProgress: cb => progressCbs.push(cb),
         vlLive: (id, key, files, args, opts) => vl.runLive(id, key, files, args, opts, d => liveCbs.forEach(cb => cb(id, d))),
         vlLiveSend: async (id, line) => vl.liveSend(id, line),
-        vlLiveRead: async (id, name) => vl.liveRead(id, name),
+        vlLiveRead: async (id, name, max) => vl.liveRead(id, name, max),
         onVlLiveData: cb => liveCbs.push(cb),
         pickFolder: async () => folder.next,
         readFolder: dir => readFolder(dir),
@@ -133,7 +135,143 @@ async function until(cond, ms) {
 // two-state, has nothing to report.
 const arch = t => JSON.stringify(t.steps.map(s => [s.cyc, s.pc, s.instr, s.regw, s.memw]));
 
-setTimeout(async () => {
+// [8], run in a process of its own (see below): the pages of the other
+// sections fill this one's heap, and jsdom does not give it back.
+async function checkpointSection(dir, cache) {
+  const vl = createVerilator({ root: VL_ROOT, cacheDir: cache });
+  // The same page with the checkpoint module left out: every replay from reset.
+  const noCk = html.replace('let ck = state.off ? null : state;', 'let ck = null;');
+  check('(the page can be built without checkpoints, for reference)', noCk !== html);
+  const cp = makePage(createRunner(NATIVE), { next: dir }, vl);
+  const cq = makePage(createRunner(NATIVE), { next: dir }, vl, noCk);
+  await sleep(1500);
+  const fresh = async (x, cycles) => {
+    x.win.resetAll();
+    await x.win.loadExample('dip_led');
+    x.win.setDipSwitches(0x00ad);
+    x.win.setHdlCycles(cycles);
+  };
+  for (const x of [cp, cq]) {
+    x.win.setHdlSimulator('verilator');
+    await x.win.hdlPickFolder();
+    x.win.setHdlDumpVcd(false);
+    x.win.setHdlLiveWave('pause');
+    await fresh(x, 500000);
+  }
+  const seen7 = [];
+  const watch7 = setInterval(() => {
+    const s = cp.doc.getElementById('statusBar').textContent;
+    if (seen7[seen7.length - 1] !== s) seen7.push(s);
+  }, 5);
+  const ks = t => (t.vlCks || []).map(c => c.k).join();
+  await cp.win.runHdlSimulation();
+  let ct = cp.win.getHdlTrace();
+  check('A run keeps its two newest checkpoints (' + ks(ct) + ')', ks(ct) === '400000,200000');
+  let ms = Date.now();
+  await cp.win.runHdlSimulation();
+  console.log('    Resume to 1,000,000 cycles: ' + (Date.now() - ms) + ' ms');
+  ct = cp.win.getHdlTrace();
+  check('Resume replays from the newest checkpoint before the end',
+    seen7.some(s => /replaying cycles 400,000 to 500,000/.test(s)));
+  check('…and then holds the two newest of the longer recording (' + ks(ct) + ')', ks(ct) === '800000,600000');
+  cq.win.setHdlCycles(1000000);
+  await cq.win.runHdlSimulation();
+  check('The joined recording is the one a run from reset makes (' + ct.steps.length + ' instructions)',
+    ct.budget === 1000000 && arch(ct) === arch(cq.win.getHdlTrace()));
+  check('…with no warning', !consoleText(cp.doc).some(l => /did not match/.test(l)));
+
+  cp.win.hdlSeek(ct.steps.length - 30000);
+  seen7.length = 0;
+  cp.win.setDipSwitches(0x0072);
+  await until(() => seen7.some(s => /simulating/.test(s)) &&
+    !/simulating/.test(cp.doc.getElementById('statusBar').textContent), 60000);
+  await sleep(300);
+  ct = cp.win.getHdlTrace();
+  check('A switch moved while paused replays from the checkpoint before it',
+    seen7.some(s => /simulating cycles 800000 to/.test(s)));
+  cq.win.hdlDiscardTrace();
+  cq.win.hdlSetStim(ct.timeline.stim);
+  const cr = await cq.win.hdlBuildTrace(ct.budget, { quiet: true });
+  check('…and records what a replay from reset records', !!cr && arch(cr) === arch(ct));
+  cp.win.hdlSeek(ct.steps.length);
+  check('…with the LEDs following (0x' + cp.win.getLedState().toString(16) + ')', cp.win.getLedState() === 0x72);
+
+  // The design's signals: the testbench's own trace bookkeeping differs,
+  // since a replay from a checkpoint prints its records to be checked.
+  // Compared signal by signal: two whole waveforms as text do not fit in
+  // this process beside everything else it holds.
+  const sameDut = () => {
+    const a = cp.win.parseVcd(cp.win.getHdlLastVcd() || ''), b = cq.win.parseVcd(cq.win.getHdlLastVcd() || '');
+    let n = 0, changes = 0;
+    for (const [name, s] of a.byPath) {
+      if (!/\.dut\./.test(name)) continue;
+      const t = b.byPath.get(name);
+      if (!t) return false;
+      const x = a.changes.get(s.id) || { times: [], values: [] }, y = b.changes.get(t.id) || { times: [], values: [] };
+      if (x.times.length !== y.times.length || x.times.some((v, i) => v !== y.times[i] || x.values[i] !== y.values[i])) return false;
+      n++;
+      changes += x.times.length;
+    }
+    return n > 20 && changes > 50000;
+  };
+  for (const x of [cp, cq]) { x.win.setHdlDumpVcd(true); x.win.setHdlWaveTop(true); await fresh(x, 700000); }
+  await cp.win.runHdlSimulation();
+  await cq.win.runHdlSimulation();
+  check('The waveform built on Pause, from a checkpoint, shows the design as one built from reset does', sameDut());
+  for (const x of [cp, cq]) x.win.setHdlLiveWave('live');
+  seen7.length = 0;
+  await cp.win.runHdlSimulation();
+  await cq.win.runHdlSimulation();
+  check('Resume with the waveform followed live starts from a checkpoint before the waveform\'s window',
+    seen7.some(s => /replaying cycles 600,000 to 700,000/.test(s)));
+  check('…and its waveform and recording are those of a run from reset',
+    sameDut() && arch(cp.win.getHdlTrace()) === arch(cq.win.getHdlTrace()));
+
+  // A checkpoint that does not reproduce the recording: the PC is saved last.
+  // (The Wrapper-only waveform stays: turning it off would select another model.)
+  for (const x of [cp, cq]) { x.win.setHdlLiveWave('pause'); x.win.setHdlDumpVcd(false); }
+  ct = cp.win.getHdlTrace();
+  for (const c of ct.vlCks) {
+    const lines = c.txt.split('\n');
+    const i = lines.length - 2;
+    lines[i] = lines[i].slice(0, -3) + (lines[i].slice(-3) === '000' ? '100' : '000');
+    c.txt = lines.join('\n');
+  }
+  await cp.win.runHdlSimulation();
+  await cq.win.runHdlSimulation();
+  check('A checkpoint that does not reproduce the recording is reported',
+    consoleText(cp.doc).some(l => /did not match the recording/.test(l)));
+  check('…the run is replayed from reset, and is right', arch(cp.win.getHdlTrace()) === arch(cq.win.getHdlTrace()));
+  check('…and checkpoints stay off for those sources', !cp.win.getHdlTrace().vlCks);
+
+  // A design that sets its initial values with <= overrides the restore.
+  const pcSrc = fs.readFileSync(path.join(RV, 'ProgramCounter.v'), 'utf8');
+  const oldPc = pcSrc.replace(/output reg \[31:0\] PC = PC_INIT\s*\);/, 'output reg [31:0] PC\n    );\n    initial begin\n        PC <= PC_INIT;\n    end');
+  check('(the old ProgramCounter can be rebuilt for this)', oldPc !== pcSrc);
+  fs.writeFileSync(path.join(dir, 'ProgramCounter.v'), oldPc);
+  cp.doc.getElementById('console').innerHTML = '';
+  for (const x of [cp, cq]) await fresh(x, 500000);
+  await cp.win.runHdlSimulation();
+  await cp.win.runHdlSimulation();
+  cq.win.setHdlCycles(1000000);
+  await cq.win.runHdlSimulation();
+  check('Verilator warns about the <= in an initial block', consoleText(cp.doc).some(l => /Verilator MULTIDRIVEN/.test(l)));
+  check('…the replay from its checkpoint does not match and is run again from reset',
+    consoleText(cp.doc).some(l => /did not match the recording/.test(l)));
+  check('…and the recording is still right', arch(cp.win.getHdlTrace()) === arch(cq.win.getHdlTrace()));
+  fs.copyFileSync(path.join(RV, 'ProgramCounter.v'), path.join(dir, 'ProgramCounter.v'));
+  clearInterval(watch7);
+
+}
+
+if (process.argv[2] === '--checkpoints') {
+  setTimeout(async () => {
+    try { await checkpointSection(process.argv[3], process.argv[4]); }
+    catch (e) { console.error(e); failed++; }
+    console.log('checkpoints: ' + passed + ' passed, ' + failed + ' failed');
+    process.exit(0);
+  }, 500);
+} else setTimeout(async () => {
   const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'rvsim-vlcache-'));
   try {
     console.log('===========================================================');
@@ -155,6 +293,9 @@ setTimeout(async () => {
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rvsim-folder-'));
     for (const f of fs.readdirSync(RV)) if (/\.v$/.test(f)) fs.copyFileSync(path.join(RV, f), path.join(dir, f));
+    // A register file that reads with <=, so that there is a warning to count.
+    fs.writeFileSync(path.join(dir, 'RegFile.v'),
+      fs.readFileSync(path.join(RV, 'RegFile.v'), 'utf8').replace(/RD([12]) = /g, 'RD$1 <= '));
     const vl = createVerilator({ root: VL_ROOT, cacheDir: cache });
     const ic = makePage(createRunner(NATIVE), { next: dir }, null);
     const p = makePage(createRunner(NATIVE), { next: dir }, vl);
@@ -248,7 +389,7 @@ setTimeout(async () => {
     win.setHdlSimulator('icarus');
     check('Icarus keeps 2,000 cycles per run', doc.getElementById('hdlCycles').value === '2000');
     win.setHdlSimulator('verilator');
-    check('Verilator defaults to 1,000,000', doc.getElementById('hdlCycles').value === '1000000');
+    check('Verilator defaults to 20,000,000', doc.getElementById('hdlCycles').value === '20000000');
     check('The waveform setting shows with Verilator', doc.getElementById('hdlLiveWaveRow').style.display === 'flex');
     win.setHdlDumpVcd(true);
     win.setHdlCycles(300000);
@@ -272,6 +413,8 @@ setTimeout(async () => {
     const liveArch = steps2arch(lt);
     const replay = await win.hdlBuildTrace(300000, { quiet: true });
     check('A replay of that timeline from reset records the same run', !!replay && steps2arch(replay) === liveArch);
+    check('Followed live flat out, the waveform stops at 20 MB and says so',
+      consoleText(doc).some(l => /too fast to follow/.test(l)));
     check('The waveform was built on Pause and covers the last 50,000 cycles',
       !!win.getHdlLastVcd() && /#2500000\b|#25000\d{2}/.test(win.getHdlLastVcd().slice(0, 200000)) && win.parseVcd(win.getHdlLastVcd()).vars.length > 50);
 
@@ -282,6 +425,7 @@ setTimeout(async () => {
     win.setRunPace('real');
     win.setHdlLiveWave('live');
     const paced = win.runHdlSimulation();
+    await until(() => /running live/.test(doc.getElementById('statusBar').textContent), 120000);
     await sleep(1500);
     const midVcd = win.getHdlLastVcd();
     win.toggleRunPause();
@@ -292,12 +436,53 @@ setTimeout(async () => {
     check('Pause ends the run where it was', /paused/i.test(doc.getElementById('statusBar').textContent) || pt.budget < 4000);
     check('The waveform followed the run while it went', !!midVcd && midVcd.length > 0);
 
+    // Without the architectural trace a live run still shows the peripherals as it goes.
+    win.resetAll();
+    win.setHdlDetail('fastest', true);
+    win.setHdlCycles(50000000);
+    win.setRunPace('real');
+    win.setClkDivBits(0);
+    win.setDipSwitches(0x0011);
+    const noTrace = win.runHdlSimulation();
+    await until(() => /running live/.test(doc.getElementById('statusBar').textContent), 120000);
+    await sleep(800);
+    win.setDipSwitches(0x0022);
+    const ledLive = await until(() => win.getLedState() === 0x22, 5000);
+    const statsNt = doc.getElementById('statsBar').textContent;
+    win.toggleRunPause();
+    await noTrace;
+    check('With Detail Fastest (no trace) a live run still shows a switch change while it runs', ledLive);
+    check('…and its fraction of real time is not stuck at 0 (' + (/×[\d.]+ real time/.exec(statsNt) || ['none'])[0] + ')',
+      !/×0\.00 real time/.test(statsNt) && /Cycles: [1-9]/.test(statsNt));
+    win.setHdlDetail('full', true);
+
+    // Paced to a clock it cannot reach, the stats say how far behind it is.
+    win.resetAll();
+    win.setHdlLiveWave('pause');
+    win.setClkDivBits(0);                            // 100 MHz
+    win.setRunPace('real');
+    const fast = win.runHdlSimulation();
+    await until(() => /running live/.test(doc.getElementById('statusBar').textContent), 120000);
+    await sleep(2000);
+    const lagText = doc.getElementById('statsBar').textContent;
+    win.toggleRunPause();
+    await fast;
+    check('A live run behind its clock shows the fraction of real time (' + (/×[\d.]+ real time/.exec(lagText) || ['none'])[0] + ')',
+      /×0\.\d+ real time/.test(lagText));
+    win.resetAll();
+    win.setClkDivBits(16);
+    win.setHdlLiveWave('live');
+    const paced2 = win.runHdlSimulation();
+    await sleep(1500);
+    win.toggleRunPause();
+    await paced2;
+
     // Resume, flat out, from where the pause left it.
     win.setRunPace('max');
     win.setClkDivBits(5);
     win.setHdlLiveWave('pause');
     win.setHdlCycles(50000);
-    const b0 = pt.budget;
+    const b0 = win.getHdlTrace().budget;
     await win.runHdlSimulation();
     const rt = win.getHdlTrace();
     check('Resume carries on from the end (' + b0 + ' to ' + rt.budget + ')', rt.budget === b0 + 50000);
@@ -386,6 +571,14 @@ setTimeout(async () => {
       }
     }
     check('Timing ran', true);
+
+    console.log('\n[8] Checkpoints');
+    const child = require('child_process').spawnSync(process.execPath, [__filename, '--checkpoints', dir, cache],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 64 << 20 });
+    process.stdout.write(child.stdout || '');
+    const counts = /^checkpoints: (\d+) passed, (\d+) failed$/m.exec(child.stdout || '');
+    check('(the checkpoint section ran to the end)', !!counts && child.status === 0);
+    if (counts) { passed += +counts[1]; failed += +counts[2]; }
 
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {

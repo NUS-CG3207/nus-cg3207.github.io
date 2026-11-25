@@ -177,50 +177,50 @@ reg [31:0] ReadData_MMIO ;
 // Data memory address decoding
 //----------------------------------------------------------------
 always@(*) begin
-	dec_DMEM 				<= 1'b0;
-	bad_MEM_addr 			<= 1'b0;
-	dec_UART_RX_VALID		<= 1'b0;
-	dec_UART_RX				<= 1'b0;
-	dec_UART_TX_READY		<= 1'b0;
-	dec_UART_TX				<= 1'b0;
-	dec_OLED_COL			<= 1'b0;
-	dec_OLED_ROW			<= 1'b0;
-	dec_OLED_DATA			<= 1'b0;
-	dec_OLED_CTRL			<= 1'b0;
-	dec_OLED_STATUS			<= 1'b0;
-	dec_ACCEL_DATA			<= 1'b0;
-	dec_ACCEL_DREADY		<= 1'b0;
-	dec_LED					<= 1'b0;
-	dec_DIP					<= 1'b0;
-	dec_PB					<= 1'b0;
-	dec_SEVENSEG			<= 1'b0;
-	dec_CYCLECOUNT			<= 1'b0;
+	dec_DMEM 				= 1'b0;
+	bad_MEM_addr 			= 1'b0;
+	dec_UART_RX_VALID		= 1'b0;
+	dec_UART_RX				= 1'b0;
+	dec_UART_TX_READY		= 1'b0;
+	dec_UART_TX				= 1'b0;
+	dec_OLED_COL			= 1'b0;
+	dec_OLED_ROW			= 1'b0;
+	dec_OLED_DATA			= 1'b0;
+	dec_OLED_CTRL			= 1'b0;
+	dec_OLED_STATUS			= 1'b0;
+	dec_ACCEL_DATA			= 1'b0;
+	dec_ACCEL_DREADY		= 1'b0;
+	dec_LED					= 1'b0;
+	dec_DIP					= 1'b0;
+	dec_PB					= 1'b0;
+	dec_SEVENSEG			= 1'b0;
+	dec_CYCLECOUNT			= 1'b0;
 
 	if(ALUResult[31:DMEM_DEPTH_BITS] == DMEM_BASE[31:DMEM_DEPTH_BITS])
-		dec_DMEM <= 1'b1;
+		dec_DMEM = 1'b1;
 	else if (ALUResult[31:MMIO_DEPTH_BITS] == MMIO_BASE[31:MMIO_DEPTH_BITS]) begin
 		case (ALUResult[MMIO_DEPTH_BITS-1:2])
-			UART_RX_VALID_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_RX_VALID <= 1'b1;
-			UART_RX_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_RX <= 1'b1;
-			UART_TX_READY_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_TX_READY <= 1'b1;
-			UART_TX_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_TX <= 1'b1;
-			OLED_COL_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_COL <= 1'b1;
-			OLED_ROW_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_ROW <= 1'b1;
-			OLED_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_DATA <= 1'b1;
-			OLED_CTRL_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_CTRL <= 1'b1;
-			OLED_STATUS_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_STATUS <= 1'b1;
-			ACCEL_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DATA <= 1'b1;
-			ACCEL_DREADY_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DREADY <= 1'b1;
-			LED_OFF[MMIO_DEPTH_BITS-1:2]: dec_LED <= 1'b1;
-			DIP_OFF[MMIO_DEPTH_BITS-1:2]: dec_DIP <= 1'b1;
-			PB_OFF[MMIO_DEPTH_BITS-1:2]: dec_PB <= 1'b1;
-			SEVENSEG_OFF[MMIO_DEPTH_BITS-1:2]: dec_SEVENSEG <= 1'b1;
-			CYCLECOUNT_OFF[MMIO_DEPTH_BITS-1:2]: dec_CYCLECOUNT <= 1'b1;
-			default: bad_MEM_addr <= 1'b1;
+			UART_RX_VALID_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_RX_VALID = 1'b1;
+			UART_RX_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_RX = 1'b1;
+			UART_TX_READY_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_TX_READY = 1'b1;
+			UART_TX_OFF[MMIO_DEPTH_BITS-1:2]: dec_UART_TX = 1'b1;
+			OLED_COL_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_COL = 1'b1;
+			OLED_ROW_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_ROW = 1'b1;
+			OLED_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_DATA = 1'b1;
+			OLED_CTRL_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_CTRL = 1'b1;
+			OLED_STATUS_OFF[MMIO_DEPTH_BITS-1:2]: dec_OLED_STATUS = 1'b1;
+			ACCEL_DATA_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DATA = 1'b1;
+			ACCEL_DREADY_OFF[MMIO_DEPTH_BITS-1:2]: dec_ACCEL_DREADY = 1'b1;
+			LED_OFF[MMIO_DEPTH_BITS-1:2]: dec_LED = 1'b1;
+			DIP_OFF[MMIO_DEPTH_BITS-1:2]: dec_DIP = 1'b1;
+			PB_OFF[MMIO_DEPTH_BITS-1:2]: dec_PB = 1'b1;
+			SEVENSEG_OFF[MMIO_DEPTH_BITS-1:2]: dec_SEVENSEG = 1'b1;
+			CYCLECOUNT_OFF[MMIO_DEPTH_BITS-1:2]: dec_CYCLECOUNT = 1'b1;
+			default: bad_MEM_addr = 1'b1;
 		endcase
 	end
 	else 
-		bad_MEM_addr <= 1'b1;
+		bad_MEM_addr = 1'b1;
 end
 
 assign dec_MMIO_read = MemRead || dec_DIP || dec_PB || dec_UART_RX_VALID || dec_UART_RX || dec_UART_TX_READY || dec_UART_TX || dec_CYCLECOUNT || dec_ACCEL_DATA || dec_ACCEL_DREADY || dec_OLED_STATUS ;
@@ -231,9 +231,9 @@ assign MemWrite = MemWrite_out[3] || MemWrite_out[2] || MemWrite_out[1] || MemWr
 //----------------------------------------------------------------
 always@(*) begin
 if (dec_DMEM_W)
-	ReadData_in <= ReadData_DMEM ; 
+	ReadData_in = ReadData_DMEM ; 
 else 		// dec_MMIO_read_W
-	ReadData_in <= ReadData_MMIO ;
+	ReadData_in = ReadData_MMIO ;
 end
 
 //----------------------------------------------------------------
@@ -259,7 +259,7 @@ end
 // Asych DMEM read - //Uncomment the following block (3 lines) if NOT using synch read for memory
 //----------------------------------------------------------------
 always@( * ) begin 
-    ReadData_DMEM <= DMEM[ALUResult[DMEM_DEPTH_BITS-1:2]] ; // async read
+    ReadData_DMEM = DMEM[ALUResult[DMEM_DEPTH_BITS-1:2]] ; // async read
 end
 
 //----------------------------------------------------------------
@@ -291,32 +291,32 @@ end
 //----------------------------------------------------------------
 always@(*) begin // @posedge CLK only if using synch read for memory
 if (dec_DIP)
-	ReadData_MMIO <= { {31-N_DIPs+1{1'b0}}, DIP } ; 
+	ReadData_MMIO = { {31-N_DIPs+1{1'b0}}, DIP } ; 
 else if (dec_PB)
-	ReadData_MMIO <= { {31-N_PBs+1{1'b0}}, PB } ; 
+	ReadData_MMIO = { {31-N_PBs+1{1'b0}}, PB } ; 
 else if (dec_UART_RX)			// A read with no byte waiting returns 0 rather than falling through to whatever the next arm holds.
-	ReadData_MMIO <= UART_RX_valid ? {24'd0, UART_RX} : 32'd0;
+	ReadData_MMIO = UART_RX_valid ? {24'd0, UART_RX} : 32'd0;
 else if (dec_UART_RX_VALID)
-	ReadData_MMIO <= {31'd0, UART_RX_valid};	
+	ReadData_MMIO = {31'd0, UART_RX_valid};	
 else if (dec_UART_TX_READY)
-	ReadData_MMIO <= {31'd0, UART_TX_ready};
+	ReadData_MMIO = {31'd0, UART_TX_ready};
 else if (dec_CYCLECOUNT)
-	ReadData_MMIO <= cycle_count;
+	ReadData_MMIO = cycle_count;
 else if (dec_ACCEL_DATA)
-	ReadData_MMIO <= ACCEL_Data;	
+	ReadData_MMIO = ACCEL_Data;	
 else if (dec_OLED_STATUS)		// OLED status. Bit 0 is set while a requested page swap has not completed.
-	ReadData_MMIO <= {31'd0, OLED_SwapPending};
+	ReadData_MMIO = {31'd0, OLED_SwapPending};
 
 else	// dec_ACCEL_DREADY // the default else to avoid the statement from being incomplete
-	ReadData_MMIO <= {31'd0, ACCEL_DReady};
+	ReadData_MMIO = {31'd0, ACCEL_DReady};
 end
 
 //----------------------------------------------------------------
 // Delaying the decoded signals for multiplexing (delay only if using synch read for memory)
 //----------------------------------------------------------------
 always@(*) begin // @posedge CLK only if using synch read for memory
-    dec_DMEM_W <= dec_DMEM;
-    dec_MMIO_read_W <= dec_MMIO_read;
+    dec_DMEM_W = dec_DMEM;
+    dec_MMIO_read_W = dec_MMIO_read;
 end
 
 //----------------------------------------------------------------

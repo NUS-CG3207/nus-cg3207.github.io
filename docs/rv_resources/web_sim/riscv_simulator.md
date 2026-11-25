@@ -104,8 +104,8 @@ the default of 5 gives 3.125 MHz. The setting also determines how many cycles a 
 character takes.
 
 *Max speed* runs as fast as the browser allows. *Real time* runs at the set clock frequency,
-so delay loops take as long as on the hardware; below about 1 kHz, execution can be followed
-instruction by instruction. Real time is sustainable only at low clock frequencies, about
+so delay loops take as long as on the hardware; at about 100 Hz or slower (`CLK_DIV_BITS` 20
+and up), execution can be followed instruction by instruction. Real time is sustainable only at low clock frequencies, about
 12.5 MHz for the single-cycle model and about 1.56 MHz for the pipeline. Above that, the
 toolbar shows the fraction of real time achieved.
 
@@ -166,15 +166,36 @@ breakpoints then move through that recording.
   cycle where that simulation stops.
 - Resuming, or stepping past the end of the recording, simulates further cycles, starting
   from a checkpoint taken just before the end of the recording.
-- Checkpoints are taken every 1024 cycles or more and hold every `reg` and memory the
-  simulator finds in your sources. A design that keeps state in a `generate` block re-runs
-  from reset instead, and so does one whose re-run does not reproduce the recording it
-  replaces. The console says when either applies.
+- Checkpoints are taken every 1024 cycles or more (every 200,000 with Verilator in the
+  desktop app) and hold every `reg` and memory the simulator finds in your sources. A
+  design that keeps state in a `generate` block re-runs from reset instead, and so does one
+  whose re-run does not reproduce the recording it replaces. With Verilator that includes a
+  design that assigns with `<=` in an `initial` block, since the assignment lands after the
+  checkpoint is loaded. The console says when either applies.
 - Registers and memory cannot be edited, since what is shown is a recording.
 - Registers that have not been written show `xxxxxxxx`.
 - Step, Back and breakpoints follow the Wrapper's `PC` output, which is the fetch address.
   In a pipelined processor this runs ahead of the results, and includes instructions that
   are fetched and later flushed.
+
+### Speed
+
+Some options cost run time. They are under *Recording & output* in **Settings →
+Simulation**, and *Detail* sets them together: *Full* records everything, with Verilator
+following a live run in the waveform; *Balanced* records only the Wrapper's signals,
+building the waveform on Pause; *Fastest* records neither the waveform nor the
+architectural trace. The cross-check and post-synthesis simulation are off in all three.
+A waveform followed live stops at 20 MB, which a run at full speed reaches in seconds,
+and is then built for the last 50,000 cycles when the run stops.
+
+| Option | Cost when on | Lost when off |
+|---|---|---|
+| Waveform | about 30% of the run time | the waveform and the VCD download |
+| Waveform signals: All rather than Wrapper only | about 25% more | signals inside `RV` |
+| Waveform built while running (Verilator) | a re-read twice a second | the waveform during the run |
+| Architectural trace | about 30% (Icarus) | Step, Back, breakpoints and the Registers panel |
+| Cross-check against the JS model | a second run of the program | the cross-check |
+| Post-synthesis simulation | 20 to 35 s to synthesise, then a run 2 to 4 times slower | the netlist check |
 
 ### Interfaces
 
@@ -211,8 +232,8 @@ compilation error.
   unintended latches and races between blocking assignments. The first use downloads about
   13 MB, and each synthesis takes 20 to 35 seconds.
 - **The waveform** includes internal signals, with registers named `x5_t0` and so on.
-  **Waveform: Wrapper signals only** leaves out everything inside `RV`, which makes runs
-  about a quarter faster; to see an internal signal, turn it off and run again from Reset.
+  *Signals: Wrapper only* leaves out everything inside `RV`, which makes runs about a
+  quarter faster; to see an internal signal, choose *All* and run again from Reset.
   Memories are not recorded in a VCD; their contents are shown in the Memory panel. Clicking
   a cycle in the waveform moves the whole simulator to that cycle. The VCD can be downloaded for
   GTKWave or [Surfer](https://surfer-project.org/).
@@ -237,9 +258,9 @@ looks and behaves like the page, with these differences:
   simulation is only available with Icarus.
 - With Verilator, a run is live: switches, buttons, the accelerometer and UART input take
   effect while it runs, and it continues until **Pause**, a breakpoint or *Cycles per Run /
-  Resume* (1,000,000 by default). Back reaches only the last 2,000,000 cycles of a longer
-  run. *Real time* slows the simulation to the set clock, and with *Waveform: While running*
-  the waveform follows it, which is useful at a slow clock. The waveform covers at most the
+  Resume* (20,000,000 by default). Back reaches only the last 2,000,000 cycles of a longer
+  run. *Real time* slows the simulation to the set clock, and with the waveform *Built: While
+  running* it follows the simulation, which is useful at a slow clock. The waveform covers at most the
   last 50,000 cycles.
 - Verilator needs a C++ compiler. On a computer without one (`g++` on Linux, the Xcode
   command line tools on macOS), the first build downloads one, about 60 MB (100 MB on

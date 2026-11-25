@@ -224,6 +224,30 @@ setTimeout(async () => {
     win.setSimEngineMode('hdl');
     win.closeSettingsModal();
 
+    // --- 2b. Detail presets -------------------------------------------
+    console.log('\n[2b] Detail presets set the options that cost run time');
+    const v = id => doc.getElementById(id);
+    check('Detail starts at Full, with the trace and a waveform of all signals, followed while running',
+      v('hdlDetail').value === 'full' && v('hdlTrace').checked && v('hdlVcd').checked && v('hdlWaveTop').value === 'all' &&
+      v('hdlLiveWave').value === 'live');
+    win.setHdlDetail('balanced');
+    check('Balanced keeps the trace and records only the Wrapper\'s signals',
+      v('hdlDetail').value === 'balanced' && v('hdlTrace').checked && v('hdlVcd').checked && v('hdlWaveTop').value === 'top');
+    win.setHdlDetail('fastest');
+    check('Fastest turns the waveform and the trace off, visibly',
+      v('hdlDetail').value === 'fastest' && !v('hdlTrace').checked && !v('hdlVcd').checked);
+    check('…and hides the waveform\'s own settings with it', v('hdlWaveScopeRow').style.display === 'none');
+    check('…and the console says what it changed',
+      [...doc.querySelectorAll('#console div')].some(d => /Detail: Fastest - waveform off, architectural trace off/.test(d.textContent)));
+    win.setHdlDumpVcd(true);
+    check('Changing an option by hand reads Custom',
+      v('hdlDetail').value === 'custom' && !v('hdlDetail').querySelector('option[value="custom"]').hidden);
+    win.setHdlCompare(true);
+    win.setHdlDetail('full');
+    check('Full puts everything back, the cross-check off',
+      v('hdlDetail').value === 'full' && v('hdlTrace').checked && v('hdlVcd').checked && !v('hdlCompare').checked &&
+      v('hdlDetail').querySelector('option[value="custom"]').hidden);
+
     // --- 3. Register-file discovery ------------------------------------
     // The Wrapper is fixed, but the core behind it is student code, so the
     // path to the register array has to be found rather than assumed.
@@ -409,9 +433,12 @@ setTimeout(async () => {
     const groups = [...hdlTab.querySelectorAll('.sim-group-title')].map(e => e.textContent.trim());
     check('Sources come first, then Simulation',
       groups[0] === 'Processor sources' && groups[1] === 'Simulation');
-    check('Post-synthesis and Cycles are the Simulation group',
-      ['hdlSynth', 'hdlCycles']
+    check('Simulator and Cycles are the Simulation group',
+      ['hdlSimulator', 'hdlCycles']
         .every(id => doc.getElementById(id).closest('.sim-group').id === 'hdlGroupBoth'));
+    check('Every option Detail sets is in the group it heads',
+      ['hdlTrace', 'hdlVcd', 'hdlWaveTop', 'hdlLiveWave', 'hdlCompare', 'hdlSynth']
+        .every(id => doc.getElementById(id).closest('.sim-group') === doc.getElementById('hdlDetail').closest('.sim-group')));
     check('Post-synthesis is named as a functional simulation',
       /Post-synthesis functional simulation/.test(hdlTab.textContent));
     check('Its long explanation is folded away',
