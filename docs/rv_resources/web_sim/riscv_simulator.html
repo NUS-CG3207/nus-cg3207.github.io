@@ -5460,7 +5460,6 @@
     let sevsegState = '00000000';    // 7-segment display string
     let dipSwitches = 0;             // simulated DIP switch value (16 bits)
     let pbState = 0;                 // simulated push button state (3 bits: BTNL, BTNC, BTNR)
-    let clockToggle = 0;             // divided clock blink toggle bit
 
     // ============================================================
     // 3. REGISTER UTILITIES
@@ -7348,7 +7347,6 @@
     }
 
     function decodeAndExecute(instr32, addr) {
-      clockToggle = 1 - clockToggle;
       const opcode = instr32 & 0x7F;
       const rd = (instr32 >> 7) & 0x1F;
       const funct3 = (instr32 >> 12) & 0x7;
@@ -10680,6 +10678,25 @@
       updatePeripherals();
     }
 
+    // LED[8] is the divided clock. Refreshes come in batches whose length says
+    // nothing about the clock, so while a run is in progress (in either
+    // engine) it is drawn from the wall clock: at the clock's own rate when
+    // Real time paces one slow enough to see, otherwise flickering, which is
+    // how a fast clock looks. Lit when nothing runs.
+    let clockLedTimer = null;
+    function updateClockLed() {
+      const led = document.getElementById('led8');
+      const busy = running || !!(hdlLive || hdlChunked || hdlPlay);
+      let on = true;
+      if (busy) {
+        const hz = runPace === 'real' ? cpuHz() : Infinity;
+        on = hz <= 8 ? Math.floor(performance.now() / 1000 * hz * 2) % 2 === 0
+                     : Math.floor(performance.now() / 125) % 2 === 0;
+      }
+      if (led) led.classList.toggle('on', on);
+      if (busy && !clockLedTimer) clockLedTimer = setTimeout(() => { clockLedTimer = null; updateClockLed(); }, 60);
+    }
+
     function updatePeripherals() {
       // 1. PC[8:2] LEDs (LED[15:9]) -> Cyan/Blue
       for (let i = 15; i >= 9; i--) {
@@ -10688,11 +10705,8 @@
         if (led) led.classList.toggle('on', !!(pc & (1 << pcBit)));
       }
 
-      // 2. Divided Clock LED (LED[8]) -> Amber/Orange (blinks per cycle during execution, lit at pause)
-      const clockLed = document.getElementById('led8');
-      if (clockLed) {
-        clockLed.classList.toggle('on', running ? !!clockToggle : true);
-      }
+      // 2. Divided Clock LED (LED[8]) -> Amber/Orange
+      updateClockLed();
 
       // 3. User Output LEDs (LED[7:0]) -> Green (driven by PERIPH_LED 0xFFFF0060)
       for (let i = 7; i >= 0; i--) {

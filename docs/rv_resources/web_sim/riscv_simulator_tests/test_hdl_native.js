@@ -328,8 +328,14 @@ setTimeout(async () => {
       await fresh();
       const r2 = win.runHdlSimulation();
       await until(() => win.getHdlTrace() && win.getHdlTrace().budget > 25000, 60000);
+      // LED[8], the divided clock, blinks while it runs and is lit when not.
+      const clk = () => doc.getElementById('led8').classList.contains('on');
+      const blink = new Set();
+      for (let i = 0; i < 40; i++) { blink.add(clk()); await sleep(20); }
       win.toggleRunPause();
       await r2;
+      await sleep(100);
+      check('The divided-clock LED blinks while it runs, and is lit once paused', blink.size === 2 && clk());
       const b1 = win.getHdlTrace().budget;
       check('Pause stops it part-way (' + b1 + ')', b1 < 100000 && /paused/.test(st()));
       await win.runHdlSimulation();
