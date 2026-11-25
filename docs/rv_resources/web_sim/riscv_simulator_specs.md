@@ -1,47 +1,37 @@
-# NUS-CG3207 RISC-V Functional and HDL Simulator (RV32GC)
+# RVEduSim: specification
 
-**Reference manual, architecture guide and changelog.**
-
-> **New here?** Start with the [**User Guide**](riscv_simulator.md) — a short,
-> task-oriented walkthrough. This document is the full reference behind it.
+**Technical specification.** For a task-oriented walkthrough, see the [User Guide](riscv_simulator.md).
 
 | File | What it is |
 |---|---|
-| [`riscv_simulator.html`](riscv_simulator.html) | The simulator. Single file, no build step. Assembling, simulating and the HDL engine all run in the browser with nothing fetched; **DIP to LED** (both languages) is baked in for the same reason. Every other example, and C compilation, need the page served over `http://` — see below. |
-| [`examples/`](examples/) | Every example but DIP to LED — `asm/*.asm`, `c/*.c` — fetched by the page when you select one. Listed in `index.txt` (plain text, not `.md` — static site generators tend to render `.md` rather than serve it verbatim), one markdown-style table row per example carrying its language and the two memory depths it needs; that is the whole menu, no HTML edit needed to add one. |
-| [`vendor/`](vendor/README.md) | Local copies of the three external engines (CodeMirror, Icarus Verilog, Yosys), used only when the CDN cannot be reached. |
-| [`electron/`](electron/README.md) | The desktop app: this page in an Electron window, with Icarus Verilog built natively for each platform. See [§5.18](#518-the-desktop-app). |
+| [`riscv_simulator.html`](riscv_simulator.html) | The simulator: one file, no build step. Assembling, simulating and the HDL engine run in the browser. The **DIP to LED** example (assembly and C) is embedded in the page; every other example, and C compilation, need the page served over `http://`. |
+| [`examples/`](examples/) | All other examples: `asm/*.asm`, `c/*.c`, fetched when selected. `examples/hdl/` holds `Wrapper.v` and `RV_reference.v`, a prebuilt gate-level netlist of a reference core. |
+| [`examples/index.txt`](examples/index.txt) | The Example menu: one markdown-style table row per example, giving its key, language, label, file, the `IROM`/`DMEM` depth bits it needs, and a description. Adding a row and a file adds an example; the HTML is not edited. The file is `.txt` so static site generators serve it verbatim rather than render it. |
+| [`vendor/`](vendor/README.md) | Local copies of the external engines: the CodeMirror 6 bundle, Icarus Verilog compiled to WebAssembly, and Yosys (`@yowasp/yosys`). |
+| [`electron/`](electron/README.md) | The desktop app: this page in an Electron window, with Icarus Verilog and Verilator built natively for each platform. See [§5.18](#518-the-desktop-app). |
 
-**Live:** <https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/> · Vibe coded by Rajesh Panicker.
+**Live:** <https://r-panicker.github.io/RVEduSim/>. A copy is also served on the [CG3207](https://nus-cg3207.github.io/) course site, <https://nus-cg3207.github.io/rv_resources/web_sim/riscv_simulator/>. Vibe coded by Rajesh Panicker.
 
-A self-contained **RISC-V RV32GC** assembler, C compiler front-end, emulator and
-visual debugger built for the NUS **CG3207** computer architecture labs. The editor
-engine, ISA tables and peripherals are embedded in one HTML file with no external
-dependencies at runtime. Example programs are not: only **DIP to LED** is, in both
-Assembly and C, so that opening the page directly from disk — `file://`, no server —
-always has *something* to work from in whichever mode you are in. Every other example
-is a plain file in `examples/`, fetched with `fetch()` when you pick it from the menu,
-which is what makes it editable without touching `riscv_simulator.html` at all — and
-what stops it working over `file://`, where browsers block `fetch()` outright. C
-compilation optionally uses the Compiler Explorer (Godbolt) REST API, which needs the
-network regardless of how the page is served; everything else — assembling,
-simulating, the HDL engine — runs in the browser.
+The page is a self-contained RISC-V assembler, C compiler front-end, emulator and visual
+debugger, with an optional second engine that simulates a Verilog processor. The editor
+engine, ISA tables and peripherals are in the HTML file. Example programs other than DIP to
+LED are plain files in `examples/`, loaded with `fetch()`, which browsers block over
+`file://`. C compilation uses the Compiler Explorer (Godbolt) REST API and needs the network
+however the page is served.
 
 ### Running it locally
 
-Double-clicking `riscv_simulator.html` works for a quick look, but only DIP to LED
-loads. To get every example and C compilation, serve the repository root over
-`http://` instead:
+Opening `riscv_simulator.html` from disk loads only DIP to LED. To get every example and C
+compilation, serve the repository root over `http://`:
 
 ```bash
-cd Visualisations   # the repository root - riscv_simulator.html lives here
+cd <repository root>   # the folder holding riscv_simulator.html
 python3 -m http.server 8000
 ```
 
-then open <http://localhost:8000/riscv_simulator.html>. Any other static server works
-the same way (`npx serve`, VS Code's Live Server, etc.) — the only requirement is that
-`examples/` and `vendor/` stay siblings of `riscv_simulator.html`, exactly as checked
-out.
+then open <http://localhost:8000/riscv_simulator.html>. Any static server works (`npx serve`,
+VS Code's Live Server). `examples/` and `vendor/` must stay siblings of
+`riscv_simulator.html`.
 
 ---
 
@@ -49,835 +39,638 @@ out.
 
 | Area | Capability |
 |------|------------|
-| **Two engines** | A `JS \| HDL` toggle in the toolbar chooses what Run, Step and Back actually execute: the built-in RV32GC interpreter, or your uploaded Verilog through **Icarus Verilog compiled to WebAssembly**. Everything else — registers, memory, peripherals, breakpoints — is shared. See [§5](#5-hdl-simulation-mode-your-verilog-in-the-browser). |
-| **Editor** | Embedded CodeMirror 6 bundle (`window.CM6`). Toggles between **RV32 Assembly** and **C**, each with its own syntax highlighter, autocomplete, live signature help and hover docs. Catppuccin Mocha dark theme. |
-| **Assembler** | Two-pass assembler for RV32I + M + A + F + D + C, plus common pseudo-instructions. Emits disassembly with label header rows, jump/branch target annotations and C source-line tags. |
-| **C support** | Compiles via Godbolt (RV32 GCC / Clang, selectable `-O` level and ABI). Prepends a baremetal CRT0 shim that sets `sp`. Builds bidirectional PC↔C-line maps for source-level stepping and breakpoints. Clang 20.1.0 is the default compiler. |
-| **Execution** | Non-blocking `requestAnimationFrame` loop, fixed `BATCH_SIZE = 10,000` instr/tick. Configurable run limit (default 100,000,000) auto-pauses infinite loops. Cycle-accurate CPI timing by instruction category. |
-| **Debugging** | Run / Pause / Resume, Step, Step Back (full register + memory history), optional **Statement Stepping** (one C statement or multi-instruction pseudo-op per step) — in **both** engines. Breakpoint gutter with smart snapping to the next valid instruction; highlighted breakpoint line numbers; active execution line tracking with auto-scroll. |
-| **Memory view** | Tabbed `[ Text \| Data \| Stack \| MMIO ]`. Text segment read-only; Data/Stack/MMIO editable. Stack shown in downward-decreasing address order. Little-endian word display. Segment overflow warnings. Verilog `.mem` dumps (`AA_IROM.mem`, `AA_DMEM.mem`). |
-| **Panel layout** | Registers / Memory / Peripherals / Disassembly are independent panels, not exclusive tabs: show any combination; ≤2 docked panels stack vertically, >2 form a **2×2 grid** with draggable row/column splitters; detach any panel into a floating window. Layout persists to `localStorage`. The three data panels share one header design with always-visible draggable column separators and frozen header rows. The Peripherals panel is deliberately untouched. |
-| **Console** | One console under the editor carries the assembler, the runtime and the Verilog compiler (tagged `[HDL]`). **Resizable** — drag the bar above it, double-click to reset; the height is remembered. |
-| **Settings** | One `⚙ Settings…` modal, 4 tabs: **Compiler**, **Linker**, **JS Simulation**, **HDL Simulation**. See [§6](#6-settings). |
+| **Two engines** | The toolbar's `JS \| HDL` toggle chooses what Run, Step and Back execute: the built-in JavaScript interpreter, or a Verilog processor simulated by Icarus Verilog (WebAssembly in the browser, native in the desktop app) or, in the desktop app, Verilator. Registers, memory, peripherals and breakpoints are shared. See [§5](#5-hdl-simulation-mode). |
+| **Editor** | CodeMirror 6 (`window.CM6`). ASM and C modes, each with its own syntax highlighter, autocomplete, signature help and hover documentation. Catppuccin Mocha dark theme. |
+| **Assembler** | Two-pass assembler for RV32I + M + A + F + D and common pseudo-instructions. Produces a disassembly with label header rows, jump/branch target annotations and C source-line tags. |
+| **C support** | Compiles through Godbolt (RV32 GCC or Clang; `-O` level and ABI selectable; default compiler RISC-V Clang 20.1.0, id `rv32-cclang2010`). A baremetal CRT0 shim that sets `sp` is prepended. PC↔C-line maps in both directions support source-level stepping and breakpoints. See [§3](#3-c-language-support). |
+| **Execution** | Non-blocking `requestAnimationFrame` loop; `BATCH_SIZE = min(10000, run limit)` instructions per tick. The run limit (`maxInstructionsPerRun`, default 100,000,000) pauses runaway loops. The functional engine models a single-cycle, multi-cycle (per-category CPI table) or 5-stage pipelined processor. See [§4](#4-execution-engines). |
+| **Debugging** | Run / Pause / Resume, Step, Step Back with full register and memory history, and optional Statement Stepping (one C statement or multi-instruction pseudo-instruction per step), in both engines. Breakpoints snap to the next executable line; the executing line is highlighted and scrolled into view. |
+| **Memory view** | Sub-tabs `[ Text \| Data \| Stack \| MMIO ]`. Text is read-only; Data, Stack and MMIO are editable. The stack is shown in decreasing address order. Words are displayed little-endian. Segment overflow is warned about. The program can be saved as Verilog `$readmemh` images `AA_IROM.mem` and `AA_DMEM.mem`. |
+| **Panels** | Registers, Memory, Peripherals, Disassembly and Locals (C mode) are independent panels: any combination can be shown, docked in a stack or a 2×2 grid, or floated. Layout persists in `localStorage`. See [§2.5](#25-panels). |
+| **Console** | One resizable console under the editor carries assembler, runtime and Verilog toolchain output (tagged `[HDL]`). |
+| **Settings** | One `⚙ Settings…` modal with three tabs: **Compiler**, **Linker**, **Simulation**. See [§6](#6-settings). |
 
-### Memory layout (SPIM-style defaults)
+### Memory layout (defaults)
 
 | Segment | Base | Size |
 |---------|------|------|
-| `.text` (code) | `0x00400000` | `0x200` (512 B / 128 instr) |
+| `.text` (code) | `0x00400000` | `0x200` (512 B, 128 instructions) |
 | `.data` | `0x10010000` | `0x200` |
-| Stack top (`sp`) | `0x10010200` | (Data base + Data size; customizable) |
+| Stack top (`sp`) | `0x10010200` | Data base + data size by default; can be overridden |
 | MMIO base | `0xFFFF0000` | — |
 
-### MMIO map (Nexys 4 board simulation)
+All values are set in Settings → Linker. Selecting an example sets the segment sizes from its
+`IROM`/`DMEM` depth bits in `examples/index.txt`.
+
+### MMIO map (Nexys 4 board peripherals)
 
 | Address | Access | Symbol | Purpose |
 |---------|--------|--------|---------|
-| `0xFFFF0000` / `0xFFFF0004` | RO | `UART_RX_VALID` / `UART_RX` | Serial receive status + data (pop on read) |
-| `0xFFFF0008` / `0xFFFF000C` | RO / WO | `UART_TX_READY` / `UART_TX` | Serial transmit status + data |
-| `0xFFFF0020`–`0xFFFF002C` | WO | `OLED_COL/ROW/DATA/CTRL` | 96×64 pixel OLED; `CTRL[3:0]` advance mode, `CTRL[7:4]` colour format (8/16/24-bit) |
-| `0xFFFF0040` / `0xFFFF0044` | RO | `ACCEL_DATA` / `ACCEL_DREADY` | Packed `[31:24]=Temp, [23:16]=X, [15:8]=Y, [7:0]=Z`, all 8-bit signed |
-| `0xFFFF0060` / `0xFFFF0064` | WO / RO | `PERIPH_LED` / `PERIPH_DIP` | 16 output LEDs / 16 DIP switches |
+| `0xFFFF0000` / `0xFFFF0004` | RO | `UART_RX_VALID` / `UART_RX` | Serial receive status and data (pop on read) |
+| `0xFFFF0008` / `0xFFFF000C` | RO / WO | `UART_TX_READY` / `UART_TX` | Serial transmit status and data |
+| `0xFFFF0020`–`0xFFFF002C` | WO | `OLED_COL/ROW/DATA/CTRL` | 96×64 Pmod OLED; `CTRL[3:0]` advance mode, `CTRL[7:4]` colour format (8/16/24-bit) |
+| `0xFFFF0040` / `0xFFFF0044` | RO | `ACCEL_DATA` / `ACCEL_DREADY` | Packed `[31:24]=Temp, [23:16]=X, [15:8]=Y, [7:0]=Z`, each 8-bit signed |
+| `0xFFFF0060` / `0xFFFF0064` | WO / RO | `PERIPH_LED` / `PERIPH_DIP` | 16 LEDs / 16 DIP switches |
 | `0xFFFF0068` | RO | `PERIPH_PB` | Push buttons (bit 2 = BTNL, 1 = BTNC, 0 = BTNR) |
-| `0xFFFF0080` | WO | `PERIPH_SEVENSEG` | 32-bit value → 8 hex digits on 7-segment |
-| `0xFFFF00A0` | RO | `CYCLECOUNT` | Cycles since reset — a CPI estimate in JS mode, real clock edges in HDL mode |
+| `0xFFFF0080` | WO | `PERIPH_SEVENSEG` | 32-bit value shown as 8 hex digits on the 7-segment display |
+| `0xFFFF00A0` | RO | `CYCLECOUNT` | Cycles since reset: the model's count in JS mode, clock edges in HDL mode |
 
-The full behavioural map is in [§7.2](#72-complete-mmio-address-map).
+The full behavioural map is in [§7.2](#72-mmio-address-map).
 
 ---
 
 ## 1. Project overview
 
-**NUS-CG3207 RISC-V Functional and HDL Simulator** is a single-file web application delivering a complete
-**RISC-V RV32GC (RV32I + M + A + F + D + C) assembler, C compiler, emulator and visual
-debugger**, powered by **CodeMirror 6** and the **Compiler Explorer (Godbolt) REST API** —
-plus an optional second execution engine that runs *your own Verilog processor* through
-**Icarus Verilog compiled to WebAssembly**.
+The simulator is a single-file web application containing a RISC-V assembler (RV32I, M, A,
+F, D and pseudo-instructions), a C front-end that compiles through the Godbolt REST API, a
+functional emulator and a visual debugger, with an optional second engine that runs a
+Verilog processor through Icarus Verilog compiled to WebAssembly (or native Icarus Verilog
+and Verilator in the desktop app).
 
-Designed for computer engineering students, hardware architects and embedded systems
-developers, it combines a modern editor supporting both **RISC-V Assembly** and **C**,
-custom syntax highlighting, live parameter signature help, hover inspection, a
-breakpoint gutter with highlighted line numbers and smart snapping, a two-pass
-assembler, a non-blocking execution engine, a real-time disassembly viewer with label
-headers and jump/branch target annotations, a step-by-step debugger with back-stepping
-history and statement stepping, an interactive memory explorer with custom segment
-mapping and read-only code protection, downward-growing stack visualisation,
-configurable instruction cycle timing, a hardware-accurate simulation of the
-**Digilent Nexys 4 FPGA board**, a 16550 **UART serial console**, a **96×64 pixel OLED
-display**, a **3-axis accelerometer & temperature sensor**, a **system cycle counter**,
-**RARS `ecall` syscalls**, and 22 pre-loaded assembly and C example programs.
+The same program, breakpoints and peripheral panels drive either the functional model or
+the RTL, so a program can be run on the model to see what it should do and then on a
+processor design to see what that design does.
 
-The distinguishing feature is that the same program, the same breakpoints and the same
-peripheral panels drive **either** a functional model **or** real RTL — so a student can
-run a program to see what it *should* do, then run it again on the processor they wrote.
+Components:
 
+- CodeMirror 6 editor for RISC-V assembly and C, with syntax highlighting, autocomplete, signature help, hover documentation and a breakpoint gutter.
+- Two-pass assembler and a disassembly view with label headers and branch/jump target annotations.
+- Step-by-step debugger with step back and statement stepping.
+- Memory explorer with configurable segment bases and sizes and a read-only text segment.
+- Single-cycle, multi-cycle and pipelined timing models, with configurable per-category cycle counts.
+- Simulated Digilent Nexys 4 board peripherals: LEDs, DIP switches, push buttons, 7-segment display, UART console, 96×64 Pmod OLED, 3-axis accelerometer and temperature sensor, and a cycle counter.
+- RARS-compatible `ecall` syscalls.
+- 13 example programs (7 assembly, 6 C), listed in `examples/index.txt`.
 
 ---
 
-## 2. Architecture & design system
+## 2. Architecture and design
 
-### 2.1 Technology stack & core philosophy
-- **Offline-First with CDN-Optimized CodeMirror 6**: Pure HTML5, CSS3, and modern Vanilla JavaScript (ES6+) with CodeMirror 6 loaded from **jsDelivr CDN** as native ESM modules (assembled into a single `window.CM6` namespace by a tiny bootstrap loader) with an automatic **local fallback** (`riscv_simulator_tests/cm6_bundle.min.js`) when the CDN is unreachable — so the simulator still boots 100% offline. Supports offline execution with built-in precompiled C mappings and online C compilation via the Godbolt REST API.
-- **Theme & Aesthetics**: Dark mode theme inspired by the *Catppuccin Mocha* palette:
-  - Base background: `#1e1e2e`
-  - Mantle / Editor background: `#181825`
-  - Surface / Panels: `#313244`
-  - Primary accents: `#cba6f7` (Mauve)
-  - Keywords: `#89b4fa` (Blue)
-  - Registers / Strings: `#a6e3a1` (Green)
-  - Directives / Types: `#f5c2e7` (Pink)
-  - Labels: `#fab387` (Peach)
-  - Immediates / Numbers: `#f9e2af` (Yellow)
-  - Comments: `#6c7086` (Gray)
-  - Errors / Breakpoints: `#f38ba8` (Red)
-- **Responsive Layout**: Resizable two-pane layout using a custom draggable divider (`.splitter`). Optimized for desktop, tablet, and mobile viewports.
-- **Typography Stack**: Modern system UI font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) with enhanced font weights (`500`–`650`) and high-contrast styling for crisp legibility across all panels.
-- **Embedded Favicon & Microchip Branding**: Custom vector SVG microchip architecture icon and embedded data URI SVG favicon in `<head>`, displaying an integrated circuit package with central silicon die, gold bonding I/O pins, and central `RV` (RISC-V) core logo.
-- **Unified Toolbar Controls**: Uniform button heights (`28px` on desktop, `32px` on mobile) and vertical alignment across standard buttons, icon controls, and dropdown selectors.
+### 2.1 Technology stack
 
----
+- **Runtime**: HTML5, CSS3 and plain JavaScript (ES6+). No build step.
+- **Editor engine**: a single CodeMirror 6 bundle, `cm6_bundle.min.js`, assembled into `window.CM6` (see §2.2).
+- **Theme**: Catppuccin Mocha palette:
 
+  | Role | Colour |
+  |---|---|
+  | Base background | `#1e1e2e` |
+  | Mantle / editor background | `#181825` |
+  | Surface / panels | `#313244` |
+  | Primary accent (Mauve) | `#cba6f7` |
+  | Keywords (Blue) | `#89b4fa` |
+  | Registers / strings (Green) | `#a6e3a1` |
+  | Directives / types (Pink) | `#f5c2e7` |
+  | Labels (Peach) | `#fab387` |
+  | Immediates / numbers (Yellow) | `#f9e2af` |
+  | Comments (Gray) | `#6c7086` |
+  | Errors / breakpoints (Red) | `#f38ba8` |
 
-### 2.2 Dual-language architecture & the CodeMirror 6 engine
+- **Layout**: editor and panel column separated by a draggable `.splitter`. The editor side keeps at least 360 px (`LEFT_MIN`), re-clamped on window resize. Below 800 px wide the page switches to a mobile layout.
+- **Typography**: system UI font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`).
+- **Icon**: an inline SVG chip icon with an `RV` label, used in the header and as the favicon.
+- **Toolbar controls**: 28 px high on desktop, 30 px on mobile.
 
-The simulator incorporates a state-of-the-art **CodeMirror 6** editor architecture mounted in `<div id="cmEditorContainer"></div>` with dynamic language reconfiguration via a `CM6.Compartment`:
+### 2.2 Editor and language modes
 
-```
-+---------------------------------------------------------------------------------------+
-|                                    CodeMirror 6 Editor                                |
-|  +---------------------------------------------------------------------------------+  |
-|  | [ RV32 ASM | C Code ]  Example: [ Basic Sum (C)                     ▼ ] 📂 💾 ↶ ↷ 🔍 |  |
-|  +---------------------------------------------------------------------------------+  |
-|  |  1 ● | #include <stdint.h>                                                      |  |
-|  |  2   | #define LEDS (*(volatile uint32_t*)0xFFFF0060)                           |  |
-|  |  3   | int main(void) {                                                         |  |
-|  |  4 ➡ |     LEDS = 0x55;  /* <-- Active execution line (cm-execLine) */           |  |
-|  |  5   |     return 0;                                                            |  |
-|  |  6   | }                                                                        |  |
-|  +---------------------------------------------------------------------------------+  |
-+---------------------------------------------------------------------------------------+
-```
+The editor is mounted in `<div id="cmEditorContainer">`. The language is swapped through a
+`CM6.Compartment`.
 
-#### 1. Language Mode Switcher (`[ RV32 ASM | C Code ]`)
-- **Assembly Mode**: Activates `riscvStreamParser` with RISC-V instruction/register autocomplete and 11 assembly example programs.
-- **C Code Mode**: Activates `cStreamParser` with C keyword/type autocomplete, `#define` MMIO macros (`LEDS`, `SWITCHES`, `BUTTONS`, `SEVSEG`, `UART_TX`, `ACCEL_DATA`, `OLED_COL`, `OLED_ROW`, `OLED_DATA`, `OLED_CTRL`), Godbolt compiler configuration modal, and 11 C example programs.
+**Language modes** (`[ ASM | C ]`, `setLanguageMode()`):
 
-#### 2. CodeMirror 6 Loading (`window.CM6`)
-The editor engine is bootstrapped by a tiny loader script that fetches a **single self-contained CodeMirror 6 bundle** (`riscv_simulator_tests/cm6_bundle.min.js`, one copy of every `@codemirror/*` / `@lezer/*` package) from **jsDelivr** (served from this repo's GitHub raw file), with a **local IIFE fallback** (`riscv_simulator_tests/cm6_bundle.min.js`) loaded automatically if the CDN is unreachable (offline / CSP-blocked). Loading the individual `@codemirror/*` ESM packages separately (as was done originally) does **not** work — each jsDelivr `+esm` bundle inlines its own `@lezer/common` internals, so `StreamLanguage`/`HighlightStyle` extensions built against one instance fail `EditorState` validation ("Unrecognized extension value") and syntax highlighting silently breaks. A single pre-bundled unit guarantees every package shares one instance. The app defers its editor bootstrap (`bootSimulator()`) until `window.CM6` exists, so load timing is non-blocking. The namespace exposes:
+- **ASM**: `riscvStreamParser` highlighting and instruction/register autocomplete.
+- **C**: `cStreamParser` highlighting, C keyword/type autocomplete, the MMIO macros `LEDS`, `SWITCHES`, `BUTTONS`, `SEVSEG`, `UART_TX`, `ACCEL_DATA`, `OLED_COL`, `OLED_ROW`, `OLED_DATA`, `OLED_CTRL`, and the compiler settings.
+
+**Loading `window.CM6`.** A loader script tries these sources in order and takes the first
+that loads:
+
+1. `vendor/codemirror/cm6_bundle.min.js` (also preloaded from `<head>`)
+2. `riscv_simulator_tests/cm6_bundle.min.js`
+3. jsDelivr: `https://cdn.jsdelivr.net/gh/r-panicker/Visualisations@main/riscv_simulator_tests/cm6_bundle.min.js`
+
+The bundle loads through a `<script>` tag, so the editor works over `file://` too. It
+contains one copy of every `@codemirror/*` and `@lezer/*` package. The packages cannot be
+loaded as separate jsDelivr `+esm` modules: each inlines its own `@lezer/common`, and
+extensions built against one instance fail `EditorState` validation ("Unrecognized extension
+value"). If `window.CM6` already exists, or `window.__CM6_DISABLE_CDN` is set (used by tests
+that inject their own bundle), the loader does nothing. `bootSimulator()` waits until
+`window.CM6` exists.
+
+The namespace exposes:
+
 - `@codemirror/state`: `EditorState`, `StateField`, `StateEffect`, `RangeSet`, `RangeSetBuilder`, `EditorSelection`, `Transaction`, `Facet`, `Compartment`.
 - `@codemirror/view`: `EditorView`, `GutterMarker`, `gutter`, `lineNumbers`, `lineNumberMarkers`, `highlightActiveLine`, `highlightActiveLineGutter`, `showTooltip`, `hoverTooltip`, `drawSelection`, `dropCursor`.
 - `@codemirror/language`: `StreamLanguage`, `HighlightStyle`, `syntaxHighlighting`, `bracketMatching`.
-- `@codemirror/commands`: `history`, `historyKeymap`, `defaultKeymap`, `indentWithTab`, `indentMore`, `indentLess`, `undo`, `redo`.
+- `@codemirror/commands`: `history`, `historyKeymap`, `defaultKeymap`, `indentWithTab`, `indentMore`, `indentLess`, `undo`, `redo`, `undoDepth`, `redoDepth`.
 - `@codemirror/search`: `openSearchPanel`, `closeSearchPanel`, `findNext`, `findPrevious`, `replaceNext`, `replaceAll`.
 - `@codemirror/autocomplete`: `autocompletion`, `completionKeymap`, `startCompletion`, `closeCompletion`, `acceptCompletion`.
 - `@lezer/highlight`: `tags` (keyword, typeName, variableName, meta, labelName, comment, number, string, punctuation, operator, propertyName).
 
-#### 3. Custom Syntax Highlighters
-- **RISC-V Assembly Tokenizer (`riscvStreamParser`)**: Instructions (`#89b4fa`), Registers (`#a6e3a1`), Directives (`#f5c2e7`), Labels (`#fab387`), Numbers (`#f9e2af`), Comments (`#6c7086`), Relocation Macros (`#89dceb`), CSRs (`#cba6f7`).
-- **C Language Tokenizer (`cStreamParser`)**: Types (`#f5c2e7`), Keywords (`#89b4fa`), Preprocessor Directives (`#f5c2e7`), Strings/Chars (`#a6e3a1`), Numbers/Hex/Binary (`#f9e2af`), Operators (`#89dceb`), Macros/Properties (`#cba6f7`), Comments (`#6c7086`).
+**Highlighting colours:**
 
----
+| Token | ASM (`riscvStreamParser`) | C (`cStreamParser`) |
+|---|---|---|
+| `#89b4fa` | Instructions | Keywords |
+| `#a6e3a1` | Registers | Strings, chars |
+| `#f5c2e7` | Directives | Types, preprocessor directives |
+| `#fab387` | Labels | — |
+| `#f9e2af` | Numbers | Numbers (hex, binary) |
+| `#89dceb` | Relocation macros (`%hi`, `%lo`) | Operators |
+| `#cba6f7` | CSRs | Macros, properties |
+| `#6c7086` | Comments | Comments |
 
+### 2.3 Breakpoints and the execution line
 
-### 2.3 Visual debugging & breakpoints
+- Clicking the breakpoint gutter (`.cm-breakpoint-gutter`) or the line numbers, or pressing `F9` on the cursor line, toggles a breakpoint. The gutter is kept in sync with the simulator's `breakpoints` Set.
+- A breakpoint shows a red `●` (`#f38ba8`) and highlights its line number (`cm-breakpoint-line-number`). The code line itself is not tinted; full-line highlighting is reserved for the execution line.
+- A breakpoint set on a line with no executable code (comment, directive, blank line, `}`, bare function signature) moves to the next executable line, and the console logs `Breakpoint set at line X (moved from line Y to next valid instruction).`
+- The line about to execute (after a step, a back step, or a stop) gets `cm-execLine`: background `rgba(137, 180, 250, 0.18)` and a 3 px `#89b4fa` left border. It is centred in view with `CM6.EditorView.scrollIntoView`.
 
-#### 1. Interactive Breakpoint Gutter with Drop-Shadow Glow
-- Clickable breakpoint gutter (`.cm-breakpoint-gutter`) and line numbers margin.
-- Active breakpoints display a vibrant red circular badge (`●`, `#f38ba8`) with soft drop-shadow glow.
-- Synchronized bidirectionally with the simulator's internal `breakpoints` Set and the `F9` toggle shortcut.
+### 2.4 Editing aids
 
-#### 2. Highlighted Breakpoint Line Numbers
-- When a breakpoint is set on a line, **the line number alone in the line numbers gutter is highlighted** with bold red text (`#f38ba8`), a soft red rounded background pill, and a text glow alongside the breakpoint dot marker (`●`).
-- The code line itself remains un-tinted while editing/waiting so that there is no visual ambiguity, leaving full line highlighting exclusively for the active execution line when execution reaches or stops at that point.
+- **Autocomplete** (`riscvAutocomplete`): at the start of a statement, instructions (RV32I/M/A/F/D), pseudo-instructions and directives with their syntax and descriptions; after a mnemonic, registers (`x0`–`x31`), labels and equates, with the current operand named (`PARAM 1: rd`, `PARAM 2: rs1`, `PARAM 3: imm`). In C mode: types (`int`, `uint32_t`, `size_t`, `void`), keywords (`return`, `if`, `while`, `for`, `struct`, `volatile`), preprocessor directives (`#include`, `#define`) and the MMIO macros.
+- **Signature help** (`signatureHelpField`): in an instruction's operands (e.g. `addi |`, `sw x1, 4(|)`), a tooltip above the cursor shows the signature with the active operand highlighted.
+- **Hover** (`riscvHoverTooltip`): hovering a mnemonic, register, directive or declared label shows its syntax, description and encoding or line information.
+- **Tab**: with no selection, `Tab` inserts a literal `\t`. With a selection, `Tab` indents it (`indentMore`) and `Shift+Tab` unindents it (`indentLess`).
+- **Find and replace** (`Ctrl+F` / `Ctrl+H`, `#findReplacePanel`): match counter (`#findCount`), next/previous (`Enter` / `Shift+Enter`), match case (`Alt+C`), replace and replace all, both undoable. `Esc` closes it.
+- **Editor facade**: `window.editor` exposes `.value`, `.selectionStart`, `.selectionEnd`, `.scrollTop`, `.scrollLeft`, `.focus()`, `.setSelectionRange()`, `.addEventListener()` and `.removeEventListener()` over the CodeMirror view; `window.editorHistory` provides `undo()` and `redo()`.
 
-#### 3. Smart Breakpoint Snapping to Next Valid Instruction
-- If a user clicks or sets a breakpoint on a line that does not contain an executable instruction (e.g. comments, directives, blank lines, closing braces `}`, or bare function signatures):
-  - The simulator automatically resolves the line and **moves the breakpoint to the next valid executable instruction/statement line**.
-  - The console status log provides clear feedback: `Breakpoint set at line X (moved from line Y to next valid instruction).`
+### 2.5 Panels
 
-#### 4. Unambiguous Execution Line Tracking (`cm-execLine`)
-- When execution actually reaches a breakpoint (or during `Step (F8)`, `Back (Shift+F8)`, `Run (F5)`), the active instruction line is prominently highlighted with a blue background (`rgba(137, 180, 250, 0.18)`) and a 3px blue left accent border (`#89b4fa`), and automatically scrolls smoothly into view (`CM6.EditorView.scrollIntoView`).
+The right column holds independent panels, defined in `PANEL_DEFS`:
 
----
+| Panel | Shown |
+|---|---|
+| Registers, Memory, Peripherals, Disassembly | Always available |
+| Locals | C mode only; the chip is hidden in ASM mode |
+| Waveforms | Mobile only, in HDL mode (on desktop the waveform is a dock at the bottom of the window) |
+| Datapath | Mobile only (on desktop the datapath is a dock) |
 
-
-### 2.4 Advanced editing, IntelliSense & guidance
-
-#### 1. Context-Aware IntelliSense Autocomplete (`riscvAutocomplete`)
-- **Mnemonic Position**: At the start of a statement, completions offer matching RV32I/M/A/F/D/C instructions, pseudo-instructions, and directives with full syntax formats and descriptions.
-- **Operand Position & Active Instruction Locking**: Once a mnemonic is established on the line (e.g. after typing `addi ` or `sw `), completions filter to Registers (`x0`–`x31`), Labels, and Equates, and show active instruction operand parameter highlights (e.g. `PARAM 1: rd`, `PARAM 2: rs1`, `PARAM 3: imm`).
-- **C Autocomplete**: Suggests standard C types (`int`, `uint32_t`, `size_t`, `void`), keywords (`return`, `if`, `while`, `for`, `struct`, `volatile`), preprocessor directives (`#include`, `#define`), and FPGA MMIO macros (`LEDS`, `SWITCHES`, `BUTTONS`, `SEVSEG`, `UART_TX`, `ACCEL_DATA`, `OLED_COL`, `OLED_ROW`, `OLED_DATA`, `OLED_CTRL`).
-
-#### 2. Live Signature Helper Floating Tooltip (`signatureHelpField`)
-- While the cursor is in the operand section of any instruction (e.g. `addi |` or `sw x1, 4(|)`), a floating tooltip appears above the cursor displaying the instruction's signature with the **active parameter dynamically highlighted** in bold peach/cyan with an underline.
-
-#### 3. Interactive Hover Tooltips (`riscvHoverTooltip`)
-- Hovering the mouse over any instruction mnemonic, register name, directive, or declared label displays a styled documentation card with its syntax format, description, and encoding/line metadata.
-
-#### 4. Precision Tab & Indentation Engine
-- **In-line Tab Insertion**: When the cursor is collapsed, pressing `Tab` inserts a literal `\t` at the cursor position without shifting or auto-indenting the whole line.
-- **Block Indentation**: When a block of text is selected, `Tab` indents the entire selection (`indentMore`), and `Shift+Tab` unindents (`indentLess`).
-
-#### 5. Floating Find & Replace Panel (`Ctrl+F` / `Ctrl+H`)
-- Real-time search match counter (`findCount`), next/previous navigation (`Enter` / `Shift+Enter`), case-sensitivity toggle (`Alt+C`), single replacement, and replace-all with full undo history tracking.
-
-#### 6. Backward-Compatible Editor Facade
-- Provides a drop-in proxy object `window.editor` exposing `.value`, `.selectionStart`, `.selectionEnd`, `.scrollTop`, `.scrollLeft`, `.focus()`, `.setSelectionRange()`, `.addEventListener()`, and `.removeEventListener()`.
-
----
-
-
-### 2.5 Dockable & detachable inspector panels
-
-The four right-side inspector views — **Registers**, **Memory**, **Peripherals**, and **Disassembly** — are no longer mutually-exclusive tabs. Each is an independently toggled panel that can be stacked in the side column or torn off into a floating window.
+The toolbar's Datapath button (Waveform in HDL mode, `toggleVisualisation()`) shows or hides
+the datapath or waveform view: as a dock on desktop, as its panel on mobile.
 
 ```
 +---------------------------------------------------+
-| ● Registers   ● Memory   ○ Peripherals  ⟳ Disasm  |   <- toolbar chips (● shown, ⟳ = detached)
+| ● Registers   ● Memory   ○ Peripherals  ⟳ Disasm  |   <- chips (● shown, ⟳ detached)
 +---------------------------------------------------+
-| With ≤2 docked panels:                           |
-|  REGISTERS                              ⧉   ✕    |
-|  ============== drag to resize ================= |
-|  MEMORY                                 ⧉   ✕    |
+| ≤2 docked panels:                                 |
+|  REGISTERS                              ⧉   ✕     |
+|  ============== drag to resize =================  |
+|  MEMORY                                 ⧉   ✕     |
 |                                                   |
-| With >2 docked panels (2×2 grid):                |
-| +----------------------------+  +--------------+ |
-| | REGISTERS          ⧉   ✕  |  | MEMORY  ⧉  ✕ | |
-| | ...                       |  | ...          | |
-| | ========== drag ==========|  |===== drag ====| |
-| | PERIPHERALS        ⧉   ✕  |  | DISASM  ⧉  ✕ | |
-| | ...                       |  | ...          | |
-| +----------------------------+  +--------------+ |
-|         +--------------------------------------+
-|         | DISASSEMBLY (floating)      ▣    ✕   |  <- draggable by header,
-|         |  0x00400000  ...                    |     resizable from any edge
-|         +--------------------------------------+
+| >2 docked panels (2×2 grid):                      |
+| +----------------------------+  +--------------+  |
+| | REGISTERS          ⧉   ✕  |  | MEMORY  ⧉  ✕ |  |
+| | ========== drag ==========|  |===== drag ====|  |
+| | PERIPHERALS        ⧉   ✕  |  | DISASM  ⧉  ✕ |  |
+| +----------------------------+  +--------------+  |
+|         +--------------------------------------+  |
+|         | DISASSEMBLY (floating)      ▣    ✕   |  <- dragged by header,
+|         +--------------------------------------+     resized from any edge
 ```
 
-- **Toolbar chips (`#panelChip-*`)**: Clicking a chip shows or hides that panel. A filled mauve dot marks a visible panel; a blue haloed dot marks one that is currently detached/floating.
-- **Docked stack (`.panel-stack`)**: Visible non-floating panels arrange in the right column. With **≤2 docked panels** they stack vertically, each with an injected header bar (`.panel-hdr`) carrying a title, a **⧉ float / ▣ dock** toggle, and a **✕ hide** button. A `.panel-vsplitter` between adjacent docked panels drags to redistribute height (double-click resets to an even split).
-- **2×2 grid layout**: With **>2 docked panels** the panels automatically arrange as a **2×2 grid** (2 rows × 2 columns) — row 1 holds the first ⌈n/2⌉ panels, row 2 the rest. The dock expands to **50% of the window width** so each panel is about a quarter of the screen, and returns to the user's previous width when fewer panels are shown. A draggable **`.panel-hsplitter`** resizes the two columns, while the **`.panel-vsplitter`** resizes the two rows (double-click either to even out). Per-row heights and per-panel column widths persist.
-- **Floating panels (`.tab-content.panel-floating`)**: `position: fixed`, dragged by their header, resized natively from any edge (`resize: both`). They render above the editor but below the Settings modal, and stay clamped inside the viewport on window resize.
-- **Persistence**: Which panels are shown, their order, docked row heights, per-panel column widths, and floating positions/sizes are saved to `localStorage` under `rvsim.panelDock.v1` and restored on reload. Defaults to Registers-only, docked (unchanged first-run layout).
-- **Intra-panel column-resize separators**: Each of the three data panels — **Registers**, **Memory**, and **Disassembly** — draws an always-visible hairline **`.col-resizer`** separator at every column boundary but the last (`#`/`Name`/`Content (Hex)` in Registers, `Addr`/`Machine code`/`Native instruction` in Disassembly, `Addr`/`Content (Hex)` in Memory's column-header bar). The line thickens to mauve under the pointer and has an 11px hit area, so the boundaries are discoverable at a glance rather than having to be hunted for. All three panels share one header design (small uppercase labels) and one separator, and all three **freeze their header row** (`position: sticky`) so it stays put while the rows scroll under it — the shared `.panel-body` is the scrollport, so the toolbar/legend above scrolls away while the header pins to the top of the panel. Only the vertical axis is pinned: a header still scrolls sideways in step with its data when a narrow panel scrolls horizontally.
-- **How the columns are sized** (`PANEL_COLS` / `applyPanelColLayout()`): every column has a px width. Columns marked `grow: 0` (`#`, `ABI Name`, `Addr`, `Machine code`, `Content (Hex)`) hold their content-sized width and **never scale up just because the panel got wider**; the `grow`-weighted columns (Registers' `Content (Dec)`, `Native instruction` + `Original source`, Memory's `Content (ASCII)`/`Content (DEC)`) share out whatever surplus the panel has beyond that. Every header and content cell in Registers and Memory (Disassembly is untouched) is centre-aligned. When the panel is *narrower* than the sum of the minimums nothing is crushed: the widths hold and the panel **scrolls horizontally** instead. That is what keeps the wrapping off any single column — the text columns take up the slack first (they have the largest span between `min` and `fit`), and past that point the whole row scrolls.
-- **Dragging a separator** behaves like a spreadsheet: the first movement pins every column at its current rendered width, then only the dragged column's width changes — so **everything to its right keeps its width and simply shifts along**. Pinning happens on the first *move*, never on a plain click. **Double-click** any separator to unpin the whole panel and return to the automatic layout. Pinned widths persist per panel under `rvsim.panelColW.<panel>`. A `ResizeObserver` re-runs the layout whenever a panel is resized. The **Peripherals** panel is deliberately left untouched.
-- **Live updates**: All four panels keep refreshing (`updateRegisters`, `updateMemoryView`, `updateDisassembly`, `updatePeripherals`) on every step/run/reset regardless of visibility, so any combination of open panels stays current. Disassembly auto-scroll to the current-PC row fires whenever that panel is visible in either mode.
-- **Compatibility**: The legacy `switchTab(name)` entry point still exists and now means "ensure this panel is visible and refreshed".
-- **Empty state (all panels hidden)**: When every docked panel is hidden on desktop the panel area shows a compact single-line hint — *"All panels are hidden — use the buttons above to show Registers, Memory, Peripherals, or Disassembly"* — with a subtle grid icon and the panel names emphasised in a lighter tone (`.panel-stack-empty`). The old two-line `<br>`-split message was replaced for a cleaner look.
-- **Mobile (`≤ 800px`)**: The panels revert to a **classic tabbed view** — the chip strip becomes a mutually-exclusive tab bar and exactly one panel is shown at a time (tapping a chip switches to that panel and shows it even if it was hidden on desktop). Detaching, the 2×2 grid and all splitters are disabled; the floating/⧉/✕ header controls are hidden. The mobile tab selection is **ephemeral** — it never changes the persisted desktop visibility, so opening the simulator on a wide screen restores your docked/grid layout exactly. Even if **all panels are hidden** in the persisted desktop layout, the tabbed view still shows exactly one tab (falling back to Registers) so the panel area is never empty on mobile. The main editor/dock splitter is clamped so the code editor always keeps at least 360px (and is re-clamped on window resize), so a wide dock can never push the editor off-screen or leave blank space on the right.
+- **Chips** (`#panelChip-<name>`): show or hide a panel. A filled mauve dot marks a visible panel; a blue haloed dot marks a floating one.
+- **Docked stack** (`.panel-stack`): with up to two docked panels they stack vertically. Each has a header (`.panel-hdr`) with its title, a ⧉ float / ▣ dock toggle and a ✕ hide button. A `.panel-vsplitter` between panels redistributes height; double-click evens it out.
+- **2×2 grid** (`dockUsesTwoColumns()`): with more than two docked panels, row 1 holds the first ⌈n/2⌉ panels and row 2 the rest. The dock widens to 50% of the window (`DOCK_TWO_COL_WIDTH_PCT`) and returns to its previous width when two or fewer panels are docked. `.panel-hsplitter` resizes the columns (minimum `MIN_COL_W = 90` px) and `.panel-vsplitter` the rows; double-click either to even them out.
+- **Floating panels** (`.tab-content.panel-floating`): `position: fixed`, dragged by the header, resized from any edge (`resize: both`). They sit above the editor and below the Settings modal, and are clamped into the viewport on window resize.
+- **Persistence**: visibility, order, row heights, column widths and floating positions and sizes are saved under `rvsim.panelDock.v1`. The default is Registers alone, docked.
+- **Empty state**: with every panel hidden on desktop, `.panel-stack-empty` shows a one-line hint.
+- **Refresh**: `updateRegisters`, `updateMemoryView`, `updateDisassembly`, `updatePeripherals` and `updateLocalsView` run on every step, run and reset whether or not the panel is visible. The Disassembly panel scrolls to the current PC whenever it is visible.
+- **`switchTab(name)`**: makes the named panel visible and refreshes it.
 
----
+**Column layout** (`PANEL_COLS`, `applyPanelColLayout()`). Registers, Memory, Disassembly and
+Locals share one header style, a frozen header row (`position: sticky` inside the
+`.panel-body` scrollport; it still scrolls horizontally with the data) and a `.col-resizer`
+hairline at every column boundary but the last (11 px hit area, mauve on hover). Each column
+has `min`, `fit` and `grow` values:
 
+| Panel | Fixed columns (`grow: 0`) | Growing columns |
+|---|---|---|
+| Registers | `#`, ABI name, content (hex) | content (dec) |
+| Memory | address, content (hex) | content (ASCII / DEC) |
+| Disassembly | address, machine code | native instruction, original source |
+| Locals | name, address, content (hex) | content (dec) |
 
-### 2.6 Multi-row responsive toolbar & button state lifecycle
+Fixed columns keep their content width; growing columns share any surplus. When the panel is
+narrower than the sum of the minimums, widths hold and the panel scrolls horizontally.
+Dragging a separator pins every column at its rendered width on the first move (not on a
+click) and then changes only the dragged column, so columns to its right shift without
+resizing. Double-click a separator to unpin the panel. Pinned widths persist under
+`rvsim.panelColW.<panel>`. A `ResizeObserver` re-runs the layout when a panel resizes. The
+Peripherals panel does not use this layout.
+
+**Mobile (≤ 800 px).** The chips become a tab bar showing exactly one panel at a time. Floating,
+the grid, the splitters and the ⧉/✕ header controls are disabled. The selected tab
+(`mobileTab`) is not persisted and does not change the desktop layout. If every panel is
+hidden in the saved desktop layout, the tab view still shows one panel (Registers by default).
+
+### 2.6 Toolbar and button states
 
 ```
-+-----------------------------------------------------------------------------------------------------------------+
-| Row 1: [ ASM | C ]  Example: [ Basic Sum (C) ▼ ]  📂 Open  💾 Save   |   ↶ Undo  ↷ Redo  🔍 Find                 |
-| Row 2: ⚙ Assemble   ▶ Run   ⏭ Step   ⏮ Back   ⟲ Reset   |   💾 Dump Text  💾 Dump Data  ⚙ Settings…            |
-| Row 3: Step 3: PC = 0x40000c                            Cycles: 3 EST | Instr: 3 | PC: 0x0040000c               |
-+-----------------------------------------------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------+
+| Row 1: [ ASM | C ] [ JS | HDL ]  Example: [ … ▼ ]  📂 Open  💾 Save  |  ↶ Undo  ↷ Redo  🔍 Find |
+| Row 2: ⚙ Assemble  ▶ Run  ⏭ Step  ⏮ Back  ⟲ Reset  |  ⧉ Datapath  ⭳ Download ▼  ⚙ Settings… |
+| Row 3: <status message>                    <time> | Cycles: N single | Instr: N | PC: 0x… |
++--------------------------------------------------------------------------------------------+
 ```
 
-#### 1. Structured Toolbar Layout
-- **Row 1 (Source & Editing)**: Language Toggle (`[ ASM | C ]`), Example selector, File operations (`📂 Open`, `💾 Save`), and Editor controls (`↶ Undo`, `↷ Redo`, `🔍 Find`).
-- **Row 2 (Simulation & Controls)**: Execution controls (`⚙ Assemble`, `▶ Run` / `⏸ Pause` / `▶ Resume`, `⏭ Step`, `⏮ Back`, `⟲ Reset`), Memory dump exports (`💾 Dump Text`, `💾 Dump Data`) and Settings (`⚙ Settings…`).
-- **Row 3 (Status & Live Metrics)**: The status message on the left — real-time feedback with distinct colour-coded alert levels (`info`, `success`, `warning`, `error`) — and the always-on metrics readout on the right: `Cycles: X <est|hw> | Instr: Y | PC: 0xNNNNNNNN`.
-  - The **`est` / `hw` tag** says where the cycle count came from: a CPI-table estimate in the functional engine, or counted clock edges in HDL mode. Same number, very different provenance.
-  - The **PC** is the address of the instruction about to execute, picked out in blue monospace. It lives here rather than only in the status message because that message is transient — any later message overwrites it, and the PC is the one number you keep looking for while stepping.
-- **Mobile Responsive 4-Row Design**: Automatically reorganizes into 4 dedicated rows on mobile screens with touch-friendly `32px` heights and wrapped layout. Relocated memory dump buttons keep execution controls uncluttered.
+- **Row 1, source and editing**: language toggle, engine toggle, the HDL source chip (`#hdlFilesChip`, HDL mode only), Example selector, Open (`.asm .s .c .h .txt .v .sv .vh .svh`), Save, Undo, Redo, Find.
+- **Row 2, simulation**: Assemble (`Ctrl+Enter`), Run / Pause / Resume (`F5`), Step (`F8`), Back (`Shift+F8`), Reset; the Datapath / Waveform toggle; the Download menu (`AA_IROM.mem`, `AA_DMEM.mem`, testbench `.v`, waveform `.vcd`); Settings.
+- **Row 3, status**: the status message (`#statusBar`, levels `info`, `success`, `warn`, `error`) and the metrics (`#statsBar`): simulated time, `Cycles: N <tag>`, `Instr: N`, `CPI` (multi-cycle and pipelined models), `Mispredicts` (pipelined with branch prediction), and `PC`. The tag names where the cycle count comes from: `single`, `multi` or `pipe` for the functional model, `hw` for clock edges in HDL mode. The PC is the address of the instruction about to execute.
+- **Mobile**: the toolbar becomes a grid. Row 1 holds the file and mode group; row 2 holds the editor group and the Datapath/Download/Settings group side by side, with Undo, Redo, Find and Settings as icons; row 3 holds the simulation controls; the status row follows.
 
-#### 2. Intelligent UX Button State Lifecycle
-All toolbar action buttons dynamically track runtime and editor state:
-- **Assemble (`#btnAssemble`)**: Active when code is newly loaded or modified; inactive (`disabled`, tooltip: `"Program is already assembled and up to date"`) once assembled.
-- **Undo (`#btnUndo`) & Redo (`#btnRedo`)**: Track CodeMirror 6's native transaction history depth via `CM6.undoDepth` and `CM6.redoDepth`.
-- **Run / Pause / Resume (`#runPauseBtn`)**: Inactive when unassembled; shows `▶ Run` when ready; morphs into `⏸ Pause` while running; shows `▶ Resume` when paused mid-execution.
-- **Step Forward (`#btnStep`) & Step Back (`#btnBack`)**: Step forward is active when assembled and paused; Step back is active whenever instruction execution history exists (`execHistory.length > 0`).
-- **Reset (`#btnReset`)**: Active during execution; resets registers/peripherals while maintaining assembled status so the user can immediately step or run without re-assembling.
+**Button states:**
 
----
+- **Assemble** (`#btnAssemble`): enabled when the source is new or modified; disabled with the tooltip "Program is already assembled and up to date" once assembled.
+- **Undo / Redo** (`#btnUndo`, `#btnRedo`): follow `CM6.undoDepth` and `CM6.redoDepth`.
+- **Run** (`#runPauseBtn`): disabled until assembled; `▶ Run` when ready, `⏸ Pause` while running, `▶ Resume` when paused.
+- **Step / Back** (`#btnStep`, `#btnBack`): Step is enabled when assembled and paused; Back when there is history (`execHistory.length > 0`).
+- **Reset** (`#btnReset`): resets registers and peripherals and keeps the program assembled, so it can be stepped or run without re-assembling.
 
 ### 2.7 The console
 
-One console sits under the editor and carries everything: assembler diagnostics,
-runtime messages, `ecall` output, and the Verilog toolchain's output tagged `[HDL]`.
-There is no second console anywhere — an HDL compile error and an assembler error
-appear in the same place, in the order they happened.
+One console (`#console`) under the editor carries assembler diagnostics, runtime messages,
+`ecall` output and the Verilog toolchain's output, tagged `[HDL]`, in the order they occur.
+Drag the bar above it (`#consoleResizer`) to resize it; double-click the bar to return to the
+default 140 px (`CONSOLE_H_DEFAULT`). The height is saved under `rvsim.consoleHeight.v1`.
 
-It is **resizable**: drag the bar above it, or double-click that bar to return to the
-default 140 px. The height is remembered in `localStorage` (`rvsim.consoleHeight.v1`).
-That matters because a Verilog compile error can run to many lines, while a working
-session wants the space back for the editor.
-
-The **status bar** below it carries the one-line "what is happening right now" message —
-including the HDL engine's progress (`HDL: compiling…`, `HDL: simulating 2000 cycles…`).
-
+The status message above the editor reports what is happening now, including HDL engine
+progress (prefixed `HDL`).
 
 ---
 
+## 3. C language support
 
-## 3. C language support & Godbolt integration
+### 3.1 Compilation through Compiler Explorer
+- C source is compiled remotely with `POST https://godbolt.org/api/compiler/<id>/compile` (12 s timeout). Assembly mode needs no network; C mode reports an error when the API cannot be reached.
+- Compilers (**⚙ Settings → Compiler**): `rv32-cclang2010` (Clang 20.1.0, default), `rv32-cclang` (Clang trunk), `rv32-cgcc1420` (GCC 14.2.0), `rv32-cgcctrunk` (GCC trunk).
+- Optimization levels: `-O0` (default; one-to-one C line mapping), `-O1`, `-O2`, `-Os`, `-O3`.
+- Architecture flags default to `-march=rv32i -mabi=ilp32`; the *Include M extension* checkbox switches them to `-march=rv32im`. `-fno-pic -fno-pie` is always appended. Without the M extension the compiler calls libgcc helpers for multiply and divide, which are not linked; `warnAboutLibgccHelpers()` reports them after compilation.
+- Test harnesses can supply a compiler response through `window.__mockGodboltResponse` (an object, or a function of the source). It is used when no live response is available, which is always the case under jsdom.
 
-### 3.1 REST API compilation pipeline
-- Compiles C code via `POST https://godbolt.org/api/compiler/<id>/compile` targeting RV32 GCC / Clang (`rv32-cgcc1420`, `rv32-cgcctrunk`, `rv32-cclang2010`, `rv32-cclang`).
-- Passes configurable optimization levels (`-O0 (Debug, Recommended)`, `-O1`, `-O2`, `-Os`, `-O3`) and ABI flags (`-march=rv32im -mabi=ilp32 -fno-pic -fno-pie`).
-- Automatically prepends a dynamic baremetal CRT0 startup shim that sets the stack pointer `sp` to the configured Stack Top (`dataBase + dataSize`):
-  ```assembly
-  .text
-  .globl _start
-  _start:
-      li sp, 0x10010200    # Set sp to Data Base + Data Size (0x10010000 + 0x200)
-      call main            # Call C main()
-      li a7, 10            # Exit syscall
-      ecall
-  __halt:
-      j __halt
-  ```
+### 3.2 CRT0 startup shim
+The compiled assembly is wrapped in a startup shim before it is assembled:
 
-### 3.2 Source-to-assembly bidirectional line mapping
-- Parses Godbolt's emitted assembly array (`res.asm[i].source.line`) and establishes bidirectional mappings:
-  - `pcToCLineMap`: Maps execution address $PC \rightarrow \text{C Line}$
-  - `cLineToPcsMap`: Maps $\text{C Line} \rightarrow [PC_1, PC_2, \dots]$
-  - `cLineToFirstPcMap`: Maps $\text{C Line} \rightarrow \text{First } PC$
-- Maps startup preamble (`_start` to `call main`) to the `main()` function entry line.
+```assembly
+.text
+.globl _start
+_start:
+    li sp, 0x10010200    # stackBase: Data Base + Data Size by default
+    la ra, __halt
+    j main
+    ...                  # compiled program
+.text
+__halt:
+    j __halt
+```
 
-### 3.3 C source-level stepping & debugging
-- **Single Stepping (`F8` / `⏭ Step`)**: Highlights the active C source statement in CodeMirror 6 while advancing the underlying RV32 machine code.
-- **Step Back (`Shift+F8` / `⏮ Back`)**: Restores CPU registers, memory, and active C line highlighting.
-- **Breakpoints in C**: Click on C source lines to toggle breakpoints with smart line snapping; `▶ Run` (`F5`) halts on active C lines.
+- `sp` is set to `stackBase` (default `0x10010200`, that is `dataBase + dataSize`). If the estimated `.data` size exceeds the Data segment, the startup `sp` is raised above the data (end of data plus 8 KiB, rounded up to 4 KiB) and a warning names the Linker setting and the `DMEM_DEPTH_BITS` parameter to change for hardware.
+- `main()` is entered with `j main` and is expected not to return. `ra` holds `__halt`, so a `ret` from `main` lands on the trap. The trap follows all compiled code, so a PC that runs off the end of the program also stops there.
+
+### 3.3 Source-to-assembly line mapping
+Each instruction is mapped to the C line given in Compiler Explorer's `asm[i].source.line`:
+
+| Map | Contents |
+|---|---|
+| `pcToCLineMap` | PC → C line |
+| `cLineToPcsMap` | C line → all PCs compiled from it |
+| `cLineToFirstPcMap` | C line → first PC |
+
+Shim instructions carry no source line.
+
+### 3.4 C source-level stepping and breakpoints
+- **Step** (`F8`) advances the machine code and highlights the C statement the current PC belongs to. **Back** (`Shift+F8`) restores registers, memory and the highlight.
+- A breakpoint set on a C line with no code moves to the next line that has code (`findNextValidInstructionLine()`, using `cLineToFirstPcMap`). **Run** (`F5`) halts on breakpointed lines.
 
 ---
 
 ## 4. Execution engines
 
-The toolbar's `JS | HDL` pill chooses which engine Run, Step, Back and Reset drive.
-Everything around them — the editor, breakpoints, the registers/memory/disassembly
-panels and the whole peripheral board — is shared, so switching engines changes what is
-executing, not what you are looking at.
+The toolbar's `JS | HDL` pill chooses which engine Run, Step, Back and Reset drive. The editor, breakpoints, the registers, memory and disassembly panels and the peripheral board are shared by both engines.
 
 | | Functional (JS) | Hardware (HDL) |
 |---|---|---|
-| Executes | Built-in RV32GC interpreter | Your uploaded `.v` sources |
-| Stepping | Live, one instruction at a time | Through a recording — forwards *and* backwards |
-| Run / Resume / breakpoints | Yes | Yes — Resume seeks the recording to the next breakpoint |
-| Registers panel | Live | Read out of your register file by hierarchical reference |
-| Memory panel | Live | Driven by the Wrapper's actual DMEM writes |
-| LEDs / 7-seg / OLED / UART | Live | Driven by your hardware's pins |
-| Unwritten registers | Shown as `0` | Shown as `xxxxxxxx` — the hardware truth |
-| `Cycles` readout | CPI-table estimate, tagged `est` | Real clock edges, tagged `hw` |
-| Speed | Millions of instr/sec | ~40k–200k cycles/sec |
+| Executes | Built-in RV32GC interpreter | The uploaded `.v` sources |
+| Stepping | Live, one instruction at a time | Through a recording, forwards and backwards |
+| Run / Resume / breakpoints | Yes | Yes; Resume seeks the recording to the next breakpoint |
+| Registers panel | Live | Read from the register file by hierarchical reference |
+| Memory panel | Live | Driven by the Wrapper's DMEM writes |
+| LEDs / 7-seg / OLED / UART | Live | Driven by the hardware's pins |
+| Unwritten registers | Shown as `0` | Shown as `xxxxxxxx` |
+| `Cycles` readout | Model estimate, tagged `est` | Clock edges, tagged `hw` |
+| Speed | Millions of instructions/s | About 40k–200k cycles/s |
 
-**Only one engine ever executes.** Switching away from a running functional simulation
-pauses it first (its state is kept, so switching back and pressing Resume carries on),
-and the engine toggle is locked while an HDL run is in flight. Before this was enforced,
-the JavaScript engine would keep running underneath the HDL view, advancing the cycle
-and instruction counters until it hit the JS run limit.
+Only one engine executes at a time (`setSimEngineMode()`):
+- Switching away from a running functional simulation stops it. Its state is kept, so switching back and pressing Resume continues.
+- The toggle is disabled while an HDL run is in progress, because an HDL run cannot be paused.
+- A switch does not discard the HDL recording. Each switch lands on the instruction the other engine had reached.
 
-Switching engines does not throw a recording away. Each switch lands on the instruction
-the other engine had reached, so you can step through the RTL, hop to the functional
-model to get somewhere quickly, and come back to the hardware at the same instruction.
+### 4.1 Functional engine: run loop and timing model
+- **Run loop.** Execution proceeds in batches of `BATCH_SIZE = min(10000, run limit)` instructions per event-loop tick, so the UI stays responsive during long runs.
+- **Run limit.** `simMaxInstrPerRun` (**⚙ Settings → JS Simulation**, *Max Instructions Per Run*): default `100,000,000`, range 1 to 2,000,000,000. A run pauses when it reaches the limit.
+- **Statement Stepping (Fast Mode)** (`statementStepping`, default off, offered on both the JS and HDL settings tabs). Step executes every instruction of the current C statement or multi-instruction pseudo-instruction at once, and Back undoes the same span. In HDL mode a Step seeks the same distance through the recording.
+- **Microarchitecture** (`simMicroarch`): *Single-cycle* (one cycle per instruction), *Multi-cycle* (cycles from the table below) or *5-stage pipeline* (Step and Back move one clock cycle). Switching resets the program.
+- **Multi-cycle cycle table** (`cycleConfig`, each value 1 to 1000):
 
+| Key | Class | Default |
+|---|---|---|
+| `basic` | ALU / shift / LUI / AUIPC | 1 |
+| `muldiv` | Multiply / divide (M) | 2 |
+| `load` | Load (LW / LH / FLW / FLD) | 2 |
+| `store` | Store (SW / SH / FSW / FSD) | 2 |
+| `branch` | Branch | 1 |
+| `jump` | JAL / JALR | 1 |
+| `fp` | Floating-point ops | 4 |
+| `system` | ECALL / EBREAK | 1 |
 
-### 4.1 The functional engine: control & timing model
-- **Non-Blocking Simulation Loop**: Uses `requestAnimationFrame` with an internal batch size (`BATCH_SIZE = 10,000` instructions per event-loop tick) to maintain a responsive 60 FPS UI while executing high-throughput simulations.
-- **Configurable Run Limit (`simMaxInstrPerRun`)**: Configurable via **⚙ Settings → ⏱ JS Simulation** (default `100,000,000` instructions per run, range $1$ to $2,000,000,000$), automatically pausing long-running or infinite loops after the specified limit.
-- **Statement Stepping (Fast Mode)**:
-  - When enabled via `⚙ Settings…` $\rightarrow$ **⏱ JS Simulation** or **🔌 HDL Simulation** (the same setting, offered on both tabs), stepping forward (`F8`) executes all machine instructions belonging to the current C statement or multi-instruction pseudo-op in a single discrete step.
-  - Step back (`Shift+F8`) cleanly undoes the multi-instruction statement step in one operation.
-  - It applies to **both engines**: in HDL mode a Step seeks that same distance through the recording, and Back covers exactly the same distance in reverse.
-- **Cycle-Accurate CPI Timing**: Instruction execution accrues cycles according to categorized CPI settings (ALU/Basic, Multiply/Divide, Load, Store, Branch, Jump, Floating Point, System/Syscall).
+### 4.1b Assembler diagnostics
+The assembler rejects input it cannot encode exactly as written, rather than substituting, truncating or ignoring part of it.
 
-### 4.1b Assembler diagnostics: nothing accepted silently
-
-Things the assembler used to accept quietly, and now refuses. Each was a way for a
-program to be wrong without anything on screen saying so — the hardest kind of bug to
-find in a teaching simulator. The first three were reported from use; the rest came out
-of the audit below.
-
-**A bare number is not a register.** `add t0, t0, 1` used to assemble as
-`add t0, t0, x1`, because a bare `1` was read as register 1. The disassembly still showed
-`add t0, t0, 1`, so nothing gave it away. It is now an error that names the token and
-suggests the instruction that was almost certainly meant:
+**Registers.** Registers are written `x0`–`x31` (`f0`–`f31`) or by ABI name. A bare number in a register operand is an error that names the token and suggests the immediate form:
 
 ```
 '1' is a number, not a register. add takes registers only — write x0–x31 or an
 ABI name such as t0. Did you mean `addi`?
 ```
 
-Registers are written `x0`–`x31` or by ABI name. The same rule applies to the
-floating-point file: a bare number is not `f1` either.
+**Loads and stores to a symbol.** When a symbol's address does not fit a 12-bit offset from `x0`, the address is built with `auipc` and a `%pcrel_lo` offset:
 
-**A store to a symbol must name its scratch register.** `sw t0, var1` cannot be one
-instruction — the address has to be built in a register first — and a store has no
-register it is free to overwrite, since `rs2` holds the value being stored. The old
-behaviour picked `x5`, or `x6` when the value was already in `x5`, and clobbered it
-without a word. The third operand is now required, which is the rule GNU `as` applies:
+| Form | Expansion |
+|---|---|
+| `lw rd, sym` (integer loads) | `auipc rd, …` then `lw rd, …(rd)`; no other register is written |
+| `flw`/`fld fd, sym` | error: the scratch register must be named |
+| `sw rs2, sym` (all stores) | error: the scratch register must be named |
+| `op reg, sym, rt` (loads and stores) | `auipc rt, …` then `op reg, …(rt)` |
+
+The store error reads:
 
 ```
 sw t0, var1 would need a scratch register to hold the address of 'var1', and would
-silently overwrite it. Name it: `sw t0, var1, t1` assembles to `lui t1, %hi(var1)`
-then `sw t0, %lo(var1)(t1)`. Pick a register you do not need.
+silently overwrite it. Name it: `sw t0, var1, t1` assembles to
+`auipc t1, %pcrel_hi(var1)` then `sw t0, %pcrel_lo(var1)(t1)`. Pick a register you do not need.
 ```
 
-**A load from a symbol clobbers nothing.** `lw s3, delay_val` *does* have a register it
-may overwrite — `rd`, which the load is about to write anyway — so it now builds the
-address there: `lui x19, …` then `lw x19, …(x19)`. No third operand, and no other
-register touched. The exception is a float load (`flw`, `fld`), whose `rd` is in the FP
-file and cannot hold an address; those still need the scratch register named.
+**Other checks.**
 
-#### The rest of the audit
+| Input | Result |
+|---|---|
+| Too few or too many operands (`add t0, t1`, `add t0, t1, t2, t3`, `nop t0`, `ret t0`, `li t0`) | error naming the expected count and form |
+| Shift amount outside 0–31 (`slli t0, t1, 32`) | error |
+| `lui`/`auipc` immediate outside the 20-bit field (`lui t0, 0x100000`) | error; suggests `li` or `%hi(symbol)` |
+| `li` value that does not fit 32 bits | error |
+| Label defined twice | error |
+| Label with a register name (`t0:`) | error |
+| `.byte` / `.half` / `.word` value outside the signed or unsigned range of its width | error naming the range and the truncated value |
+| Misaligned load/store offset (`lw t0, 1(sp)`) | warning: the Wrapper's data memory is word-addressed, so the hardware accesses a different word |
 
-Those three were found by hand, which is a bad way to find bugs, so the assembler was put
-through a battery of 51 deliberately-wrong programs. **28 assembled without a single
-message.** These are the ones that mattered:
+Operand counts come from `allowedArity()`, which derives them from the instruction format plus a few exceptions (`jalr`, `jal`, `fence`, single-source FP conversions), and from `pseudoArity()`, which reads the highest `%N` in each pseudo-instruction's expansion template. A new pseudo-instruction is therefore checked without further changes.
 
-| What was accepted | What it silently produced | Now |
-|---|---|---|
-| `add t0, t1` | `add t0, t1, x0` — a missing operand filled in with `x0` | error naming the count and the shape |
-| `add t0, t1, t2, t3` | the surplus operand dropped | error |
-| `nop t0`, `ret t0` | operand ignored | error |
-| `slli t0, t1, 32` | shamt masked with `0x1F` → **a shift by zero**; `99` → a shift by 3 | error: RV32 shifts by 0–31 |
-| `lui t0, 0x100000` | truncated to 20 bits → loaded `0` | error naming the 20-bit limit |
-| `a: … a: …` | the second definition wins; every reference points at it | error: defined more than once |
-| `t0: …` then `j t0` | `parseReg` wins, so the jump goes to whatever `x5` holds | error: a register name cannot be a label |
-| `.byte 256` | stored `0` | error naming the range and what it would truncate to |
-| `.half 65536`, `.word 0x1FFFFFFFF` | truncated | error |
-| `lw t0, 1(sp)` | assembled; the word-addressed Wrapper memory reads a different word | warning |
-| `sub t0`, `jal`, `li t0` | `Cannot read properties of undefined` | a proper arity message |
+The following are accepted: mnemonics in any case; writes to `x0` (`addi x0, x0, 5`); a `.eqv` used before its definition (the assembler is two-pass); `lui` with a negative immediate within the signed 20-bit range; and the register writes that `call` (`ra`), `tail` (`t1`) and `li`/`la` (`rd`) make by definition.
 
-Operand counts come from `allowedArity()` (the instruction format plus the handful of
-genuine exceptions — `jalr`, `jal`, `fence`, the single-source FP conversions) and from
-`pseudoArity()`, which reads the highest `%N` in each pseudo-instruction's own expansion
-template — so a new pseudo-instruction is checked without anything being added by hand.
-
-What is still accepted, correctly: mnemonics in any case, `addi x0, x0, 5` (RISC-V
-discards the write), a `.eqv` used before its definition (this is a two-pass assembler),
-`lui` with a negative immediate inside the signed 20-bit range, and the register writes
-that `call` (`ra`), `tail` (`t1`) and `li` / `la` (`rd`) make by definition.
-
-#### `ecall` is a simulator service
-
-`ecall` works here because the simulator implements the RARS syscall services. Nothing in
-the CG3207 hardware does — the processor has no trap support, and there is no OS or ISR
-behind it. Every built-in example that uses `ecall` says so in a header comment, and the
-assembler repeats it once per assemble, naming how many sites the program has. It is not
-raised for C, because the CRT0 shim ends every compiled program with an exit `ecall` that
-the student did not write.
+#### `ecall`
+`ecall` invokes the simulator's implementation of the RARS syscall services. The Wrapper and a processor without trap support provide no equivalent, so programs meant for the board should use the MMIO peripherals. In assembly mode, each assemble logs one notice giving the number of `ecall` sites; no notice is shown in C mode. Built-in examples that use `ecall` say so in a header comment.
 
 ---
 
-### 4.2 Disassembly viewer with label headers & annotations
-- **Label Header Rows (`.disasm-label-row`)**: Disassembly renders distinct label headers (e.g. `main:`, `loop:`, `factorial:`) preceding the target instruction address in both Assembly and C modes. Label names (`.disasm-label-name`) are rendered in **orange** (`#fab387`) — the same colour as labels in the Code window and the Memory-view row labels.
-- **Jump / Branch Target Annotations (`.disasm-target-label`)**: Numeric and hexadecimal jump/branch offsets (e.g. `jal 0x00400040`) are automatically annotated with human-readable target label badges (e.g. `<main>`, `<loop>`).
-- **Machine-code display mode (segmented `[ Byte | Word ]`)**: The Disassembly toolbar has a **segmented `[ Byte | Word ]` pill** under the Machine-code column — **Word is the default**. Word mode renders each aligned 4-byte group as one whole 8-digit little-endian 32-bit hex word (`xxxxxxxx`); Byte mode renders the classic separate bytes (`xx xx xx xx`). Both modes group in 4-byte chunks (multi-word data stays chunked). The selected mode is visually highlighted and persists across re-assembles.
-- **Register naming (`x0`–`x31`)**: The *Native instruction* column names registers the way the encoding does — `add x5, x5, x6`, never `add t0, t0, t1`. ABI names are a source-level convenience and stay in the *Original source* column beside it, which is what makes the two columns worth reading against each other. This renaming alone is **not** treated as a pseudo-instruction expansion: a row is only marked (and coloured) as one when a real pseudo-instruction was expanded.
-- **Original-source pseudoinstructions (`.code-list .pseudo`)**: The *Original source* column for a pseudoinstruction is coloured **blue** (`#89b4fa`), a simple colour swap from orange — freeing orange exclusively for labels (the code window, memory view, and disassembly labels all use `#fab387` consistently).
-- **C Source Line Tags (`.disasm-cline-tag`)**: Instructions compiled from C display source line number and statement text (e.g. `[Line 10: total += arr[i];]`).
-- **Fixed data columns / elastic text columns**: **Addr** and **Machine code** are `grow: 0` columns — sized so the hex address / machine-code word fits on one line, and never stretched when the panel widens. **Native instruction** and **Original source** carry the `grow` weight and **split any surplus between them equally**, so neither is left alone to absorb it. Both wrap at word boundaries first (`word-break: normal`) rather than chopping mnemonics mid-token; below the minimum widths the table stops shrinking and the panel scrolls. Widths come from the table's `<colgroup>`, written by `applyPanelColLayout()` — see the panel-layout section above.
-- **Disassembly Auto-Scrolling**: The active execution instruction row (`.current-native`) automatically scrolls into view during stepping, step back, and breakpoint halts.
+### 4.2 Disassembly viewer
+- **Label rows** (`.disasm-label-row`): a header row such as `main:` or `loop:` precedes each labelled address, in Assembly and C modes. Label names (`.disasm-label-name`) are orange (`#fab387`), the colour used for labels in the code window and the memory view.
+- **Branch and jump targets** (`.disasm-target-label`): numeric targets (e.g. `jal 0x00400040`) carry a badge naming the target label (`<main>`).
+- **Machine-code display**: a `[ Byte | Word ]` pill (`disasmViewMode`, default `word`). Word mode shows each aligned 4-byte group as one 8-digit 32-bit hex word (LSB to the right); Byte mode shows separate bytes (`xx xx xx xx`, LSB to the left). Both group data in 4-byte chunks. The mode persists across assembles.
+- **Native instruction column**: registers are named `x0`–`x31`, as encoded (`add x5, x5, x6`). ABI names stay in the *Original source* column. This renaming alone does not mark a row as a pseudo-instruction expansion.
+- **Pseudo-instructions**: in the *Original source* column a pseudo-instruction is blue (`#89b4fa`, `.code-list .pseudo`); its expanded native instructions are green (`.native-expanded`).
+- **C line tags** (`.disasm-cline-tag`): instructions compiled from C show the source line and its text, e.g. `[Line 10: total += arr[i];]`.
+- **Column widths**: *Addr* and *Machine code* are fixed (`grow: 0`), sized to fit their content on one line. *Native instruction* and *Original source* share any surplus width equally and wrap at word boundaries (`word-break: normal`). Below the minimum widths the panel scrolls. Widths are written to the table's `<colgroup>` by `applyPanelColLayout()` (see the panel-layout section).
+- **Auto-scroll**: the current instruction row (`.current-native`) is scrolled into view on Step, Back and breakpoint halts.
 
 ---
 
-## 5. HDL simulation mode: your Verilog in the browser
+## 5. HDL simulation mode
 
-Switch the toolbar pill from **JS** to **HDL** and Run, Step and Back stop executing the
-JavaScript model and start executing *your RTL*. The assembled program is handed to your
-design exactly the way Vivado does it — as `AA_IROM.mem` / `AA_DMEM.mem` read by your
-Wrapper's own `$readmemh` — and everything your hardware does (LEDs, 7-segment, OLED,
-UART, register writes, memory writes, the PC) is fed back into the simulator's existing
-panels.
-
+With the toolbar's `JS | HDL` pill set to **HDL**, Run, Step and Back execute your RTL instead of the JavaScript model. The assembled program reaches the design as `AA_IROM.mem` and `AA_DMEM.mem`, read by the Wrapper's own `$readmemh`, as in Vivado. LEDs, 7-segment display, OLED, UART, register writes, memory writes and the PC are fed back into the simulator's usual panels.
 
 ### 5.1 Using it
 
-1. **Switch to HDL** — the `JS | HDL` pill in the toolbar. The engine (~2.7 MB of
-   WASM) begins loading, and with no sources yet loaded the **🔌 HDL Simulation**
-   settings tab opens by itself, because nothing else can happen until it has them.
-2. **Load your Verilog** — drop `.v` files **anywhere on the page**, open them with
-   **📂 Open**, use *browse…* on that tab, or pick the folder they are in with
-   *folder…* ([§5.17](#517-loading-a-folder)). Include `Wrapper.v`, `RV.v` and **every**
-   submodule (`ALU.v`, `Decoder.v`, `Extend.v`, `MCycle.v`, `PC_Logic.v`,
-   `ProgramCounter.v`, `RegFile.v`, `Shifter.v`). The file holding `module Wrapper` is
-   tagged in the list, and a chip next to the `JS | HDL` pill shows the count — turning
-   amber if there is no Wrapper among them. **Reference core** on the same tab
-   loads `examples/hdl/RV_reference.v` and a copy of the fixed `Wrapper.v` instead: a
-   working RV32I+M core, pre-synthesised into one flattened module with its internal
-   names discarded, so HDL mode has something to run before the student's own processor
-   does. Its register file is left intact, so the Registers panel still works.
-3. **Assemble a program** as usual (any example, or your own).
-4. **Run**, then **Step** / **Back** to move through what the hardware did.
-   **Run** becomes **Resume** once there is a recording; **Reset** (⟲) is how you
-   ask for a fresh one.
+1. Set the pill to **HDL**. The Icarus Verilog engine (`ivlpp`, `ivl`, `vvp` compiled to WebAssembly, about 2.9 MB) starts loading. If no sources are loaded, ⚙ Settings opens on its **⏱ Simulation** tab.
+2. Load the Verilog: drop `.v` files anywhere on the page, open them with **📂 Open**, use *browse…* in the *Processor sources* group, or pick their folder with *folder…* ([§5.17](#517-loading-a-folder)). Accepted extensions are `.v`, `.sv`, `.vh` and `.svh`. Include `Wrapper.v`, the core's top module (`RV`) and every module it instantiates. The file declaring `module Wrapper` is tagged in the list. **Prebuilt processor** replaces the loaded sources with `examples/hdl/Wrapper.v` and `examples/hdl/RV_reference.v`: a working RV32I+M core, pre-synthesised into one flattened module with its internal names discarded except for the register file, so the Registers panel still works.
+3. Assemble a program.
+4. **Run**, then **Step** and **Back** through what the hardware did. With a recording in hand, Run is labelled **Resume**; **Reset** (⟲) discards the recording.
 
-Switching between **JS** and **HDL** does not throw anything away. The recording
-survives the trip, and each switch lands on the instruction the other engine had
-reached — so you can step through the RTL, hop to the functional model to get
-somewhere quickly, and come back to the hardware at the same instruction. Only one
-engine ever executes: switching away from a running functional simulation pauses it
-first, and the engine toggle is locked while an HDL run is in flight.
+Switching between JS and HDL keeps the recording, and each switch lands on the instruction the other engine had reached. Only one engine executes at a time: switching away from a running functional simulation pauses it, and the engine toggle is locked while an HDL run is in progress.
 
-### 5.2 Where everything lives (there is no HDL panel)
+### 5.2 Controls
 
-Everything the hardware engine needs is done **once per session**, so it lives in
-**⚙ Settings** rather than holding a panel open for the whole run. The panel layout is
-the same four panels it has always been — Registers, Memory, Peripherals, Disassembly.
+There is no HDL panel; the panel layout is the same as in JS mode.
 
 | Where | What |
 |---|---|
-| ⚙ → **🔌 HDL Simulation** | sources · cycle budget · Trace · Verilog standard · VCD · cross-check · register-file path · *Save testbench* — see [§6](#6-settings) |
-| **Toolbar** | Run / Resume · Step · Back · Reset · the source chip · **⭳ VCD**, once a run has produced one |
-| **Console** (under the editor) | the engine's output, tagged `[HDL]`, next to the assembler's |
-| **Status bar** | what the engine is doing right now |
+| ⚙ Settings → ⏱ Simulation | *Processor sources*; *Simulation* (simulator, *Cycles per Run / Resume*); *Recording & output* (Detail preset, *Record the architectural trace*, *Record a waveform* and its signal scope, Verilog standard, cross-check, post-synthesis simulation); *Register file* path. See [§6](#6-settings). |
+| Toolbar | Run / Resume, Step, Back, Reset, the source chip, and the **⭳ Download** menu (`AA_IROM.mem`, `AA_DMEM.mem`, *Testbench (.v)*, *Waveform (.vcd)*) |
+| Console (under the editor) | engine output, tagged `[HDL]` |
+| Status bar | the engine's current activity |
 
-The source chip beside the `JS | HDL` pill is the standing answer to "is my Verilog
-loaded?" — `9 files` with the names on hover, or an amber `⚠ no Verilog` / `⚠ no Wrapper`.
-Clicking it opens the tab that manages them.
+The source chip beside the pill shows the number of loaded files (names on hover), or an amber `⚠ no Verilog` / `⚠ no Wrapper`. Clicking it opens the Simulation tab.
 
-Two readouts worth naming, because they look identical and are not: the toolbar's
-**Cycles** is tagged `est` in JS mode (an estimate from the per-instruction table) and
-`hw` in HDL mode (real clock edges counted by your simulation). The cycles table
-affects only the first.
+The toolbar's **Cycles** readout is tagged `hw` in HDL mode: clock edges counted by the simulation. In JS mode it is tagged `single`, `multi` or `pipe` and comes from the per-instruction cycles table, which has no effect in HDL mode.
 
-Nothing is bundled: the Verilog is always yours, loaded per session or read from a
-folder.
+No Verilog is bundled into the page. Sources are loaded per session or read from a folder.
 
-### 5.3 The Wrapper is never modified
+### 5.3 The Wrapper interface
 
-The simulator only ever *instantiates* your `Wrapper`; it does not read, rewrite or
-patch it. Everything it needs, it generates around it as a **testbench** — the same
-thing you would write by hand in Vivado. Use **Save testbench** to get that exact file
-for offline use with Vivado or `iverilog`.
+The simulator only instantiates `Wrapper`; it never rewrites or patches it. Everything else is a generated testbench, `cg3207_hdl_tb`, of the kind you would write by hand for Vivado or `iverilog`.
 
-Instantiation is **positional**, exactly as generated:
+The testbench connects the Wrapper by **named association**, so port order is free, but the Wrapper must declare these ports by these names:
 
-```verilog
-Wrapper dut(DIP, PB, LED_OUT, LED_PC, SEVENSEGHEX, UART_TX, UART_TX_ready,
-            UART_TX_valid, UART_RX, UART_RX_valid, UART_RX_ack, OLED_Write,
-            OLED_Col, OLED_Row, OLED_Data, ACCEL_Data, ACCEL_DReady, RESET, CLK);
+| Port | Width | Direction (seen from `Wrapper`) |
+|---|---|---|
+| `DIP` | `[15:0]` | input |
+| `PB` | `[2:0]` | input |
+| `LED_OUT` | `[7:0]` | output |
+| `LED_PC` | `[6:0]` | output |
+| `SEVENSEGHEX` | `[31:0]` | output |
+| `UART_TX` | `[7:0]` | output |
+| `UART_TX_ready` | 1 bit | input |
+| `UART_TX_valid` | 1 bit | output |
+| `UART_RX` | `[7:0]` | input |
+| `UART_RX_valid` | 1 bit | input |
+| `UART_RX_ack` | 1 bit | output |
+| `OLED_Write` | 1 bit | output |
+| `OLED_Col` | `[6:0]` | output |
+| `OLED_Row` | `[5:0]` | output |
+| `OLED_Data` | `[23:0]` | output |
+| `ACCEL_Data` | `[31:0]` | input |
+| `ACCEL_DReady` | 1 bit | input |
+| `RESET` | 1 bit | input |
+| `CLK` | 1 bit | input |
+
+The OLED double-buffering pair, `OLED_Swap` (output) and `OLED_SwapPending` (input), is optional. It is connected only when the Wrapper declares both. `OLED_SwapPending` is tied low in the testbench, so a program polling it never blocks.
+
+The testbench also reads `dut.PC`, `dut.Instr`, `dut.MemWrite_out`, `dut.ALUResult`, `dut.WriteData_out`, `dut.MemRead` and `dut.dec_OLED_STATUS` by hierarchical reference (§5.6). Of the Wrapper's body, only the localparams `IROM_DEPTH_BITS` and `DMEM_DEPTH_BITS` are read out of the source (§5.8). The core inside it, the memories and their wiring are entirely the design's own.
+
+### 5.4 The generated testbench
+
+The testbench the page runs contains no assembled code, no switch settings and no input data. All of it is supplied at run time:
+
+| Input | How it arrives |
+|---|---|
+| Cycle budget, trace level | `+CYCLES=<d>` (default 2000), `+TRACE=<d>` (default 2) |
+| DIP, buttons, accelerometer at reset | `+DIP=<h>`, `+PB=<h>`, `+ACCEL=<h>`, `+ADRDY=<h>` (defaults 0, 0, `0x19000040`, 1) |
+| Timed input changes | `stim.mem`, read when `+NSTIM=<n>` is non-zero: `<cycle> <code> <value>` triples, codes 1 = DIP, 2 = PB, 3 = ACCEL_Data, 4 = ACCEL_DReady; at most 1024 entries |
+| UART input | `uart_rx.mem`, read when `+NRX=<n>` is non-zero: `<cycle> <byte>` pairs; at most 4096 entries |
+| Waveform | `+VCD` writes `dump.vcd`; `+VCDTOP` limits it to the testbench and Wrapper levels; `+VCDFROM=<d>` starts it at that cycle |
+| Partial trace | `+TRACEFROM=<d>` leaves out every record before that cycle |
+| The program | `AA_IROM.mem` / `AA_DMEM.mem`, via the Wrapper's `$readmemh` |
+
+`+LIVE` and `+LIVEFROM=<d>` apply only to live runs with Verilator in the desktop app.
+
+The clock period is 10 ns; `RESET` is released at 12 ns. `UART_TX_ready` is held at 1. `TRACE` levels: `0` silent, `1` peripherals only, `2` adds the architectural trace. The design's own `$display` output passes through to the console.
+
+The compiled binary is cached against a hash of the simulator, Verilog standard, all sources, the testbench and the checkpoint module, so a re-run, a step or an input change skips `ivlpp` and `ivl`.
+
+**⭳ Download → Testbench (.v)** saves `cg3207_hdl_tb.v`. After a run in HDL mode it bakes that run's inputs in as defaults: the switch, button and accelerometer values at the start, every recorded input change and UART byte at the cycle it arrived, the cycle budget, and `TRACE` level 1. Before any run, or in JS mode, it starts from the current inputs. Plusargs still override every setting, and the checkpoint module is not included. It needs `AA_IROM.mem` and `AA_DMEM.mem` beside it and runs with no arguments:
+
+```
+iverilog -o sim *.v cg3207_hdl_tb.v && vvp sim
 ```
 
-which fixes the port list — name, width, direction and order — that `module Wrapper`
-must declare:
+### 5.5 Clock-edge timing
 
-| # | Port | Width | Direction (seen from `Wrapper`) |
-|---|---|---|---|
-| 1 | `DIP` | `[15:0]` | input |
-| 2 | `PB` | `[2:0]` | input |
-| 3 | `LED_OUT` | `[7:0]` | output |
-| 4 | `LED_PC` | `[6:0]` | output |
-| 5 | `SEVENSEGHEX` | `[31:0]` | output |
-| 6 | `UART_TX` | `[7:0]` | output |
-| 7 | `UART_TX_ready` | 1 bit | input |
-| 8 | `UART_TX_valid` | 1 bit | output |
-| 9 | `UART_RX` | `[7:0]` | input |
-| 10 | `UART_RX_valid` | 1 bit | input |
-| 11 | `UART_RX_ack` | 1 bit | output |
-| 12 | `OLED_Write` | 1 bit | output |
-| 13 | `OLED_Col` | `[6:0]` | output |
-| 14 | `OLED_Row` | `[5:0]` | output |
-| 15 | `OLED_Data` | `[23:0]` | output |
-| 16 | `ACCEL_Data` | `[31:0]` | input |
-| 17 | `ACCEL_DReady` | 1 bit | input |
-| 18 | `RESET` | 1 bit | input |
-| 19 | `CLK` | 1 bit | input |
+A timestamp in `stim.mem` or `uart_rx.mem` means the input is in force during that cycle, so the instruction of cycle *C* reads an input stamped *C*. The testbench drives it with a nonblocking assignment at the rising edge that starts cycle *C* (it compares the stamp against `cyc + 1`).
 
-Reorder, resize, rename or drop any of them and the testbench still compiles — Verilog
-port connections are positional — but it wires the wrong signal to the wrong pin with no
-error, so the failure shows up as nonsense on a peripheral rather than as a rejected
-design. `IROM_DEPTH_BITS` and `DMEM_DEPTH_BITS` are the only things about the Wrapper
-the simulator reads back out of your source rather than assuming (§5.8); everything else
-about its *body* — the core inside it, the memories, how it wires them together — is
-entirely yours.
+`LED_OUT`, `SEVENSEGHEX`, `UART_TX_valid`, `OLED_Write` and `UART_RX_ack` are `output reg` in the Wrapper: a write by the instruction of cycle *C* lands at the edge that ends *C*. They are sampled on the falling edge of cycle *C+1* and reported as cycle *C*, so each effect is attributed to the instruction that caused it. `MemWrite_out` is combinational and is sampled on the rising edge with the instruction record.
 
----
+Section 11 of `riscv_simulator_tests/test_hdl_mode.js` covers both directions.
 
+### 5.6 Register file discovery
 
-### 5.4 The testbench is generic
+* **Fixed signals.** The PC, the instruction stream and every memory write come from the Wrapper's `PC`, `Instr`, `MemWrite_out`, `ALUResult` and `WriteData_out`, so they work for any core behind it.
+* **Discovered register file.** The page looks for a 32-entry array of 32-bit regs under the Wrapper's core instance and shows the result in the *Register file* field (`hdlRegPath`); a path typed there overrides it.
 
-The generated testbench contains **no assembled code, no switch settings and no input
-data**. Every one of those is supplied at *run* time:
+Writes are detected by comparing the array against a shadow copy on every falling edge, so only the array is named; the register file's ports and module name do not matter. The testbench also declares wires `x<n>_<abi>` aliasing each register, because `$dumpvars` does not dump arrays. If the path cannot be resolved, the run is retried without the register view.
 
-| Setting | How it arrives |
-|---|---|
-| Cycle budget, trace level | `+CYCLES=`, `+TRACE=` plusargs |
-| DIP, buttons, accelerometer at reset | `+DIP=`, `+PB=`, `+ACCEL=`, `+ADRDY=` plusargs |
-| Waveform dump | `+VCD` plusarg |
-| Timed input changes | `stim.mem` — `<cycle> <code> <value>` triples |
-| UART input | `uart_rx.mem` — `<cycle> <byte>` pairs |
-| The program itself | `AA_IROM.mem` / `AA_DMEM.mem`, via your Wrapper's `$readmemh` |
+### 5.7 UART input
 
-Two consequences worth knowing:
+The testbench models the board's single holding register. A byte arrives at its timestamp whether or not the program has read the previous one; if `UART_RX_valid` is still set and the byte is not being acknowledged that cycle, the new byte is discarded and the held one kept. `UART_RX_ack` clears `UART_RX_valid` and is reported as its own event, so the console's RX queue drains when the hardware takes a byte: `RX_VALID` falls on the instruction that reads `0xFFFF0004`, and returns when you step back over it.
 
-* **It compiles once.** The binary is cached against a hash of your sources, so a
-  re-run, a step or an input change skips `ivlpp` and `ivl` entirely — a few hundred
-  milliseconds instead of a few seconds.
-* **The saved testbench stands alone.** Every plusarg has a working default, so
-  `iverilog -o sim *.v cg3207_hdl_tb.v && vvp sim` runs it with no arguments at all.
-  Nothing about it is specific to the program you happened to have loaded.
-
-`TRACE` levels: `0` silent, `1` peripherals only, `2` (default) adds the architectural
-trace. Your own `$display` output passes through to the HDL console untouched.
-
-### 5.5 Which clock edge, and why it matters
-
-A timestamp in `stim.mem` or `uart_rx.mem` means **in force during that cycle**, so
-an input stamped at cycle *C* is already settled when the instruction of cycle *C*
-reads it. The testbench therefore drives it one edge earlier, at the edge that
-*starts* cycle *C* — these are nonblocking assignments, and driving them at the edge
-that ends *C* would let the instruction read the previous value.
-
-The same reasoning runs the other way. `LED_OUT`, `SEVENSEGHEX`, `UART_TX_valid`,
-`OLED_Write` and `UART_RX_ack` are all `output reg` in the Wrapper: the write made by
-the instruction of cycle *C* lands at the edge that ends *C* and is only readable
-during *C+1*. They are sampled on the **falling** edge, where the new value is
-visible but the trace still sits inside step *C* — so the effect is attributed to the
-instruction that caused it rather than to the one after it. `MemWrite_out` is
-combinational and stays on the rising edge, alongside the instruction record.
-
-Section 11 of the test suite pins both directions down.
-
-### 5.6 Reading the register file
-
-Register values come from a hierarchical reference into your design. Two tiers, by how
-much they can be trusted:
-
-* **Guaranteed** — the Wrapper is fixed, so `dut.PC`, `dut.Instr`, `dut.MemWrite_out`,
-  `dut.ALUResult` and `dut.WriteData_out` always exist. The PC, the instruction stream
-  and every memory write come from these, and work for *any* core behind that Wrapper.
-* **Discovered** — the register bank lives in code you can change. The page looks for a
-  32-entry array of 32-bit regs reachable under the Wrapper's core instance, and reports
-  what it found under the *Register file* field; type a path there to override it.
-
-Writes are detected by comparing the array against a shadow copy on the falling clock
-edge, so **only the array is ever named** — renaming your register file's ports, or the
-module itself, cannot break the trace. If the path cannot be resolved at all, the run
-falls back to a Wrapper-only testbench: you lose the register view, not the simulation.
-
-### 5.7 The UART console follows the hardware
-
-`UART_RX_ack` is reported as its own event, so the console's RX FIFO drains exactly
-when your hardware takes a byte — `RX_VALID` falls back to 0 on the instruction that
-reads `0xFFFF0004`, and comes back if you step *back* over it. Nothing about the
-console is guessed from the program.
-
-A **buffered** send has no drip feed here (nothing steps the functional engine's
-instruction counter), so the whole sequence is queued at once, spaced by the same
-instruction gap you asked for, and delivered on that schedule inside the recording.
+A send from the console is placed on the input timeline all at once, starting at the current cycle, with consecutive characters the *Arrival* gap apart (in cycles), and the recording is replayed (§5.11).
 
 ### 5.8 Memory images
 
-Your Wrapper owns instruction and data memory outright — it must declare an IROM and a
-DMEM (or reach ones declared below it), sized by two localparams, `IROM_DEPTH_BITS` and
-`DMEM_DEPTH_BITS`, and load them itself with `$readmemh("AA_IROM.mem", ...)` /
-`$readmemh("AA_DMEM.mem", ...)`, the same call Vivado's simulator would make. The
-simulator's part is narrower than it looks: it assembles your program, writes those two
-files to match what your localparams say the memories can hold, and reads the depths
-back out of your source so a design with an enlarged IROM gets a correspondingly sized
-image. It never creates the memories, and it never simulates a default size behind your
-back. If the program needs more instruction words than your IROM holds, the console
-says so rather than letting the Wrapper quietly fetch NOPs past the end.
+The Wrapper owns instruction and data memory. It declares an IROM and a DMEM (or reaches ones declared below it), sized by the localparams `IROM_DEPTH_BITS` and `DMEM_DEPTH_BITS`, and loads them with `$readmemh("AA_IROM.mem", ...)` and `$readmemh("AA_DMEM.mem", ...)`. The simulator reads the two depths from the source and writes images of matching size; it never creates the memories or assumes a default size. If the program needs more instruction words than the IROM holds, the console says so.
 
-Images are built from the assembled memory image, so gaps inside a segment keep their
-addresses. Words past the end of the program are left uninitialised (`X`), matching
-what Vivado does with a short `$readmemh` file — the resulting "Not enough words"
-notice is expected and is filtered from the console.
-
----
-
+Images are built from the assembled memory image, so gaps inside a segment keep their addresses. Words past the end of the program are left uninitialised (`X`), as with a short `$readmemh` file in Vivado; the resulting "Not enough words" notice is filtered from the console.
 
 ### 5.9 Execution model: record, then scrub
 
-`vvp` runs to `$finish` and cannot be paused mid-flight, so **stepping does not drive
-the simulator at all**. A run records the whole simulation once — one record per PC
-change, plus register writes, memory writes and peripheral activity — and Step and Back
-move through that recording.
+`vvp` cannot be paused mid-run and takes no input while it runs, so Step and Back do not drive the simulator. A run records the simulation as tagged lines on standard output, and Step and Back move through that recording. Stepping is instant, Back works, and because the trace keys on PC changes rather than cycles it stays correct for multi-cycle or pipelined cores.
 
-This is better than live stepping on every axis that matters here:
+| Record | Meaning |
+|---|---|
+| `@@I cyc pc instr` | PC changed (one per instruction) |
+| `@@W cyc reg value` | register write |
+| `@@M cyc addr MemWrite_out data` | memory write (`ALUResult`, the write strobes, `WriteData_out`) |
+| `@@L`, `@@S` | `LED_OUT`, `SEVENSEGHEX` changed |
+| `@@T`, `@@O`, `@@A` | UART byte sent, OLED pixel write, UART RX acknowledged |
+| `@@B`, `@@P` | OLED buffer swap, read of the swap-pending flag (double-buffered Wrapper only) |
+| `@@N`, `@@F` | next instruction to fetch, and final LED / 7-segment / `LED_PC` state, after the last cycle |
 
-* stepping is instant, because nothing is re-simulated;
-* **Back works**, which no real Verilog simulator offers;
-* the recording keys on *PC changes*, not on cycles, so it stays correct if you make
-  your core multi-cycle or pipelined (`WE_PC` is hardwired to 1 in the single-cycle
-  template, but need not be).
-
-Untick **Trace** to record peripheral activity only. That is slightly faster, and
-disables Step.
+Unticking *Record the architectural trace* records peripheral activity only. That saves about 30% of the run time but disables Step, Back, breakpoints and the Registers panel.
 
 ### 5.10 Run, Resume and breakpoints
 
-Breakpoints work exactly as they do in the functional engine — they are source lines,
-and the recording is searched by mapping each recorded PC back to its line.
+Breakpoints are source lines, found in the recording by mapping each recorded PC back to its line.
 
-* **Run** (no recording yet) simulates, then stops at the first breakpoint, or at the
-  end of the budget if none is hit.
-* **Resume** continues from wherever you are to the next breakpoint. With no
-  breakpoints it runs to the end of what has been recorded.
-* **Resume at the end of the recording** records another *Cycles* worth and carries
-  on — that is the "run for another N cycles" button. The new cycles are simulated
-  from the last checkpoint (§5.11), not from reset.
-* **Reset** (⟲) discards the recording, so the next Run starts the hardware from
-  reset again. Pressed while a simulation is running, it stops it.
+* **Run** with no recording records up to *Cycles per Run / Resume* cycles and stops at the first breakpoint, or at the end.
+* **Resume** goes to the next breakpoint; a breakpoint already inside the recording is reached without simulating. At the end of the recording, Resume records another *Cycles per Run / Resume* cycles, continuing from the last checkpoint (§5.11) rather than from reset.
+* **Reset** (⟲) discards the recording, so the next Run starts from reset. During a run it stops the simulation.
 
-**Statement Stepping** applies here too. With it on, one **Step** covers every machine
-instruction the current source line expands to — a `la` pseudo-op, or a C statement —
-by seeking that far through the recording, and **Back** covers exactly the same
-distance in reverse.
+With Icarus, a Run is recorded in chunks of about 300 ms of simulation (`HDL_CHUNK_MS`), each started from the checkpoint at the end of the previous one, and the page follows each chunk as it arrives. Pause and breakpoints take effect between chunks. An input changed during the run is placed on the timeline at the cycle shown, and the recording is replayed from there before the next chunk.
 
-*Cycles* keeps one meaning throughout: how much a fresh Run records, and how much each
-Resume adds. It is never rewritten behind your back. Stepping past the end of the
-recording also extends it, geometrically rather than by one increment, so a long
-program does not re-simulate on every step. If the PC has stopped advancing (a halt,
-or a tight self-loop) the console says so instead.
+**Statement Stepping** applies: one Step covers every machine instruction the current source line expands to (a `la` pseudo-instruction, or a C statement), and Back covers the same distance in reverse.
 
-### 5.11 Changing an input while paused
+*Cycles per Run / Resume* is the size of a fresh recording and of each Resume increment; the page never rewrites it. Its default with Icarus is 200,000 and the maximum recording is 2,000,000 cycles. Stepping past the end of the recording also extends it, growing geometrically. If the PC has stopped advancing (a halt or a self-loop), the console says so.
 
-Because the simulation is deterministic, a change made mid-run does not have to break
-the illusion. Flip a DIP switch, press a button, move the accelerometer or type into the
-UART console while paused, and the change is **timestamped at the current cycle** and
-the run replayed. Everything before that point comes out bit-identical, so you land
-exactly where you were with the change now in effect. What had been recorded after the
-change was recorded with the old input, so the replay stops one *Cycles* past the change
-instead of going back to where the old recording ended.
+### 5.11 Changing an input while paused, and checkpoints
 
-This is what `stim.mem` and `uart_rx.mem` are for: the timeline of inputs is data the
-testbench reads, not something baked into it.
+Changing a DIP switch, a button or the accelerometer, or sending UART input, while paused timestamps the change at the current cycle and replays the run. The simulation is deterministic, so everything before the change is reproduced exactly and the view returns to the same point with the change in effect. The replay records one *Cycles per Run / Resume* past the change.
 
-**Checkpoints.** A replay does not start from reset. `vvp` cannot save its own state
-(Icarus does not implement `$save`), so a second top-level module, `cg3207_hdl_ck`,
-compiled in beside the testbench, does it: every `+CKEVERY` cycles, 1 ns after the
-falling edge, it writes every `reg` of the design and of the testbench to
-`ck_<cycle>.txt` and every memory that something assigns to `ck_<cycle>_m<i>.mem`, in
-binary so that x and z bits survive. `+CKAT=<cycle>` adds one more, which the page
-places 17 cycles before the end of every run. `+CKLOAD=<cycle>` loads one back 1 ns into
-a run, before the first rising edge, and the run carries on from that cycle. The page
-keeps up to 40 checkpoints, 1024 cycles apart to start with, the spacing doubling as the
-recording grows. A replay starts from the latest one before the first cycle at which the
-input timeline changed; extending the recording (Resume, or stepping off its end) starts
-from the one near the end, so it re-runs only the 16 cycles it has to verify, whatever
-*Cycles per Run / Resume* is.
+**Checkpoints.** Icarus does not implement `$save`, so a second top-level module, `cg3207_hdl_ck`, compiled beside the testbench, saves and restores state:
 
-The new run's records are joined onto the old recording at the first cycle the input
-timelines differ (or at its end, for an extension): what it printed before that is set aside
-to be checked, what it printed from there on is parsed onto the recording, so a join costs
-the same however long the recording is. Its VCD is joined onto the old VCD, moved 10 ns per
-cycle later. Both VCDs must hold the same
-signals, so a recording made with the other *Waveform: Wrapper signals only* setting is
-replayed from reset instead. That join is only right if the
-checkpoint held all of the design's state, and the state is found by reading the
-sources (regs, `integer`s, ANSI `output reg` ports, instances, through the hierarchy
-under the Wrapper). So the replay always starts at least 16 cycles before the change and
-must reproduce the old recording over that stretch record for record. If it does not,
-the run is repeated from reset, and checkpoints stay off for those sources. A design
-with a `generate` loop, an array of instances, a `generate` block that declares regs or
-instances, or a multi-dimensional memory has no checkpoints at all, and the console
-says which. Section 15 of the HDL test suite checks that a replay from a checkpoint,
-joined, is the run from reset, waveform included.
+* Every `+CKEVERY=<n>` cycles, 1 ns after the falling edge, it writes every `reg` of the design and the testbench to `ck_<cycle>.txt`, and every memory that something assigns to `ck_<cycle>_m<i>.mem`, in binary so x and z bits survive.
+* `+CKAT=<cycle>` writes one more; the page sets it 17 cycles before the end of each run.
+* `+CKLOAD=<cycle>` restores `ck_load.txt` and `ck_load_m<i>.mem` 1 ns into the run, before the first rising edge, and the run continues from that cycle.
 
-The checkpoint module is not in the downloadable testbench, and it is a separate top
-level so that `$dumpvars(0, cg3207_hdl_tb)` leaves it out of the waveform.
+The page keeps up to 40 checkpoints (`HDL_CK_KEEP`), 1024 cycles apart to start with (`HDL_CK_EVERY`); the spacing doubles as the recording grows. A replay starts from the latest checkpoint at least 16 cycles (`HDL_CK_VERIFY`) before the first cycle at which the input timeline changed. Extending the recording starts from the checkpoint near its end.
+
+The new run's output is joined onto the old recording at the first cycle where the input timelines differ, or at its end for an extension, so a join costs the same however long the recording is. The new VCD is joined onto the old one, shifted 10 ns per cycle. Both VCDs must hold the same signals, so a recording made with a different *Signals* setting is replayed from reset instead.
+
+The saved state is found by reading the sources (regs, `integer`s, ANSI `output reg` ports, instances, through the hierarchy under the Wrapper), so a design could hold state this misses. Each replay from a checkpoint must therefore reproduce at least the 16 overlapping cycles of the old recording record for record. If it does not, the run is repeated from reset and checkpoints are turned off for those sources. A design with a `generate` loop, an array of instances, a `generate` block that declares regs or instances, or a multi-dimensional memory has no checkpoints, and the console says why. Section 15 of `test_hdl_mode.js` checks that a joined replay from a checkpoint matches the run from reset, waveform included.
+
+`cg3207_hdl_ck` is a separate top level so that `$dumpvars(0, cg3207_hdl_tb)` leaves it out of the waveform.
+
+`test_hdl_mode.js` compiles a processor's RTL (`Wrapper.v`, `RV.v` and its submodules) from the folder named by the environment variable `RVSIM_CORE_DIR`, and skips itself when that is not set.
 
 ### 5.12 Cross-checking against the functional model
 
-Tick **Cross-check vs JS model** and each run is followed by a replay of the same
-program on the JavaScript interpreter, comparing the PC sequence and every register
-write. It reports the *first* instruction where the two disagree, with the cycle, PC,
-instruction word and both values — which is usually exactly where an RTL bug is.
-
-Off by default: it costs a second execution of the whole program.
-
-One expected false alarm: if the program reads UART input, the two engines deliver it
-on different schedules and will diverge there legitimately.
-
----
-
+With **Cross-check against the JS model** ticked, each run is followed by a run of the same program on the JavaScript model, comparing the PC sequence and every register write. The console reports the first instruction where they disagree, with the cycle, PC, instruction word and both values. It is off by default because it costs a second execution. Programs that read UART input can diverge legitimately, because the two engines deliver input on different schedules.
 
 ### 5.13 Synthesis lint
 
-Every time you load sources, they are checked for constructs that behave one way in
-simulation and another way — or not at all — after synthesis. Results go to the console
-with a file and a line.
+Sources are checked on load for constructs that behave differently, or not at all, after synthesis. Findings go to the console with file and line. The lint never blocks a simulation.
 
 | Flagged | Why |
 |---|---|
-| `#` delay | discarded by synthesis; the hardware will not match the simulation |
-| `$display`, `$finish`, `$time`, … | simulation-only. `$readmemh`/`$readmemb` are *not* flagged — Vivado uses them for memory init |
+| `#` delay | discarded by synthesis |
+| `$display`, `$finish`, `$time`, … | simulation-only; `$readmemh` / `$readmemb` are not flagged, since Vivado uses them for memory initialisation |
 | `real`, `time`, `event` | not synthesisable |
 | `forever`, `while` | synthesis needs a statically bounded loop |
-| `casex` | X-matching does not exist in hardware; `casez` is the safe form |
+| `casex` | X-matching does not exist in hardware; use `casez` |
 | blocking `=` in a clocked block | races other blocks reading the same signal on that edge (loop headers exempt) |
-| `always @(a, b)` on combinational logic | synthesis reads it as `@*` regardless, so an incomplete list is a real mismatch |
-| `initial` with a delay | simulation-only (a plain `initial` power-up value is fine) |
+| `always @(a, b)` on combinational logic | synthesis treats it as `@*`, so an incomplete list is a simulation mismatch |
+| `initial` with a delay | simulation-only; a plain `initial` power-up value is fine |
 
-It is a **lint, not a synthesis run**, and it never blocks a simulation. To confirm the
-design really synthesises — and that the synthesised version behaves the same — use the
-post-synthesis check below.
+To confirm that the design synthesises and behaves the same afterwards, use post-synthesis simulation (§5.14).
 
 ### 5.14 Post-synthesis functional simulation
 
-Tick **Post-synthesis functional simulation** (⚙ Settings → 🔌 HDL Simulation) and every
-run is simulated twice: once as you wrote it, and once as a gate-level netlist produced
-by **Yosys**. The two are compared, and the first point where they differ is reported.
+With **Post-synthesis functional simulation** ticked, each run is simulated twice: once from the RTL, and once from a gate-level netlist produced by Yosys. The first difference is reported.
 
 | Stage | What happens |
 |---|---|
-| Synthesise | Yosys runs `synth -top RV` over your core and writes a generic netlist. Cell count and any warnings go to the console. |
-| Shim | Synthesis resolves parameters away, so a small wrapper module is generated to keep the fixed Wrapper's `RV #(.PC_INIT(…)) RV1(…)` valid. |
-| Simulate | The netlist is compiled against the real `Wrapper.v` and the same generated testbench, and run with the same switches, cycle budget and inputs as the RTL. |
-| Compare | The instruction stream, memory writes and peripheral activity of the two runs are diffed. |
+| Synthesise | Yosys runs `read_verilog` over the core's files, `chparam -set PC_INIT <base> RV`, `synth -top RV`, `write_verilog -noattr netlist.v` and `stat`. Cell count and warnings go to the console. The netlist is cached against the core sources and the base address. |
+| Shim | Synthesis resolves parameters away, so the synthesised top is renamed `RV_synth` and wrapped in a generated `RV #(parameter PC_INIT)` module, keeping the Wrapper's `RV #(.PC_INIT(…)) RV1(…)` valid. |
+| Simulate | The netlist is compiled with the loaded `Wrapper.v` and the same generated testbench, and run with the same inputs and cycle budget as the RTL. |
+| Compare | The instruction stream, memory writes and peripheral activity of the two runs are compared. |
 
-With it on, a Run is simulated in one go rather than in chunks (§5.10), and cannot be
-paused; Reset stops it. The netlist's state lives in cells Yosys named, which the
-checkpoint module cannot find, so the netlist can only be simulated from reset, and it is
-compared with one RTL run of the same length. *Cycles per Run* is remembered separately
-while it is on, 50,000 by default. The setting's description says so, its tooltip gives
-the reason, and so does the Run button's while such a run is under way.
+Only the core is synthesised. The Wrapper stays behavioural, so its `$readmemh` still works and one synthesis serves every program.
 
-Only **your core** is synthesised. The Wrapper stays behavioural, which keeps its
-`$readmemh` working — so the netlist is independent of the program and one synthesis
-serves every run.
+* The panels show the RTL run; stepping, Back and the register view are unaffected.
+* Register writes are not compared, because synthesis turns the register file into logic and no array remains. The PC, memory writes and peripherals come from the Wrapper and are compared in full.
+* The netlist's state lives in cells Yosys named, which the checkpoint module cannot find, so it is simulated only from reset and compared with one RTL run of the same length. A Run is therefore recorded in one go rather than in chunks, and cannot be paused; Reset stops it.
+* *Cycles per Run / Resume* is remembered separately while this is on, 50,000 by default.
 
-Two things follow from how synthesis works:
+A divergence usually points to an inferred latch, an incomplete sensitivity list, or a race between blocking assignments.
 
-- **The panels keep showing the RTL run.** The netlist runs alongside it purely as a
-  check, so stepping, Back and the register view are unaffected.
-- **Register writes are not compared.** Synthesis turns the register file into logic,
-  so there is no array left to read. The PC, memory and peripherals all come from the
-  Wrapper and are compared in full.
+#### Loading Yosys
 
-A divergence is what a construct that simulates one way and synthesises another looks
-like — most often an inferred latch, an incomplete sensitivity list, or a race between
-blocking assignments.
+Yosys (`@yowasp/yosys`) is fetched from a pinned, immutable jsDelivr URL the first time the option is ticked, about 13 MB over the wire, and cached by the browser. It is never fetched while the option is off. Synthesis takes roughly 20 to 35 seconds and is repeated only when the sources change.
 
-#### The download
+If the CDN cannot be reached, the loader falls back to `vendor/yosys/` beside the page (see [`vendor/README.md`](vendor/README.md)). That copy requires the page to be served over `http://`: the bundle resolves its `.wasm` and resource tar relative to its own URL, and a `file://` fetch is blocked as cross-origin.
 
-Ticking the box for the first time fetches Yosys — about **13 MB** over the wire, from a
-pinned, immutable CDN URL. Nothing is downloaded until you tick it, and your browser
-caches it (`max-age` one year, `immutable`), so later sessions start immediately. It is
-never fetched if you leave the box unticked. Synthesis itself takes roughly 20–35
-seconds and is cached until your sources change.
+### 5.15 Engine sources
 
-If the CDN cannot be reached the loader falls back to `vendor/yosys/` beside this file
-(see [`vendor/README.md`](vendor/README.md)). That copy needs the page to be **served over
-`http://`**: the bundle resolves its own `.wasm` and resource tar relative to its URL, and
-a `file://` fetch is blocked as cross-origin.
-
-### 5.15 Where the engine comes from
-
-Three Emscripten modules, tried in order:
+The browser engine is three Emscripten modules (`ivlpp`, `ivl`, `vvp`, each a `.js` and a `.wasm`). They are loaded from the first of these locations that answers:
 
 1. `https://cdn.jsdelivr.net/gh/senolgulgonul/verisim@main/`
 2. `https://senolgulgonul.github.io/verisim/`
-3. `vendor/verisim/` — the copy checked in beside this file (see
+3. `vendor/verisim/`, the copy in the repository (see
    [`vendor/README.md`](vendor/README.md))
-4. `verisim/` next to this file, for a copy you drop in yourself
+4. `verisim/` next to the page, for a copy you supply
    (`ivlpp.js/.wasm`, `ivl.js/.wasm`, `vvp.js/.wasm`)
 
-The local copies are a fallback for when the CDN is blocked or down. They only
-work when the page is **served over `http://`** — Emscripten fetches its own
-`.wasm`, and a `file://` fetch is blocked as cross-origin.
+The local copies work only when the page is served over `http://`: Emscripten fetches its
+own `.wasm`, and a `file://` fetch is blocked as cross-origin.
 
-The pipeline mirrors what the `iverilog` driver does natively:
+The pipeline follows the native `iverilog` driver:
 
 | Stage | Module | In -> out |
 |---|---|---|
@@ -885,648 +678,635 @@ The pipeline mirrors what the `iverilog` driver does natively:
 | Compile | `ivl` | expanded source -> `.vvp` bytecode |
 | Run | `vvp` | `.vvp` + plusargs + input files -> stdout + optional VCD |
 
-Files move between stages through each module's in-memory filesystem; nothing touches
-your disk.
+Files pass between stages through each module's in-memory file system.
 
-Each stage runs in a module worker, made from a script inside the page, which imports the
-same `.js` by URL, so a long simulation does not freeze the page. Where a worker cannot
-start or cannot load the engine, the stages run on the page as before, and the console
-says so once. Stopping a run (Reset) terminates the worker; the next stage starts a new
-one.
+Each stage runs in a module worker, created from a script inside the page, which imports the
+same `.js` by URL, so a long simulation does not block the page. If a worker cannot start
+or cannot load the engine, the stages run on the page and the console says so once. Reset
+terminates the worker; the next stage starts a new one.
 
 > **Licensing.** These WASM modules are builds of **Icarus Verilog** and carry the
-> **GPL** — see [Licensing note](#licensing-note) at the end of this document.
+> **GPL**; see [Licensing note](#licensing) at the end of this document.
 
----
-
-In the desktop app none of this applies: the page finds `window.rvNative` with
-`icarus` set, and `hdlTool()` hands each stage's files and arguments to the native
-build through it instead ([§5.18](#518-the-desktop-app)). Nothing above `hdlTool()`
-knows which engine ran.
+In the desktop app the page finds `window.rvNative` with `icarus` set, and `hdlTool()` hands
+each stage's files and arguments to the native build instead ([§5.18](#518-the-desktop-app)).
+Nothing above `hdlTool()` depends on which engine ran.
 
 ### 5.16 Limitations
 
-- **A step is a recording, not a live simulation.** Editing a register value by hand,
-  or setting a breakpoint the hardware does not know about, has no effect on the RTL —
-  the recording is what the hardware actually did.
-- **Registers depend on discovery.** A register file that is not a 32-entry array of
-  32-bit regs needs its path typed in by hand. When it cannot be reached at all the
-  Registers panel says so in place of the values, rather than showing zeros that were
-  never read from your hardware — the PC, instructions, memory and peripherals all
-  come from the fixed Wrapper and keep working.
-- **Long runs are slow**: measured in Chrome with the trace and the waveform on, about
-  8,000 cycles a second for the `RV/` RTL and 2,000 to 4,000 for the prebuilt gate-level
-  core. A program that needs millions of cycles is better run in JS mode. Native Icarus
-  in the desktop app is only about 1.7× faster (§5.18): the time is Icarus's own.
-- **The waveform covers about the last 50,000 cycles** of a longer run (`HDL_VCD_WINDOW`;
-  up to 62,500 with Icarus, which drops the oldest in steps). The whole of a run with every
-  signal would be about 1.2 KB a cycle.
-- **First run downloads ~2.7 MB** of WASM (cached afterwards).
-- Requires a browser context that allows cross-origin `import()` — serve over `http://`
-  rather than opening the file with `file://`, or host the engine locally.
+- **A step is a recording.** Editing a register value by hand has no effect on the RTL.
+- **Registers depend on discovery.** A register file that is not a 32-entry array of 32-bit
+  regs needs its path entered by hand. When it cannot be reached, the Registers panel says so
+  in place of the values. The PC, instructions, memory and peripherals come from the fixed
+  Wrapper and are unaffected.
+- **Long runs are slow.** In Chrome, with the trace and the waveform on, an RTL core runs at
+  about 8,000 cycles a second and the prebuilt gate-level core at 2,000 to 4,000. Native
+  Icarus in the desktop app is about 1.7 times faster (§5.18); the time is spent in Icarus
+  itself. For millions of cycles use JS mode or Verilator (§5.19).
+- **The waveform covers about the last 50,000 cycles** of a longer run (`HDL_VCD_WINDOW`). With
+  Icarus it can hold up to 62,500, since the oldest changes are dropped in steps. A full dump of every signal
+  is about 1.2 KB per cycle.
+- **The first run downloads about 2.7 MB** of WASM, which the browser then caches.
+- The page needs a context that allows cross-origin `import()`: serve it over `http://` rather
+  than opening it with `file://`, or host the engine locally.
 
 ### 5.17 Loading a folder
 
-*folder…*, beside *browse…*, loads every `.v`, `.sv`, `.vh` and `.svh` file in a folder
-and its subfolders, keeping only what belongs to the design:
+*folder…*, beside *browse…*, loads every `.v`, `.sv`, `.vh` and `.svh` file in a folder and its
+subfolders, keeping only what belongs to the design:
 
-- **Only files under the Wrapper.** Starting from `module Wrapper`, the module bodies are
-  scanned for instantiations of the other modules found (comments and strings blanked
-  first), and a file is loaded if it declares any module reached that way. A file that
-  declares no module, and every header, is loaded too. The course's
-  `test_Wrapper_*.v` testbenches and an old copy of a module beside the real one are
-  left out, and the console lists them; they would otherwise become a second top level.
-  With no Wrapper in the folder, everything is loaded and the usual *no Wrapper* warning
-  shows.
-- **Not Vivado's output.** Folders whose names start with `.`, `node_modules`,
-  `xsim.dir` and anything ending `.cache`, `.runs`, `.sim`, `.hw`, `.ip_user_files`
-  or `.gen` are skipped: they hold generated copies (`*_stub.v`, simulation netlists).
-- **Two files declaring one module** are both loaded and named in a warning; the
-  compile then fails until one is removed with × (which also keeps it out of later
-  reads) or deleted.
-- **Names.** Files are listed and reported by base name; two with the same base name in
-  different subfolders take their relative path with `/` replaced by `__`.
-- At most 500 files are read.
+- **Only files under the Wrapper.** Starting from `module Wrapper`, module bodies are scanned for
+  instantiations of the other modules found (comments and strings blanked first). A file is
+  loaded if it declares any module reached that way. A file that declares no module, and every
+  header, is loaded too. Testbenches that instantiate the Wrapper and spare copies of a module
+  are left out, and the console lists them; they would otherwise become a second top level.
+  With no Wrapper in the folder, everything is loaded and the *no Wrapper* warning shows.
+- **No tool output.** Folders whose names start with `.`, `node_modules`, `xsim.dir`, and any
+  ending in `.cache`, `.runs`, `.sim`, `.hw`, `.ip_user_files` or `.gen` are skipped. They hold
+  Vivado's generated copies (`*_stub.v`, simulation netlists).
+- **Two files declaring one module** are both loaded and named in a warning. Compilation fails
+  until one is removed with × (which also keeps it out of later reads) or deleted.
+- **Names.** Files are listed and reported by base name. Two files with the same base name in
+  different subfolders take their relative path, with `/` replaced by `__`.
+- At most 500 files are read (`HDL_FOLDER_MAX`).
 
-**Read again** whenever the window regains focus and before each run from reset (the
-Run that follows Reset, or the first Step), so an edit saved in Vivado or VS Code is
-picked up when you come back. If any file changed, appeared or disappeared, the folder's
-files are replaced, the console says which, and the recording of the old sources is
-discarded. Files dropped in by hand stay, and win over a folder file of the same name.
-A folder that can no longer be read leaves the loaded files as they were.
+**Re-reading.** The folder is read again whenever the window regains focus and before each run
+from reset (the Run after Reset, or the first Step), so an edit saved in an external editor is
+picked up. If any file changed, appeared or disappeared, the folder's files are replaced, the
+console lists the changes, and the existing recording is discarded. Files added by hand stay,
+and take precedence over a folder file of the same name. If the folder cannot be read,
+the loaded files are left as they were.
 
-**How it reaches the disk**, best first:
+**Disk access**, in order of preference:
 
-| Where | How | Remembered | Read again |
+| Where | How | Remembered | Re-read |
 |---|---|---|---|
-| Desktop app | `rvNative.pickFolder()` / `readFolder()`; main may only read a folder the user chose | across restarts, in the app's `settings.json` | yes |
-| Chromium browsers | `showDirectoryPicker()`; the handle is kept in IndexedDB (`rvsim` / `kv` / `hdlFolder`) | across reloads; a later visit may need the permission again, and the button then reads *↻ name* | yes |
-| Firefox, Safari | `<input webkitdirectory>` | no | no: the browser hands over a copy, so the folder is picked again after editing |
+| Desktop app | `rvNative.pickFolder()` / `readFolder()`; the main process reads only a folder the user chose | across restarts, in the app's `settings.json` | yes |
+| Chromium browsers | `showDirectoryPicker()`; the handle is kept in IndexedDB (`rvsim` / `kv` / `hdlFolder`) | across reloads; a later visit may need permission again, and the button then reads *↻ name* | yes |
+| Firefox, Safari | `<input webkitdirectory>` | no | no: the browser supplies a copy, so the folder must be picked again after editing |
 
 *Clear files* and *Prebuilt processor* forget the folder.
 
 ### 5.18 The desktop app
 
-[`electron/`](electron/README.md) packages this page with Electron and a native build
-of Icarus Verilog for each platform (Linux AppImage, Windows NSIS installer, macOS dmg
-for arm64 and x64). The page is the same file, served from the app's resources over an
-`app://` scheme, since a `file://` page cannot fetch its own `.wasm` or examples. It
-looks and behaves as it does in a browser; what differs:
+[`electron/`](electron/README.md) packages the page with Electron and a native build of
+Icarus Verilog for each platform (Linux AppImage, Windows NSIS installer, macOS dmg for arm64
+and x64). The page is the same file, served from the app's resources over an `app://`
+scheme, since a `file://` page cannot fetch its own `.wasm` or examples. It behaves as in a
+browser, with these differences:
 
-- **Icarus runs natively.** `electron/hdl_native.js` writes the files a stage would have
-  had in the Emscripten file system into a temporary directory, rewrites `ivl.conf` to
-  point at the bundled `vvp.tgt` and VPI modules, runs `ivlpp`, `ivl` or `vvp` there
-  with the same arguments, and returns the output and the files the page asked to keep.
-  Reset kills the process. The build is pinned to the commit the WASM engine was built
-  from (`c7530db`, 14.0-devel), and `test_hdl_native.js` checks that both record the
-  same instructions, the same waveform and the same checkpoint replay.
-- **Speed.** For 40,000 cycles of DIP to LED on the `RV/` RTL (trace, VCD and
-  checkpoints on): preprocess and compile 40 ms native against 180 ms WASM, simulation
-  5.2 s against 8.6 s. With trace, VCD and checkpoints all off native `vvp` still takes
-  2.2 s, about 18,000 cycles a second, so the time is Icarus's event-driven evaluation
-  and not the browser. Replaying an input change near the end takes 0.65 s.
+- **Icarus runs natively.** `electron/hdl_native.js` writes the files a stage would have had in
+  the Emscripten file system into a temporary directory, rewrites `ivl.conf` to point at the
+  bundled `vvp.tgt` and VPI modules, runs `ivlpp`, `ivl` or `vvp` there with the same
+  arguments, and returns the output and the files the page asked to keep. Reset kills the
+  process. The native build is pinned to the same Icarus commit as the WASM engine (`c7530db`,
+  14.0-devel). `test_hdl_native.js` checks that both record the same instructions, the same
+  waveform and the same checkpoint replay; it reads the RTL from the folder named by
+  `RVSIM_CORE_DIR` and skips itself when that is not set.
+- **Speed.** 40,000 cycles of a DIP-switch-to-LED program on an RTL core, with trace, VCD and
+  checkpoints on: preprocess and compile 40 ms native against 180 ms in WASM, simulation 5.2 s
+  against 8.6 s; replaying an input change near the end, 0.65 s. With all three off, native
+  `vvp` runs about 18,000 cycles a second: the cost is Icarus's event-driven evaluation.
 - **Offline.** Local copies of CodeMirror, Icarus and Yosys are tried before the CDN.
-- **The bridge** (`electron/preload.js`, `window.rvNative`) is the page's only way to
-  the machine: run one of the three Icarus tools in a fresh temporary directory, pick a
-  folder, and read a folder the user picked. The page has no Node access
-  (`contextIsolation`, `sandbox`), and links leave for the system browser.
-- **No menu bar** on Windows and Linux; macOS keeps the standard menu, without which
-  copy and paste stop working.
+- **The bridge** (`electron/preload.js`, `window.rvNative`) is the page's only access to the
+  machine: run one of the three Icarus tools in a fresh temporary directory, pick a folder, and
+  read a folder the user picked. The page has no Node access (`contextIsolation`, `sandbox`),
+  and links open in the system browser.
+- **No menu bar** on Windows and Linux. macOS keeps the standard menu, which copy and paste
+  depend on.
 - **Verilator** can be chosen instead of Icarus ([§5.19](#519-verilator-desktop-app)).
 
-Building, packaging and signing are described in
-[`electron/README.md`](electron/README.md).
+Building, packaging and signing are described in [`electron/README.md`](electron/README.md).
 
 ### 5.19 Verilator (desktop app)
 
-*Simulator* (⚙ Settings → Simulation) chooses Icarus Verilog or Verilator. The browser
-shows the same setting, disabled, with a tooltip saying it needs the desktop app, so
-that the two look alike. The choice is remembered in `localStorage`.
+*Simulator* (Settings → Simulation) chooses Icarus Verilog or Verilator. In the browser the
+setting is shown disabled, with a tooltip saying it needs the desktop app. The choice is kept
+in `localStorage`.
 
-Verilator 5.054, built by `electron/scripts/build-verilator.sh`, translates the
-sources and the same generated testbench to C++ (`--cc --exe --main --timing --trace`,
-`-Wno-fatal`, lint and style warnings off), and `electron/verilator_native.js`
-compiles it with `-O3` in parallel and links a model, which then takes the same
-plusargs and files as `vvp`. Nothing else in the page changes: the trace, stepping,
+Verilator 5.054, built by `electron/scripts/build-verilator.sh`, translates the sources and the
+same generated testbench to C++ (`--cc --exe --main --timing --trace`, `-Wno-fatal`, lint and
+style warnings off). `electron/verilator_native.js` compiles the result with `-O3` in parallel and
+links a model, which takes the same plusargs and files as `vvp`. The trace, stepping,
 peripherals, input changes and the waveform work as with Icarus.
 
-| 40,000 / 200,000 cycles of DIP to LED on the `RV/` RTL, through the page | Icarus (native) | Verilator |
+| DIP-switch-to-LED program on an RTL core, through the page | Icarus (native) | Verilator |
 |---|---|---|
 | Build | 0.05 s | 3.6 s after a source edit; 11 s the first time (its runtime) |
 | 200,000 cycles, waveform on | 27.4 s | 1.6 s |
 | 200,000 cycles, waveform off | 19.5 s | 1.0 s |
 
-What differs:
+Differences from Icarus:
 
-- **Two-state.** What Icarus shows as `x` (a register never written, an output never
-  driven) is 0, and the console says so on the first build. Instruction, register and
-  memory records match Icarus otherwise; `test_verilator.js` checks 40,000 cycles.
-- **Builds are cached** by content (sources, testbench, language, Verilator, compiler)
-  in the app's data folder, the last 8 kept, so changing the program, Reset and input
-  changes reuse the model. Verilator's runtime is compiled once per compiler.
-- **Checkpoints** come from the same reading of the sources as Icarus's (§5.11), but a
-  different module. Verilator builds one top level, so the testbench instantiates it
-  (`cg3207_ck`, kept out of the waveform by `/* verilator tracing_off */`), and it holds
-  only the regs assigned in a clocked `always` block or a task, since the rest are
-  recomputed. Every `HDL_VL_CK_EVERY` (200,000) cycles, but not at a run's last cycle, it
-  writes the state to `ck_s0` or `ck_s1` in turn, so a run of any length leaves its two
-  newest, and the recording keeps the two newest of all the runs it was joined from
-  (`t.vlCks`); the cycle each holds is the testbench's `cyc`, saved with the rest.
-  Neither block may wait: a `#1`, as Icarus's module has, makes it a process Verilator
-  schedules at run time, and writing the design's regs from a block on a clock edge forces
-  extra evaluation at every edge; either costs a fifth of the model's speed. So the
-  restore is a plain `initial` block, which Verilator runs after the design's own, and the
-  save runs when a flag set at the falling edge rises: 20,000,000 cycles in 11.04 s
-  against 11.02 s without the module. A design whose `initial` blocks assign with `<=`
-  overrides the restore; Verilator reports that as MULTIDRIVEN. Every run from a checkpoint prints its records from the checkpoint
-  (`+TRACEFROM`), and what falls before the join point is compared, record by record
-  with each record's own cycle, against the recording; a mismatch reruns from reset and
-  turns checkpoints off for those sources, as with Icarus.
-- **Post-synthesis simulation is hidden** while Verilator is chosen: it compares the
-  RTL run against an Icarus run of the netlist, and two-state against four-state would
-  diverge at every `x`.
-- **Wrapper signals only** cannot use `$dumpvars` depth, which Verilator ignores, nor
-  `--trace-depth`, since inlining puts everything under the Wrapper at one level. A
-  config file passed with the build, `tracing_off -scope "cg3207_hdl_tb.dut.*.*"`, keeps
-  the testbench's and the Wrapper's own signals and drops the rest (8.4 MB against
-  22.1 MB for 40,000 cycles); ticking it builds a second cached model.
-- **Warnings** are counted by kind with the first of each (`Verilator COMBDLY ×2: …`);
-  errors are listed with file, line and column.
-- **The status line** reports each step of a build (translating, compiling the runtime
-  and the model file by file, linking), and Reset kills the build.
+- **Two-state.** What Icarus shows as `x` (a register never written, an output never driven) is
+  0, and the console says so on the first build. Instruction, register and memory records
+  otherwise match Icarus; `test_verilator.js` checks 40,000 cycles, reading the RTL from
+  `RVSIM_CORE_DIR` and skipping itself when that is not set.
+- **Builds are cached** by content (sources, testbench, language, Verilator version, compiler) in
+  the app's data folder; the last 8 are kept (`KEEP_MODELS`). Changing the program, Reset and
+  input changes reuse the model. Verilator's runtime is compiled once per compiler.
+- **Checkpoints** come from the same reading of the sources as Icarus's (§5.11), but use a
+  different module. Verilator builds one top level, so the testbench instantiates the
+  checkpoint module (`cg3207_ck`, kept out of the waveform by `/* verilator tracing_off */`). It
+  holds only the regs assigned in a clocked `always` block or a task, since the rest are
+  recomputed. Every `HDL_VL_CK_EVERY` (200,000) cycles, except at a run's last cycle, it writes
+  the state to slot `ck_s0` or `ck_s1` in turn (`ck_s<n>.txt` for regs, `ck_s<n>_m<i>.mem` for
+  memories). A run of any length therefore leaves its two newest checkpoints, and the recording
+  keeps the two newest across all the runs it was joined from (`t.vlCks`). The cycle each holds
+  is the testbench's `cyc`, saved with the rest.
+  - Neither block may wait or be clocked: a delay such as `#1` makes it a run-time-scheduled
+    process, and writing the design's regs on a clock edge forces extra evaluation every edge;
+    either costs about a fifth of the model's speed. The restore is a plain `initial` block,
+    which Verilator runs after the design's own, and the save runs when a flag set at the
+    falling edge rises. The module costs under 1% of run time.
+  - A design whose `initial` blocks assign with `<=` overrides the restore; Verilator reports
+    this as MULTIDRIVEN.
+  - A run from a checkpoint prints its records from the checkpoint (`+TRACEFROM`). What falls
+    before the join point is compared, record by record at each record's own cycle, against the
+    recording. A mismatch reruns from reset and turns checkpoints off for those sources, as with
+    Icarus.
+- **Post-synthesis simulation is hidden** while Verilator is selected. It compares the RTL run
+  against an Icarus run of the netlist, and two-state against four-state results would differ
+  at every `x`.
+- **Signals: Wrapper only** cannot use a `$dumpvars` depth, which Verilator ignores, or
+  `--trace-depth`, since inlining places everything under the Wrapper at one level. Instead a
+  config file passed with the build, `tracing_off -scope "cg3207_hdl_tb.dut.*.*"`, keeps the
+  testbench's and the Wrapper's own signals and drops the rest (8.4 MB against 22.1 MB for
+  40,000 cycles). This setting builds a second cached model.
+- **Messages.** Warnings are counted by kind with the first of each shown
+  (`Verilator COMBDLY ×2: …`); errors are listed with file, line and column. The status line
+  reports each build step, and Reset kills the build.
 
-**Live runs.** With Verilator, Run is live: the model keeps running until Pause, a
-breakpoint or *Cycles per Run / Resume* (20,000,000 by default for Verilator, 200,000 for
-Icarus, each remembered separately), and switches, buttons, the accelerometer and typed
-UART input take effect while it runs. A C++ helper compiled into every model
-(`cg3207_live_poll`, called through DPI from a `` `ifdef VERILATOR `` block of the
-testbench at every rising edge) reads commands from stdin, drives an input change at the
-edge, which puts it in force from the next cycle exactly as a `stim.mem` entry would, and
-reports it (`@@V`, `@@U`) with that cycle, so the input timeline, and with it Back, a
-replay and the waveform, is the same as if the inputs had been there from the start. It
-flushes output every 30 ms, with a `@@C <cycle>` record so that the page knows how far
-the run has got even when nothing else is printed; the app passes it on every 50 ms and
-the page follows the recording every 100 ms with a forward-only seek. Without the
-architectural trace there are no instructions to follow, and the page applies the
-peripheral events as they come, folding them into a state snapshot past 100,000. *Real time* paces the model itself to
-the clock: 2,275 cycles in 1.5 s at 1.53 kHz. Flat out, live, the page takes in about
-285,000 cycles a second (5,000,000 cycles in 17.5 s).
+**Live runs.** With Verilator, Run is live: the model keeps running until Pause, a breakpoint or
+*Cycles per Run / Resume* is reached (default 20,000,000 for Verilator and 200,000 for Icarus,
+each remembered separately). Switches, buttons, the accelerometer and typed UART input take
+effect while it runs.
 
-- **Resume** (with or without the architectural trace) restarts the model with the
-  inputs recorded so far, from the newest checkpoint at least 16 cycles before the old end (and, with the waveform followed live,
-  before its window), and `+LIVEFROM` at the old end: no input is taken before it, the
-  replay runs at full speed, and the records that follow join onto the recording once the
-  stretch before it has been checked; until then they are held back. Changing an input
-  while paused does the same from the first cycle the input timelines differ, and the
-  waveform built on Pause from the newest checkpoint before its window, its times moved
-  10 ns per cycle of the checkpoint. With no checkpoint early enough, these replay from
-  reset as before (3.1 s near the end of a 5,000,000-cycle run).
-- **No cap.** The recording keeps the last 2,000,000 cycles (`HDL_VL_KEEP`). Once it is a
-  quarter over, the instructions before that are folded into a snapshot of the state
-  they leave (registers, data memory, peripherals, both OLED pages, UART output) and a
-  seek starts there; the instruction count still counts from reset, and Back stops at
-  the start of what is kept. The cross-check against the JS model, which runs from
-  reset, is not offered once a recording has been trimmed.
-- **The waveform** (*Waveform*, shown with Verilator): *Built on Pause* replays the run
-  with the dump on once it stops; *While running* dumps as it goes and the page re-reads
-  it twice a second, which is useful at a slow *Real time* clock. Either way it covers at
-  most the last 50,000 cycles (`+VCDFROM`), which also applies to Verilator's ordinary
-  runs.
-- The DPI import is SystemVerilog, so it is wrapped in `` `begin_keywords "1800-2017" ``;
-  the design itself is still parsed as the selected Verilog standard. The helper reads
-  stdin with `read(2)`: a thread blocked in stdio holds stdin's lock, and `exit()`
-  flushing every stream waited on it for ever once the testbench called `$finish`.
+- A C++ helper compiled into every model (`cg3207_live_poll`, called through DPI from a
+  `` `ifdef VERILATOR `` block of the testbench at every rising edge) reads commands from stdin. It
+  drives an input change at the edge, so it is in force from the next cycle exactly as a
+  `stim.mem` entry would be, and reports it (`@@V`, `@@U`) with that cycle. Back, replays and the waveform
+  therefore see the same input timeline as if the inputs had been present from the start.
+- The helper flushes output every 30 ms, with a `@@C <cycle>` record so the page knows the run's
+  progress even when nothing else is printed. The app passes output on every 50 ms, and the page
+  follows the recording every 100 ms with a forward-only seek.
+- Without the architectural trace there are no instructions to follow; the page applies
+  peripheral events as they arrive and folds them into a state snapshot past 100,000
+  (`HDL_LIVE_PRE_KEEP`).
+- *Real time* paces the model itself to the clock (2,275 cycles in 1.5 s at 1.53 kHz). At full
+  speed the page takes in about 285,000 cycles a second live (5,000,000 cycles in 17.5 s).
+- The helper reads stdin with `read(2)` rather than stdio, so that no thread blocked on input holds
+  stdin's lock when `exit()` flushes every stream after the testbench calls `$finish`.
+- The DPI import is SystemVerilog, so it is wrapped in `` `begin_keywords "1800-2017" ``. The design
+  itself is parsed as the selected Verilog standard.
 
-**The C++ compiler.** `CXX`, then `g++` and `clang++` (on macOS only when
-`xcode-select -p` finds the command line tools, since probing `clang++` without them
-opens Apple's installer), each checked by compiling a C++20 coroutine. With none, Zig
-0.17.1 is downloaded from ziglang.org into the data folder, its SHA-256 checked, and
-`zig c++` used: about 57 MB (100 MB on Windows), unpacked to about 400 MB, plus Zig's own
-cache. The console says why, the status line counts the megabytes, and Zig's first
-compile builds its C++ library (about 30 s, once), so a first build from nothing took
-45 s here and later ones 5 s. Offline, the build fails with a message naming the
-alternatives, and the next build tries again. Zig is not bundled, which keeps it out of
-every installer.
+**Resume and input changes.** Resume, with or without the architectural trace, restarts the model
+with the inputs recorded so far, from the newest checkpoint at least 16 cycles (`HDL_CK_VERIFY`)
+before the recording's end, and before the waveform window when the waveform is followed live. It passes
+`+LIVEFROM` at that end: no input is taken before that cycle, the replay runs at full speed,
+and the records that follow are held back until the stretch before the join point has been
+checked, then joined onto the recording. Changing an input while paused does the same from the
+first cycle at which the input timelines differ. The waveform built on Pause is replayed from the
+newest checkpoint before its window, with times shifted by 10 ns per cycle of the checkpoint.
+With no checkpoint early enough, these replay from reset (3.1 s near the end of a
+5,000,000-cycle run).
+
+**Recording length.** There is no cycle cap. The recording keeps the last 2,000,000 cycles
+(`HDL_VL_KEEP`). Once it is a quarter over that, the instructions before it are folded into a
+snapshot of the state they leave (registers, data memory, peripherals, both OLED pages, UART
+output), and seeks start there. The instruction count still counts from reset, and Back stops at
+the start of what is kept. The cross-check against the JS model, which runs from reset, is not
+offered once a recording has been trimmed.
+
+**Waveform.** *Built* (shown with Verilator) offers *On Pause*, which replays the run with the
+dump on once it stops, and *While running*, which dumps as it goes while the page re-reads the
+dump twice a second; the latter is useful at a slow *Real time* clock. Either way the waveform
+covers at most the last 50,000 cycles (`+VCDFROM`), which also applies to ordinary Verilator runs.
+A followed waveform that passes 20 MB (`HDL_LIVE_VCD_MAX`) is stopped: the page sends the model
+input code 8, the testbench calls `$dumpoff`, the console says so, and the waveform is built for
+the last 50,000 cycles when the run stops.
+
+**The C++ compiler.** The app uses `CXX`, then `g++`, then `clang++` (on macOS only when
+`xcode-select -p` finds the command line tools, since probing `clang++` without them opens Apple's
+installer). Each is checked by compiling a C++20 coroutine. If none works, Zig 0.17.1 is
+downloaded from ziglang.org into the data folder, its SHA-256 checked, and `zig c++` used: about
+57 MB (100 MB on Windows), about 400 MB unpacked, plus Zig's own cache. Zig's first compile builds its C++
+library (about 30 s, once), so a first build from nothing takes about 45 s and later ones about
+5 s. Offline, the build fails with a message naming the alternatives and the next build retries.
+Zig is not bundled with any installer.
 
 ---
 
 ## 6. Settings
 
-One **`⚙ Settings…`** button opens a 4-tab modal. The two simulation tabs are named for
-the engine they configure, so a setting's scope is visible from where it sits.
+The **Settings** button opens a modal with three tabs: Compiler, Linker and Simulation.
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| ⚙ Settings & Configuration                                                                     [×] |
-+---------------------------------------------------------------------------------------------------+
-| [ ⚡ Compiler ]  [ 🗺 Linker ]  [ ⏱ JS Simulation ]  [ 🔌 HDL Simulation ]                        |
-+---------------------------------------------------------------------------------------------------+
-| ⚡ Compiler:  RISC-V 32-bit Compiler [ Clang 20.1.0 (default) | Clang Trunk | GCC 14.2.0 | Trunk ]  |
-|              Optimization [ -O0 (Debug) | -O1 | -O2 | -Os | -O3 ]                                 |
-|                ↳ note: code size varies several-fold; -O0 and -O3 are the largest, -Os smallest   |
-|                ↳ ▸ Making sure it still fits the hardware  (folded)                               |
-|              Architecture & ABI [ -march=rv32i -mabi=ilp32 ]  [ ] Include M extension (off)       |
-+---------------------------------------------------------------------------------------------------+
-| 🗺 Linker:   ⚠️ FPGA Hardware Notice — physical RAM size is fixed in hardware; exceeding the       |
-|              configured sizes will fail or wrap around on a real board.                           |
-|              Code (.text) base [ 0x00400000 ]  size [ 0x200 ]                                     |
-|              Data (.data) base [ 0x10010000 ]  size [ 0x200 ]                                     |
-|              Stack top (sp)    [ 0x10010200 ]  MMIO base [ 0xFFFF0000 ]                           |
-+---------------------------------------------------------------------------------------------------+
-| ⏱ JS Simulation:                                                                                  |
-|   BOTH ENGINES     [x] Statement Stepping (Fast Mode)                                             |
-|   JAVASCRIPT MODEL Max Instructions Per Run [ 100000000 ]                                         |
-|                    Cycles per instruction category (CPI) …                                        |
-+---------------------------------------------------------------------------------------------------+
-| 🔌 HDL Simulation:                                                                                |
-|   BOTH ENGINES     [x] Statement Stepping (Fast Mode)                                             |
-|   PROCESSOR SOURCES   drop .v files / browse…   [Wrapper.v ▸ WRAPPER] [RV.v] [ALU.v] …            |
-|                       [ Clear files ] [ Save testbench ]                                          |
-|   SIMULATION       Simulator [ Icarus Verilog | Verilator ]  (Verilator: desktop app only)        |
-|                    Cycles per Run / Resume [ 2000 ]                                               |
-|   RECORDING        Detail [ Full | Balanced | Fastest | Custom ]                                    |
-|                    [x] Record the architectural trace                                             |
-|                    [x] Record a waveform  Signals [ All | Wrapper only ]                           |
-|                                           Built [ On Pause | While running ]  (Verilator only)     |
-|                    Verilog standard [ Verilog-2005 ]   [ ] Cross-check vs JS model                |
-|                    [ ] Post-synthesis functional simulation                                       |
-|   COMPILER&OUTPUT  Verilog standard [ Verilog-2005 ]  [ ] VCD   [ ] Cross-check vs JS model       |
-|   REGISTER FILE    [ dut.RV1.RegFile1.RegBank ]  (detected automatically)                         |
-+---------------------------------------------------------------------------------------------------+
-| [ Reset Defaults ]                                                               [ Apply & Close ] |
-+---------------------------------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------+
+| Settings & Configuration                                                               [x] |
++--------------------------------------------------------------------------------------------+
+| [ Compiler ]  [ Linker ]  [ Simulation ]                                                   |
++--------------------------------------------------------------------------------------------+
+| Compiler:  RISC-V 32-bit Compiler [ Clang 20.1.0 | Clang trunk | GCC 14.2.0 | GCC trunk ]  |
+|            Optimization Level [ -O0 | -O1 | -O2 | -Os | -O3 ]                              |
+|              (note on code size)  > Making sure it still fits the hardware                 |
+|            Architecture & ABI Flags [ -march=rv32i -mabi=ilp32 ]  [ ] Include M extension  |
++--------------------------------------------------------------------------------------------+
+| Linker:    The segment sizes should not exceed the memory size provisioned in hardware.    |
+|            Code (.text) base [ 0x400000 ]     size [ 0x200 ]                               |
+|            Data (.data) base [ 0x10010000 ]   size [ 0x200 ]                               |
+|            Stack top (sp)    [ 0x10010200 ]   MMIO base [ 0xFFFF0000 ]                     |
++--------------------------------------------------------------------------------------------+
+| Simulation:                                                                                |
+|  BOTH ENGINES       [x] Statement Stepping (Fast Mode)                                     |
+|                     Clock  CLK_DIV_BITS [ 5 ] 3.13 MHz  [ Max speed | Real time ]          |
+|  JAVASCRIPT MODEL   Microarchitecture [ Single-cycle | Multi-cycle | 5-stage pipeline ]    |
+|   (JS mode only)    hazard and branch-prediction options; cycles per instruction category  |
+|                     Max Instructions Per Run [ 100000000 ]                                 |
+|  PROCESSOR SOURCES  drop .v files / browse... / folder...   [Wrapper.v] [RV.v] ...         |
+|   (HDL mode only)   [ Prebuilt processor ] [ Clear files ]                                 |
+|  SIMULATION         Simulator [ Icarus Verilog | Verilator ]                               |
+|                     Cycles per Run / Resume [ 200000 ]                                     |
+|  RECORDING & OUTPUT Detail [ Full | Balanced | Fastest | Custom ]                          |
+|                     [x] Record the architectural trace                                     |
+|                     [x] Record a waveform  Signals [ All | Wrapper only ]                   |
+|                                            Built [ On Pause | While running ] (Verilator)  |
+|                     Verilog standard [ Verilog-2005 | 2001 | 1995 | SystemVerilog ]        |
+|                     [ ] Cross-check against the JS model                                   |
+|                     [ ] Post-synthesis functional simulation (Icarus)                      |
+|  REGISTER FILE      [ dut.RV1.RegFile1.RegBank ]  detected automatically                   |
++--------------------------------------------------------------------------------------------+
+| [ Reset Defaults ]                                                        [ Apply & Close ] |
++--------------------------------------------------------------------------------------------+
 ```
 
-**Detail** (in the Recording & output group's header) sets the options that cost run time, all of which sit in that group:
+The Simulation tab shows *Both engines* and the active engine's groups only
+(`refreshSimSettingsScope()`). *Signals* and *Built* show only with the waveform on, *Built* only
+with Verilator, and *Post-synthesis functional simulation* only with Icarus.
+
+**Detail** (in the header of *Recording & output*) sets the options that cost run time, all in
+that group:
 
 | Option | Cost when on | Lost when off | Full | Balanced | Fastest |
 |---|---|---|---|---|---|
 | Waveform | about 30% of the run time | the waveform and the VCD download | on | on | off |
-| Waveform signals: All rather than Wrapper only | about 25% more | signals inside `RV` | All | Wrapper only | (no waveform) |
+| Signals: All rather than Wrapper only | about 25% more | signals inside `RV` | All | Wrapper only | (no waveform) |
 | Waveform built while running (Verilator) | a re-read twice a second | the waveform during the run | While running | On Pause | (no waveform) |
 | Architectural trace | about 30% (Icarus) | Step, Back, breakpoints and the Registers panel | on | on | off |
 | Cross-check against the JS model | a second run of the program | the cross-check | off | off | off |
 | Post-synthesis simulation | 20 to 35 s to synthesise, then a run 2 to 4 times slower | the netlist check | off | off | off |
 
-The options stay visible and can be changed one by one; the selector then reads
-*Custom*, and with no waveform its two sub-settings do not count. Choosing a preset
-lists in the console what it changed. *Full* is the default and what Reset Defaults
-restores, so with Verilator a live run's waveform follows it by default. Flat out that
-waveform would grow by about 22 MB per 40,000 cycles, so once it passes 20 MB the page
-sends the model input code 8, the testbench calls `$dumpoff`, the console says so, and
-the waveform is built for the last 50,000 cycles when the run stops.
+Each option can still be changed individually; the selector then reads *Custom*. With the
+waveform off, its two sub-settings are not compared. Choosing a preset lists its changes in the
+console. *Full* is the default, so with Verilator a live run's waveform is followed by default
+(subject to the 20 MB limit in §5.19).
 
-**Signals: Wrapper only** passes `+VCDTOP`, and the testbench
-then calls `$dumpvars(1, cg3207_hdl_tb)` and `$dumpvars(1, cg3207_hdl_tb.dut)` instead of
+**Signals: Wrapper only** passes `+VCDTOP`. The testbench then calls
+`$dumpvars(1, cg3207_hdl_tb)` and `$dumpvars(1, cg3207_hdl_tb.dut)` instead of
 `$dumpvars(0, cg3207_hdl_tb)`: the testbench's nets (CLK, RESET, the peripherals, the
-`x<n>_<abi>` register aliases) and the Wrapper's own signals (PC, Instr, MemWrite_out, …),
-nothing inside `RV`. Every default waveform row is in that set. For 40,000 cycles of DIP
-to LED on the `RV/` RTL the VCD goes from 47.8 MB to 9.7 MB and the run from 9.3 s to
-6.6 s in WASM, 5.6 s to 4.3 s native.
+`x<n>_<abi>` register aliases) and the Wrapper's own signals (PC, Instr, MemWrite_out, …), and
+nothing inside `RV`. Every default waveform row is in that set. For 40,000 cycles on an RTL core
+the VCD is 9.7 MB instead of 47.8 MB.
 
-**Statement Stepping applies to both engines**, so it appears at the top of both
-simulation tabs — one setting with two controls, kept in step: ticking it on either
-turns it on for both.
+**Post-synthesis simulation** defaults *Cycles per Run* to 50,000 while it is on. A Run is
+simulated in one go and cannot be paused (Reset stops it); an input changed meanwhile takes
+effect where the run ends. Yosys (about 13 MB) is downloaded the first time the option is ticked.
 
-On the **JS Simulation** tab the settings are **dimmed, not hidden** while the HDL
-engine is the one running. A setting you can still find, that tells you why it is doing
-nothing, beats one that has quietly vanished — or worse, one that silently does nothing.
+**Apply & Close** reloads the program only when the memory layout changed.
 
-**Apply & Close** reloads the program only when the **memory layout actually changed**.
+**Compiler tab.** Changing the compiler, the optimisation level, the M-extension toggle or the
+architecture flags clears the compiled program, since it does not match the settings shown;
+compile again to continue.
 
-Changing anything on the **Compiler** tab — the compiler, the optimisation level, the
-M-extension toggle or the architecture flags — **clears the compiled program**, because
-what is loaded no longer corresponds to the settings on screen. Compile again to
-continue.
+- The optimisation level changes code size several-fold (`-O0` and `-O3` are usually the
+  largest, `-Os` the smallest). The program must fit **Code (.text) size** on the Linker tab,
+  which must match `IROM_DEPTH_BITS` in the Wrapper on the FPGA; raising only the linker setting
+  builds here and truncates silently on hardware.
+- The **M extension is off by default**. With it off, a `*` or `%` in C becomes a call to a
+  libgcc helper such as `__mulsi3`, which is not part of the program and cannot be resolved.
+  The simulator reports this at compile time, as soon as the helper appears in the assembly
+  (`LIBGCC_HELPER_RE`). The message names both remedies: **Include M extension**, or a higher
+  optimisation level, which often replaces a multiply or divide by a constant with shifts and
+  adds.
 
-The **optimisation level** carries a note, because it changes how much code the compiler
-emits — often several-fold. `-O0` keeps every C statement separate and `-O3` unrolls and
-inlines, so both are usually the largest; `-Os` is the smallest. A folded *Making sure it
-still fits the hardware* explains the limit: **Code (.text) size** on the Linker tab here,
-`IROM_DEPTH_BITS` in `Wrapper.v` on the FPGA, and the two have to agree — raising only the
-linker setting builds here and then silently truncates on hardware.
+**Reset Defaults** resets the current tab only (`resetCurrentSettingsTab()`). On the Compiler tab it
+restores Clang 20.1.0, `-O0` and RV32I, clearing the compiled program if anything changed. On the
+Linker tab it fills in the default layout, which takes effect on Apply. On the Simulation tab in
+HDL mode it restores the cycle counts, Verilog-2005, automatic register-file detection, Icarus
+and *Full*, and keeps the loaded sources; *Clear files* removes those.
 
-The **M extension is off by default**. With it off, a `*` or `%` in C becomes a call to a
-libgcc helper such as `__mulsi3`, which is library code that is not part of the program,
-so it cannot be resolved. The simulator reports this **at compile time**, as soon as the
-helper appears in the assembly, rather than waiting for the assembler to fail on an
-unknown symbol. There are two ways out, and the message names both: tick **Include M
-extension**, or raise the optimisation level — from `-O1` upwards the compiler will often
-replace a multiply or divide by a constant with shifts and adds and the call disappears
-entirely. That is why the same program can assemble at `-Os` and fail at `-O0`.
+---
 
-**Reset Defaults** on the HDL tab restores the settings but **keeps your loaded
-sources** — those are your work, and *Clear files* is right there.
+## 7. Memory model and segment mapping
 
+### 7.1 Segments and the Memory view
+
+Default layout (all configurable in Settings → Linker):
+
+| Segment | Base | Default size |
+|---|---|---|
+| Text (`.text`) | `0x00400000` | `codeSize` = `0x200` (512 B, 128 instructions) |
+| Data (`.data`) | `0x10010000` | `dataSize` = `0x200` (512 B) |
+| Stack | top = `dataBase + dataSize` (`0x10010200`), grows down | — |
+| MMIO | `0xFFFF0000` | §7.2 |
+
+Selecting an example sets the Text and Data sizes from its `IROM`/`DMEM` depth bits (§9).
+
+- **Size checks.** If the assembled code exceeds `codeSize`, a warning names the overflow in bytes and instructions; the instructions past the limit are not loaded. If the data exceeds `dataSize` (assembly only), a warning is logged. Both warnings name the matching Wrapper parameter (`IROM_DEPTH_BITS`, `DMEM_DEPTH_BITS`) for HDL mode.
+- **Toolbar.** `Addr` (hex start address), region sub-tabs `[ Text | Data | Stack | MMIO ]`, a refresh button, `Rows` (default 64, max 128), and a `[ Byte | Word ]` toggle. The toolbar row also carries the legend.
+- **Rows.** One row is always one 32-bit word in both modes, so when a narrow panel wraps, a word's Content cell can only drop below its own Hex cell.
+  - **Word** (default): each word is one 8-digit hex value; legend `Full word (LSB to the right)`. The Content column is decimal, with a signed/unsigned switch.
+  - **Byte**: four separately editable bytes in memory order; legend `Little endian (LSB to the left)`. The Content column is ASCII. A single click edits a byte, a double click edits the word.
+- **Colours.** Bytes written at runtime are yellow (`#ffe08f`). The endianness hint is cyan (`#00ffff`), the `Editable` marker blue (`#89b4fa`), and labels orange (`#fab387`, the editor's label colour).
+- **Labels.** Any code or data label whose address falls in a row is drawn above that word with a trailing colon (`main:` above `0x00400000`). Several labels in one word are comma-separated and wrap within the column, so the Hex and Content columns stay aligned. A label that is not word-aligned shows its exact byte address as a tooltip (`Symbol at 0x10010002`). In the MMIO tab each register shows its name and access type instead (`DIP (RO):`). Both use `.mem-row-label` inside `.mem-row-label-anchor`. Label and register names are searchable through the panel's row filter.
+- **Editability.** Text is read-only. Data and Stack are editable at byte and word level. MMIO is editable per register (§7.3).
+- **Stack tab.** Addresses run downward from the stack top, one word per row (`0x10010200`, `0x100101FC`, ...).
+- **Memory images.** The toolbar's **Download** menu saves `AA_IROM.mem` (text) and `AA_DMEM.mem` (data), alongside the generated testbench and the waveform. Each file has one 8-digit uppercase hex word per line, little-endian, with a `// @<ADDR>` comment at the start and at every address gap, for `$readmemh`.
+
+### 7.2 MMIO address map
+
+The Memory view's MMIO tab labels each register with its name and access type, without the address. A register marked `RO` is not editable there, except `UART_RX` (§7.3).
+
+| Address | Access | Symbol | Behaviour |
+|---|---|---|---|
+| `0xFFFF0000` | RO | `UART_RX_VALID` | Bit 0 = 1 while a received byte is held in `UART_RX`. |
+| `0xFFFF0004` | RO | `UART_RX` | Returns the held byte and clears `UART_RX_VALID`. Returns 0 and consumes nothing when no byte is held. |
+| `0xFFFF0008` | RO | `UART_TX_READY` | Always 1. |
+| `0xFFFF000C` | WO | `UART_TX` | Writes the low 8 bits to the UART terminal. |
+| `0xFFFF0020` | WO | `OLED_COL` | Column index, 7 bits stored (§8.1). |
+| `0xFFFF0024` | WO | `OLED_ROW` | Row index, 6 bits stored. |
+| `0xFFFF0028` | WO | `OLED_DATA` | Pixel colour (§8.1). |
+| `0xFFFF002C` | WO | `OLED_CTRL` | Bits `[3:0]` trigger mode, bits `[7:4]` colour format; a write with bit 3 set presents the frame. |
+| `0xFFFF0030` | RO | `OLED_STATUS` | Bit 0 = swap pending. Always 0 in the simulator (§8.1). |
+| `0xFFFF0040` | RO | `ACCEL_DATA` | `[31:24]` temperature, `[23:16]` X, `[15:8]` Y, `[7:0]` Z. |
+| `0xFFFF0044` | RO | `ACCEL_DREADY` | Bit 0 = 1 when a reading is available. |
+| `0xFFFF0060` | WO | `PERIPH_LED` | User LEDs `LED[7:0]`. Only a word write or a byte write to offset 0 takes effect. |
+| `0xFFFF0064` | RO | `PERIPH_DIP` | 16 DIP switches `SW15`..`SW0`. |
+| `0xFFFF0068` | RO | `PERIPH_PB` | Push buttons: bit 2 = BTNL, bit 1 = BTNC, bit 0 = BTNR. |
+| `0xFFFF0080` | WO | `PERIPH_SEVENSEG` | 32-bit value shown as 8 hex digits; a byte write replaces that byte. |
+| `0xFFFF00A0` | RO | `CYCLECOUNT` | Clock cycles since reset (`totalCycles`). |
+
+The OLED, LED and 7-segment registers read back the last value written, so the Memory view has something to show; `UART_TX` reads 0.
+
+### 7.3 Read-only registers
+
+A write to a read-only register, from a program or from the Memory view, has no effect, as on the hardware. `UART_RX` is the exception: writing it queues a byte for reception, as a way to feed input. `MMIO_REGISTERS` in `riscv_simulator.html` is the single definition of each register's address, name, access, read and write behaviour; the Memory view's editability, `handleMMIOWrite()`'s write gate and the Peripherals panel all read from it. `editable` defaults to `access !== 'RO'` and is overridden only for `UART_RX`.
 
 ---
 
 
-## 7. Memory model & segment mapping
+## 8. Peripherals
 
-### 7.1 Tabbed memory view & protection model
-- **Tabbed Navigation**: `[ Text | Data | Stack | MMIO ]`.
-- **Two-row Memory toolbar**:
-  - **Row 1**: `Addr` (hex address input) · region sub-tabs `[ Text | Data | Stack | MMIO ]` · a **↻ refresh** button.
-  - **Row 2**: `Rows` (number of rows to display) · a **segmented `[ Byte | Word ]` display-mode toggle** (an explicit two-button pill, not a bare checkbox — the active mode is visually highlighted, matching the sub-tab styling).
-- **Byte / Word View Toggle**: The **`[ Byte | Word ]`** segmented control in the Memory toolbar switches between the classic **byte view** (separate editable bytes, single-click byte edit / double-click word edit) and a **whole-word view** where each aligned 4-byte group renders as one 8-digit little-endian 32-bit hex word. **Word is the default mode** on load. Word cells are click-editable via the same word overlay (the Text tab stays read-only). **One row is always one 32-bit word** — never two, in either mode — specifically so that a narrow panel's wrap (Hex cell on one line, Content cell dropping to the line below it) can only ever separate a word from its own Content value, never from another word's; the Content column reads ASCII in Byte mode and DEC (with a signed/unsigned switch) in Word mode. The legend hint updates to match the active mode:
-  - **Byte mode**: `each row = one 32-bit word, little endian (LSB to the left)`.
-  - **Word mode**: `each row = one 32-bit word · Full word (LSB to the right)` (deliberately *not* called "big endian" — RISC-V is little-endian; the word is shown whole).
-- **Legend / colour key (own row)**: The legend is a dedicated row beneath the toolbar with syntax highlighting that mirrors the code editor:
-  - `label` is rendered in **orange** (`#fab387`, the same colour used for labels in the CodeMirror syntax theme) = symbol defined at that row's address.
-  - `highlighted bytes` in **yellow** (`#ffe08f`) = bytes written at runtime.
-  - `Data/Stack/MMIO: editable (Text: read-only)` in **blue** (`#89b4fa`).
-  - The little-endian hint in **cyan** (`#00ffff`).
-- **Symbol / segment label annotations**: Any **code or data label** whose address falls inside a row is rendered **directly above the word it belongs to** in orange (`#fab387`, `.mem-row-label`), with a trailing `:` — `main:` above the `0x00400000` row — matching how the label reads in the program itself. An MMIO register gets the same treatment in place of a user symbol: its own name and access type, e.g. `DIP (RO):`, no address (the row's address already is the register). Both use the same anchor (`.mem-row-label-anchor` wraps the label above the word cell / byte group). Labels spanning a word's bytes are listed comma-separated, exactly like the disassembly view's address→label mapping — a wide result (two labels sharing an address, e.g. `DMEM, delay_val:`) **wraps onto extra lines within the column's own width** rather than widening that one row, so every row's Hex/Content columns stay pixel-aligned regardless of label length. For a **non-word-aligned** label (e.g. a `.byte`/`.asciz` symbol that lands at `+2` within a word), hovering the label reveals its **exact byte address** in a tooltip (e.g. `Symbol at 0x10010002`) — no visual clutter, just a hover hint.
-- **Read-Only Text Protection**: The **Text** tab (the `.text` segment) in the Memory View is strictly read-only to prevent accidental program corruption during inspection, while **Data** and **Stack** retain full interactive byte- and word-level editing; **MMIO** is editable per-register — read-only registers (DIP, PB, ...) render the same way (§7.3).
-- **Downward Decreasing Stack View**: The **Stack** tab renders addresses in **downward decreasing order**, one word per row (`0x10010200`, `0x100101FC`, `0x100101F8`...) to accurately visualize the downward growth of the RISC-V stack.
-- **Hardware Boundary Checks & Warnings**:
-  - **Code Segment Overflow**: Emits a warning if assembled instructions exceed configured `codeSize` (default `0x200` / 512 B / 128 instructions).
-  - **Data Segment Overflow**: Emits a warning and safely adjusts the startup stack pointer if data allocations exceed configured `dataSize` (default `0x200` / 512 B).
-  - Alerts users of potential memory wrap-around on fixed-size physical FPGA block RAM (IROM/DMEM).
-- **Verilog Memory Dumps**:
-  - Text segment $\rightarrow$ **`AA_IROM.mem`** (`💾 Dump Text`).
-  - Data segment $\rightarrow$ **`AA_DMEM.mem`** (`💾 Dump Data`).
-  - Formatted with `// @<HEX_ADDR>` address comments for FPGA testbench synthesis compatibility.
+The Peripherals panel models a Nexys 4 / 4 DDR / A7 board with a Pmod OLED. Its foldable sections, top to bottom:
 
-### 7.2 Complete MMIO address map
+- **LEDs and DIP switches.** `LED[15:9]` show `PC[8:2]`. `LED[8]` is the divided clock: lit when nothing runs; during a run it blinks at the clock's own rate when *Real time* pacing sets a clock of 8 Hz or less, and otherwise flickers every 125 ms. `LED[7:0]` are driven by `PERIPH_LED`. Sixteen clickable DIP switches feed `PERIPH_DIP`.
+- **Push buttons** BTNL, BTNC, BTNR: click to toggle, or hold J, K or L. **7-segment display**: 8 hex digits.
+- **Cycle counter**: `CYCLECOUNT`.
+- **UART console** (§8.3), **accelerometer** (§8.2), **OLED** (§8.1).
 
-Each register's own name and access type is what the Memory view's MMIO tab shows
-above its word cell (§4 of the user guide) — `UART RX VALID (RO)`, `LED (WO)`, and
-so on, no address; a register marked `RO` here is not editable there (`UART_RX` is
-the one exception — see §7.3).
+Each section title shows the register addresses; status bits (`RX_VALID`, `TX_READY`, `DREADY`, `SWAP PENDING`) appear as badges in the titles.
 
-| MMIO Address | Size | Access | Symbol | Description & Behavioral Rules |
-|--------------|------|--------|--------|--------------------------------|
-| `0xFFFF0000` | 4 B  | Read   | `UART_RX_VALID` | Bit 0 = 1 if data is available in `UART_RX` queue. |
-| `0xFFFF0004` | 4 B  | Read   | `UART_RX` | Reading returns and pops next 8-bit character from queue. |
-| `0xFFFF0008` | 4 B  | Read   | `UART_TX_READY` | Bit 0 = 1 when `UART_TX` is ready (always `1`). |
-| `0xFFFF000C` | 4 B  | Write  | `UART_TX` | Transmits 8-bit character to UART terminal. |
-| `0xFFFF0020` | 4 B  | Write  | `OLED_COL` | Pixel column index ($0..95$). |
-| `0xFFFF0024` | 4 B  | Write  | `OLED_ROW` | Pixel row index ($0..63$). |
-| `0xFFFF0028` | 4 B  | Write  | `OLED_DATA` | Writing color word sets pixel & triggers advance. |
-| `0xFFFF002C` | 4 B  | Write  | `OLED_CTRL` | Control mode (bits `[3:0]` advance mode, bits `[7:4]` format). |
-| `0xFFFF0040` | 4 B  | Read   | `ACCEL_DATA` | Packed 32-bit `[31:24] Temp, [23:16] X, [15:8] Y, [7:0] Z`. |
-| `0xFFFF0044` | 4 B  | Read   | `ACCEL_DREADY` | Bit 0 = 1 when new reading is available. |
-| `0xFFFF0060` | 4 B  | Write  | `PERIPH_LED` | User Output LEDs (bits `[15:0]`). |
-| `0xFFFF0064` | 4 B  | Read   | `PERIPH_DIP` | 16-bit DIP Switch inputs (`SW15`..`SW0`). |
-| `0xFFFF0068` | 4 B  | Read   | `PERIPH_PB` | Push Buttons (Bit 2=BTNL, Bit 1=BTNC, Bit 0=BTNR). |
-| `0xFFFF0080` | 4 B  | Write  | `PERIPH_SEVENSEG` | 32-bit value displayed as 8 hex digits on 7-Segment. |
-| `0xFFFF00A0` | 4 B  | Read   | `CYCLECOUNT` | Total instruction cycles elapsed since reset (`totalCycles`). |
+### 8.1 OLED display (`0xFFFF0020`–`0xFFFF0030`)
 
-### 7.3 Writing a read-only register
+- **Resolution**: 96 columns × 64 rows, drawn on a 96×64 canvas scaled to 192×128 px.
+- **Colour format** (`OLED_CTRL[7:4]`). Narrow components are left-aligned and zero-filled, not scaled (3-bit red `0b111` becomes `0xE0`). Each format requires certain byte lanes; an access that does not cover them still paints the pixel, with the previous colour.
 
-Every register marked `Read` above is read-only exactly as real hardware would be:
-a program (or an edit in the Memory view) that writes one has no effect. The one
-deliberate exception is `UART_RX` — writing it injects a byte into the RX queue, a
-simulator-only way to feed input, not a real register write; `MMIO_REGISTERS` in
-`riscv_simulator.html` is the single place this is decided; the Memory view's
-editability, `handleMMIOWrite()`'s write-gate, and this table's `Access` column all
-read from it.
+  | Value | Format | Required byte lanes |
+  |---|---|---|
+  | `0x0` | 8-bit, 3R-3G-2B | byte 0 |
+  | `0x1` | 16-bit, 5R-6G-5B (RGB565) | bytes 0 and 1 |
+  | `0x2` | 24-bit, 8R-8G-8B | any of bytes 0–2; each covered lane updates that component |
+
+  The colour is resolved when `OLED_DATA` is written, so a later format change does not retint it.
+- **Trigger modes** (`OLED_CTRL[3:0]`):
+
+  | Value | Name | What paints a pixel |
+  |---|---|---|
+  | `0x0` | `vary_pixel_data` | A write to `OLED_DATA` paints at (`OLED_COL`, `OLED_ROW`). |
+  | `0x1` | `vary_col` | A write to `OLED_COL` paints the stored colour at the new column. |
+  | `0x2` | `vary_row` | A write to `OLED_ROW` paints the stored colour at the new row. |
+  | `0x4` | `autoadvance_col` | A write to `OLED_DATA` paints, advancing the column first (row-major; after column 95 it wraps to column 0 of the next row). |
+  | `0x5` | `autoadvance_row` | As `0x4`, column-major (after row 63 it wraps to row 0 of the next column). |
+
+  In both auto-advance modes the first data write after a mode change or a write to `OLED_COL`/`OLED_ROW` paints at the position set, and the registers are left on the last pixel drawn. A frame is redrawn by setting both to 0 and streaming it again.
+- **Column folding.** `OLED_COL` stores 7 bits. The panel does not wrap columns 96..127; it folds them onto 32..63, as the Pmod controller's addressing does. The auto-advance arithmetic uses the raw 7-bit value.
+- **Double buffering.** `OLED_CTRL` is written only when an access covers byte 0. A write with bit 3 set presents the frame and its other bits are ignored; a write with bit 3 clear sets the mode and format. Both pages start as page 0, so a program that never presents draws straight to the screen (`Single buffered · writes appear at once`). The first present splits the pages; each present swaps them and copies the shown page into the new back page, so a program only redraws the pixels that change. The panel shows `Double buffered · showing page N, drawing into page M`.
+- **Present timing.** The simulator models no scanout: a present lands at once and `OLED_STATUS` always reads 0. On the board a present waits up to one frame (15.73 ms) for the scanout boundary, then takes 12,288 clocks to copy the page back; pixels written before the boundary appear in the frame being presented, and pixels written during the copy are lost. The first pixel written after a present with no read of `OLED_STATUS` in between logs one warning per run, with both delays converted to cycles at the current clock. Edits typed into the Memory view do not trigger it.
+- **Clear Display** blanks the frame buffer.
+
+### 8.2 Accelerometer and temperature sensor (`0xFFFF0040`–`0xFFFF0044`)
+
+`ACCEL_DATA` packs four 8-bit signed fields:
+
+| Bits | Field | Range | Default |
+|---|---|---|---|
+| `[31:24]` | Temperature | −40..+85 °C | 25 (`0x19`) |
+| `[23:16]` | X | −128..127 (±2 g, 64 = 1 g) | 0 |
+| `[15:8]` | Y | −128..127 | 0 |
+| `[7:0]` | Z | −128..127 | 64 (`0x40`, +1 g) |
+
+- Sliders set each field and show its value in hex and in g. Holding X, Y, Z or T and pressing `,` or `.` changes that field by −5 or +5, clamped to its range.
+- Presets: **Flat** (Z = 64, X = Y = 0), **Tilt X** and **Tilt Y** (that axis to −64 with the others 0; a second click flips it to +64, and so on), **Shake** (X = 127, Y = −128, Z = 127), **Zero All**.
+
+### 8.3 UART console (`0xFFFF0000`–`0xFFFF000C`, 115200 8N1)
+
+- **Receive model.** The FPGA side has a single holding register (`uartRxByte`/`uartRxFull`) and no FIFO. Sent bytes wait in the PC-side buffer (`uartPending`, shown as *RX Queue*) and are delivered one at a time. A byte that arrives while the register is still full is dropped and the held byte kept, as on the board, where this is silent; the console reports the number of bytes lost.
+- **Arrival** sets the delivery pace:
+  - *Paste (baud rate)*, the default: one character per 8640 clocks of the 100 MHz UART clock, converted to CPU cycles at the current clock divider (270 cycles at `CLK_DIV_BITS` 5).
+  - *Typed (slow)*: the gap entered in the cycles/char box.
+  - *Forgiving (never drops)*: a byte is delivered only after the program has read the previous one. The board does not behave this way; the mode is for debugging logic rather than timing.
+- **ASCII input** accepts escapes such as `\r`, `\n`, `\t` and `\xHH`.
+- **Hex input** takes comma-separated bytes, with or without a `0x` prefix or a trailing `h` (`0x48, 0x69, 0x0D`, `48, 69, 0D`, `69h`). Tokens that are not one or two hex digits are skipped. In Hex mode the terminal shows transmitted bytes as `0xHH`; switching back to ASCII re-renders the same bytes as text.
+- While a send is in progress, **Send** becomes **Cancel** and the status shows progress (`Sending: 3/10`).
+- The input field uses `autocomplete="off"`, `autocapitalize="off"`, `spellcheck="false"` and `enterkeyhint="send"`. Global shortcuts are ignored while any form field has focus, so an on-screen keyboard stays open.
 
 ---
 
 
-## 8. Peripherals & FPGA board simulation
+## 9. Example programs
+
+There are 13 examples, 7 in assembly and 6 in C. `dip_led` and `dip_led_c` are baked into `riscv_simulator.html`; the rest are fetched from `examples/asm/` or `examples/c/` when selected, which requires the page to be served over `http://`.
+
+The **Example** menu is built at startup from `examples/index.txt` by `loadExampleIndex()`. The file is plain text so that static site generators serve it verbatim. Its table has one row per example:
 
 ```
-+---------------------------------------------------------------------------------------------------+
-|                                 COMPACT NEXYS 4 FPGA PERIPHERAL BOARD                             |
-|                                                                                                   |
-|  UART Serial Console (115200 8N1) 0xFFFF0000–0xFFFF000C        RX_VALID: 0  ·  TX_READY: 1         |
-|  [Terminal Output Box]                                                                            |
-|  Line 1: [ Mode: ASCII/Hex ] [ Text Box ] [ Send ] [ Clear ]                                      |
-|  Line 2: [☑ Buffer] [ 10 ▲▼ ] instr delay  ·  RX Queue: 0 bytes (empty)                            |
-|                                                                                                   |
-|  OLED 96x64 Pixel Display (0xFFFF0020–0xFFFF002C)              [ Clear Display ]                  |
-|  [ 288x192 3x Canvas ]             OLED_COL: 0 (0-95)  ·  OLED_ROW: 0 (0-63)  ·  OLED_CTRL: 0x00  |
-|                                    Advance Mode: 0..5  ·  Color Format: 8-bit / 16-bit / 24-bit    |
-|                                                                                                   |
-|  3-Axis Accelerometer & Temp (0xFFFF0040–0xFFFF0044)           DREADY: 1  ·  Cycles: 1234          |
-|  X Axis: [----|----] 0 (0x00, +0.00g)   Y Axis: [----|----] 0 (0x00, +0.00g)                      |
-|  Z Axis: [----|--O-] 64 (0x40, +1.00g)   Temp:   [---|-----] 25°C (0x19)                           |
-|  Presets: [Flat (Z=+1g)] [Tilt X (±1g)] [Tilt Y (±1g)] [Shake (±2g)] [Zero All]                   |
-|                                                                                                   |
-|  [P8][P7][P6][P5][P4][P3][P2]   [CLK]   [L7][L6][L5][L4][L3][L2][L1][L0]   (16 LEDs)              |
-|  LED15------------------LED9    LED8    LED7----------------------LED0                            |
-|                                                                                                   |
-|  [SW15]--------------[SW9]     [SW8]    [SW7]--------------------[SW0]   (16 Dual-Rect 22px DIPs)  |
-|                                                                                                   |
-|  Push Buttons: [L] [C] [R] (Bit 2=BTNL, Bit 1=BTNC, Bit 0=BTNR)  7-Segment: [0 0 0 0 0 0 0 0]   |
-+---------------------------------------------------------------------------------------------------+
+| Key | Lang | Label | File | IROM | DMEM | Description |
 ```
 
-### 8.1 96×64 pixel OLED display (`0xFFFF0020`–`0xFFFF002C`)
-- **Resolution**: 96 Columns $\times$ 64 Rows ($288\text{px} \times 192\text{px}$ canvas at 3x scale).
-- **Color Formats (`OLED_CTRL[7:4]`)**:
-  - `0x0`: 8-bit Color (3-Red, 3-Green, 2-Blue)
-  - `0x1`: 16-bit Color (5-Red, 6-Green, 5-Blue / RGB565)
-  - `0x2`: 24-bit RGB Color (8-Red, 8-Green, 8-Blue)
-- **Advance Modes (`OLED_CTRL[3:0]`)**:
-  - `0x0` (`vary_pixel_data_mode`): Writing `OLED_DATA` updates the current pixel without modifying coordinates.
-  - `0x1` (`vary_col_mode`): Writing `OLED_DATA` updates pixel and increments column index (`col = (col + 1) % 96`).
-  - `0x2` (`vary_row_mode`): Writing `OLED_DATA` updates pixel and increments row index (`row = (row + 1) % 64`).
-  - `0x4` (`autoadvance_col`): Column auto-advances across line; wraps to next row when reaching column 95.
-  - `0x5` (`autoadvance_row`): Row auto-advances down column; wraps to next column when reaching row 63. Perfect for column-major framebuffer streams.
-  - In both auto-advance modes the first data write paints at the position set, and writing `OLED_COL` or `OLED_ROW` sets where the next one goes, so a frame is redrawn by setting both to 0 and streaming it again.
+`Lang` is `asm` or `c`. `IROM` and `DMEM` are the `IROM_DEPTH_BITS`/`DMEM_DEPTH_BITS` the program needs (memory of `2**bits` bytes; default 9). Selecting an example sets the Linker segment sizes from them, and HDL mode refuses a program that does not fit the loaded `Wrapper.v`. Rows before the first all-dashes row are treated as headers. The parsed table fills `EXAMPLE_MENU`, `EXAMPLE_FILENAMES` and `EXAMPLE_DEPTHS`. Adding an example is a row in the index plus the source file; `riscv_simulator.html` does not change unless a baked example changes, in which case its baked copy must be updated to match. The menu layout assumes up to 15 rows per language. Until the index loads (permanently, over `file://`), the menu holds only the baked example for each language.
 
-### 8.2 3-axis accelerometer & temperature sensor (`0xFFFF0040`–`0xFFFF0044`)
-- **`0xFFFF0040` (RO)**: `ACCEL_DATA` — 32-bit packed `{temperature, X, Y, Z}` from **MSB to LSB**:
-  - `[31:24]`: **Temperature** (8-bit signed integer, $-40..+85^\circ\text{C}$, default `25` / `0x19`, offset `+3`).
-  - `[23:16]`: **X Acceleration** (8-bit signed integer, $\pm 2g$, default `0` / `0x00` = $0.00g$, offset `+2`).
-  - `[15:8]`: **Y Acceleration** (8-bit signed integer, $\pm 2g$, default `0` / `0x00` = $0.00g$, offset `+1`).
-  - `[7:0]`: **Z Acceleration** (8-bit signed integer, $\pm 2g$, default `+64` / `0x40` = $+1.00g$, offset `+0`).
-- **`0xFFFF0044` (RO)**: `ACCEL_DREADY` — Bit 0 = 1 when data is ready.
-- **Interactive Controls & Presets**: Range sliders for X, Y, Z ($\pm 128$), temperature slider, live $g$-force calculation, and presets (`Flat`, `Tilt X ±1g`, `Tilt Y ±1g`, `Shake ±2g`, `Zero All`). The **`Tilt X` / `Tilt Y`** presets are toggles: the **first click sets the axis to $-1g$** (X or Y to `-64`/`0xC0`, Z to `0`), and the second click flips to `+1g` (`+64`), repeating alternately.
+### 9.1 C examples
 
-### 8.3 UART serial console (`0xFFFF0000`–`0xFFFF000C`)
-- Memory-mapped serial terminal with independent output buffer, auto-sequencer delay, hex/ASCII I/O modes, and responsive flex wrapping.
-- **ASCII mode**: Type raw text (including escapes such as `\r`, `\n`, `\t`, `\xHH`); the terminal echoes the raw characters as they are transmitted.
-- **Hex mode**: Type **comma-separated hex bytes** — each token is interpreted as a hex byte with or without the `0x`/`0X` prefix (e.g. `0x48, 0x69, 0x0D` or `48, 69, 0D`; a single trailing `h` suffix such as `69h` is also accepted). Tokens larger than `0xFF` or non-hex tokens are silently skipped. The terminal **output re-renders live as `0xHH` bytes** (e.g. `0x41 0x0D`) and stays in hex view across program-run batches, steppers, and resets — switching the mode back to ASCII re-renders the same transmitted bytes as raw text.
-- **Mobile-friendly input**: the transmit field uses `autocomplete="off"`, `autocapitalize="off"`, `spellcheck="false"`, and `enterkeyhint="send"`, and the global keyboard shortcuts (F5/F8/F9/Ctrl+Enter/Ctrl+S) are suppressed while any form field is focused, so the on-screen keyboard stays open and typing is not interrupted.
+| Key | File | Description |
+|---|---|---|
+| `dip_led_c` | `DIP_to_LED.c` | Mirrors the DIP switches onto the LEDs with a short polling delay. Baked in. |
+| `fibonacci_c` | `fibonacci.c` | Iterative Fibonacci series stored in an array. |
+| `hello_world_c` | `HelloWorld.c` | UART command echo with a greeting, in one loop with one state variable and no function calls, like `HelloWorld.asm`. |
+| `hello_jal_c` | `HelloWorld_jal_jalr.c` | The same echo loop; the greeting is printed by `print_string(const char *s)`, which takes the string as a parameter the way `PRINT_S` takes it in `a0`. |
+| `circle_accel_c` | `Circle_delay_accel.c` | Midpoint circle on the OLED, moved by accelerometer X/Y tilt; frame count on the 7-segment display; UART messages. |
+| `image_display_c` | `ImageDisplay_autoadvance_accel.c` | Draws one of two 96×64 8-bit bitmaps (`Uphill.png`, `Downhill.png`) with `autoadvance_row`, chosen by X tilt; status messages on the UART. |
+
+### 9.2 Assembly examples
+
+| Key | File | Description |
+|---|---|---|
+| `dip_led` | `DIP_to_LED.asm` | Copies the DIP switches to the LEDs in a loop. Baked in. |
+| `rars_syscalls` | `rars_syscalls.asm` | RARS `ecall` services: print string, integer, hex, char, exit. |
+| `fib` | `fibonacci.asm` | Fibonacci numbers in `x1`–`x5`. |
+| `hello_world` | `HelloWorld.asm` | Prints "Hello World" over the UART character by character. |
+| `hello_jal` | `HelloWorld_jal_jalr.asm` | UART printing through a subroutine using `jal` and `jalr`. |
+| `circle_accel` | `Circle_delay_accel.asm` | Assembly version of the OLED circle and accelerometer example. |
+| `image_display_accel` | `ImageDisplay_autoadvance_accel.asm` | Assembly version of the 96×64 image display with auto-advance mode 5 and tilt detection. |
+
+`DIP_to_LED` and `HelloWorld` serve as smoke tests for HDL mode: in a few hundred cycles they exercise a DIP read, an LED write and the full UART handshake against the RTL.
 
 ---
 
 
-## 9. Pre-loaded example programs
+## 10. Processor state, instruction set and syscalls
 
-The simulator comes pre-loaded with **13 rich example programs** (7 in Assembly and 6 in C).
-`dip_led` / `dip_led_c` are the two baked into the page; every other example is fetched from
-`examples/asm/` or `examples/c/` when selected, which is what needs the page served over
-`http://` (see the file table at the top of this document).
+### 10.1 Registers
 
-The menu itself is not hardcoded either. `examples/index.txt`
-(plain text, not `.md` — a static site generator hosting this repo tends to render `.md`
-through its own Markdown pipeline rather than serve it verbatim, which broke this fetch) each
-hold one markdown-style table — `| key | label | file | description |` per row — parsed at
-startup into the dropdown and the file each key maps to. **Adding a program is a row in the
-matching index plus the `.asm`/`.c` file itself; nothing in `riscv_simulator.html` changes.**
-Both tables are designed for up to 15 rows; nothing enforces that as a hard limit, it is just
-what the dropdown's layout assumes. Until that fetch resolves — permanently, over `file://`,
-where it never will — the menu falls back to the one baked example in each language, so it is
-never genuinely empty.
-
-### 9.1 C examples (6)
-1. **`dip_led_c` (DIP to LED)**: C translation of `DIP_to_LED.asm` — mirrors the DIP switches onto the LEDs on a short polling delay. The one C example baked into the page.
-2. **`fibonacci_c` (Fibonacci)**: Iterative Fibonacci series generator storing values in an array.
-3. **`hello_world_c` (Hello World)**: C translation of `HelloWorld.asm` — a single unstructured-but-goto-free loop with one state variable, no callee function, matching how `HelloWorld.asm` predates `jal`/`jalr` in the course.
-4. **`hello_jal_c` (Hello Subroutine)**: C translation of `HelloWorld_jal_jalr.asm` — the same echo loop, but the greeting is printed by a real function, `print_string(const char *s)`, taking the string as a parameter the way `PRINT_S` takes it in `a0`.
-5. **`circle_accel_c` (Circle & Delay Accel - `Circle_delay_accel.c`)**: Implements the Midpoint Circle Algorithm on the OLED display, polls accelerometer X/Y tilt, animates circle positions, outputs frame counts to the 7-Segment display, and sends UART telemetry.
-6. **`image_display_c` (Image Display & Accel - `ImageDisplay_autoadvance_accel.c`)**: High-performance OLED graphics rendering using Auto-Advance Mode 5 (`autoadvance_row`), displaying 96x64 8-bit color bitmap artwork (`Uphill.png` / `Downhill.png`), responding dynamically to X-axis accelerometer tilt, and logging status messages to the UART terminal.
-
-### 9.2 Assembly examples (7)
-1. **`dip_led` (`DIP_to_LED.asm`)**: Direct hardware loop copying 16-bit DIP switch states directly to output LEDs. The one example baked into the page.
-2. **`rars_syscalls` (`rars_syscalls.asm`)**: Comprehensive demonstration of RARS `ecall` services (print string, integer, hex, char, exit).
-3. **`fib` (`fibonacci.asm`)**: Computes Fibonacci numbers in registers `x1`–`x5`.
-4. **`hello_world` (`HelloWorld.asm`)**: Direct character-by-character UART transmission of "Hello World".
-5. **`hello_jal` (`HelloWorld_jal_jalr.asm`)**: Modular UART printing subroutine utilizing `jal` and `jalr`.
-6. **`circle_accel` (`Circle_delay_accel.asm`)**: Complete assembly implementation of OLED circle rendering and accelerometer integration.
-7. **`image_display_accel` (`ImageDisplay_autoadvance_accel.asm`)**: Assembly implementation of 96x64 image display using auto-advance mode 5 and accelerometer tilt detection.
-
----
-
-
-The `DIP_to_LED` and `HelloWorld` assembly examples double as the HDL mode's smoke
-tests — they exercise a DIP read, an LED write and the full UART handshake against real
-RTL in a few hundred cycles.
-
-
----
-
-
-## 10. Processor state, ISA reference & RARS syscalls
-
-### 10.1 Register bank structure
-Models 32 32-bit integer registers (`x0`–`x31`), 32 floating-point registers (`f0`–`f31`), and the Program Counter (`PC`). Register `x0` is hardwired to `0x00000000`.
-- **Hardware-Accurate Stack Pointer**: `sp` (register `x2`) is initialized to `0x00000000` on reset as per RISC-V hardware specification.
+32 integer registers `x0`–`x31`, 32 floating-point registers `f0`–`f31`, and `PC`. `x0` always reads 0. All integer registers, including `sp` (`x2`), are 0 after reset, as on hardware. The *Stack top (sp)* setting in Settings → Linker (default `dataBase + dataSize`) sets where the Stack tab starts.
 
 ```
 +-----+----------+-------------------+-------------------+
 |  #  | ABI Name |   Content (Hex)   |   Content (Dec)   |
 +-----+----------+-------------------+-------------------+
 | x0  |   zero   |     00000000      |         0         |
-| x1  |    ra    |     00010040      |       65600       |
 | x2  |    sp    |     00000000      |         0         |
 | ... |   ...    |        ...        |        ...        |
 +-----+----------+-------------------+-------------------+
 ```
-No `0x` prefix on Content (Hex) — the header already says it's hex; Memory's Addr column is the one place that keeps `0x`, since its header doesn't.
 
-### 10.2 Supported instruction set (RV32GC)
-- **RV32I Base**: `add`, `sub`, `and`, `or`, `xor`, `sll`, `srl`, `sra`, `slt`, `sltu`, `addi`, `andi`, `ori`, `xori`, `slli`, `srli`, `srai`, `slti`, `sltiu`, `lui`, `auipc`, `lw`, `lh`, `lhu`, `lb`, `lbu`, `sw`, `sh`, `sb`, `beq`, `bne`, `blt`, `bge`, `bltu`, `bgeu`, `jal`, `jalr`, `fence`, `ecall`, `ebreak`.
-- **RV32M Extension**: `mul`, `mulh`, `mulhsu`, `mulhu`, `div`, `divu`, `rem`, `remu`.
-- **RV32A Extension**: `lr.w`, `sc.w`, `amoswap.w`, `amoadd.w`, `amoxor.w`, `amoand.w`, `amoor.w`, `amomin.w`, `amomax.w`, `amomin.u`, `amomax.u`.
-- **RV32F / RV32D Extension**: `flw`, `fsw`, `fadd.s`, `fsub.s`, `fmul.s`, `fdiv.s`, `fsqrt.s`, `feq.s`, `flt.s`, `fle.s`, `fcvt.w.s`, `fcvt.s.w`, `fld`, `fsd`, `fadd.d`, `fsub.d`, `fmul.d`, `fdiv.d`.
-- **RV32C Extension**: `c.addi`, `c.li`, `c.lui`, `c.mv`, `c.add`, `c.sub`, `c.and`, `c.or`, `c.xor`, `c.lw`, `c.sw`, `c.j`, `c.jr`, `c.jalr`, `c.beqz`, `c.bnez`, `c.slli`, `c.srli`, `c.srai`, `c.andi`, `c.nop`, `c.ebreak`.
-- **Pseudo-Instructions**: `li`, `la`, `mv`, `not`, `neg`, `j`, `jr`, `ret`, `call`, `tail`, `nop`, `beqz`, `bnez`, `blez`, `bgez`, `bltz`, `bgtz`, `bgt`, `ble`, `seqz`, `snez`, `sltz`, `sgtz`.
+Content (Hex) has no `0x` prefix, since the header says it is hex; the Memory view's `Addr` column keeps `0x`. Content (Dec) has a signed/unsigned switch.
 
-### 10.3 RARS `ecall` syscall services
+### 10.2 Supported instructions
 
-| Syscall Code (`a7`) | Name | Inputs | Outputs / Effects | Destination |
-|---------------------|------|--------|-------------------|-------------|
-| `1` | `PrintInt` | `a0` = integer to print | Prints decimal integer | Status Log Console |
-| `2` | `PrintFloat` | `fa0` = single-precision float | Prints float value | Status Log Console |
-| `3` | `PrintDouble` | `fa0` = double-precision float | Prints double value | Status Log Console |
-| `4` | `PrintString` | `a0` = address of null-terminated string | Prints null-terminated string | Status Log Console |
-| `5` | `ReadInt` | None | `a0` = integer entered by user | User Input Prompt |
-| `6` | `ReadFloat` | None | `fa0` = float entered by user | User Input Prompt |
-| `7` | `ReadDouble` | None | `fa0` = double entered by user | User Input Prompt |
-| `8` | `ReadString` | `a0` = destination buffer, `a1` = max length | Reads string into memory at `a0` | User Input Prompt |
-| `9` | `Sbrk` | `a0` = number of bytes to allocate | `a0` = address of allocated block | Dynamic Heap |
-| `10` | `Exit` | None | Halts execution cleanly | Execution Engine |
-| `11` | `PrintChar` | `a0` = ASCII character code | Prints character | Status Log Console |
-| `12` | `ReadChar` | None | `a0` = ASCII character code | User Input Prompt |
-| `34` | `PrintIntHex` | `a0` = integer | Prints `0x...` hexadecimal string | Status Log Console |
-| `35` | `PrintIntBinary` | `a0` = integer | Prints `0b...` binary string | Status Log Console |
-| `36` | `PrintIntUnsigned` | `a0` = unsigned integer | Prints unsigned decimal value | Status Log Console |
-| `40` | `MilliSleep` | `a0` = milliseconds to delay | Pauses execution delay | Simulator Timer |
-| `93` | `Exit2` | `a0` = exit return code | Halts execution with return code | Execution Engine |
+- **RV32I**: `add`, `sub`, `and`, `or`, `xor`, `sll`, `srl`, `sra`, `slt`, `sltu`, `addi`, `andi`, `ori`, `xori`, `slli`, `srli`, `srai`, `slti`, `sltiu`, `lui`, `auipc`, `lw`, `lh`, `lhu`, `lb`, `lbu`, `sw`, `sh`, `sb`, `beq`, `bne`, `blt`, `bge`, `bltu`, `bgeu`, `jal`, `jalr`, `fence`, `ecall`, `ebreak`.
+- **M**: `mul`, `mulh`, `mulhsu`, `mulhu`, `div`, `divu`, `rem`, `remu`.
+- **A**: `lr.w`, `sc.w`, `amoswap.w`, `amoadd.w`, `amoxor.w`, `amoand.w`, `amoor.w`, `amomin.w`, `amomax.w`, `amominu.w`, `amomaxu.w`.
+- **F**: `flw`, `fsw`, `fmadd.s`, `fmsub.s`, `fnmsub.s`, `fnmadd.s`, `fadd.s`, `fsub.s`, `fmul.s`, `fdiv.s`, `fsqrt.s`, `fsgnj.s`, `fsgnjn.s`, `fsgnjx.s`, `fmin.s`, `fmax.s`, `fcvt.w.s`, `fcvt.wu.s`, `fcvt.s.w`, `fcvt.s.wu`, `fmv.x.w`, `fmv.w.x`, `feq.s`, `flt.s`, `fle.s`, `fclass.s`.
+- **D**: `fld`, `fsd`, `fmadd.d`, `fmsub.d`, `fnmsub.d`, `fnmadd.d`, `fadd.d`, `fsub.d`, `fmul.d`, `fdiv.d`, `fsqrt.d`, `fsgnj.d`, `fsgnjn.d`, `fsgnjx.d`, `fmin.d`, `fmax.d`, `fcvt.s.d`, `fcvt.d.s`, `fcvt.w.d`, `fcvt.wu.d`, `fcvt.d.w`, `fcvt.d.wu`, `feq.d`, `flt.d`, `fle.d`, `fclass.d`.
+- **Pseudo-instructions**: `li`, `la`, `lla`, `lga`, `mv`, `not`, `neg`, `nop`, `j`, `jr`, `ret`, `call`, `tail`, `beqz`, `bnez`, `blez`, `bgez`, `bltz`, `bgtz`, `bgt`, `ble`, `bgtu`, `bleu`, `seqz`, `snez`, `sltz`, `sgtz`, `fmv.s`, `fneg.s`, `fabs.s`, `fmv.d`, `fneg.d`, `fabs.d`.
+
+### 10.3 RARS `ecall` services
+
+The service number is in `a7`. Output goes to the console; input is read through a browser prompt and echoed to the console. An unknown service number is logged as a warning.
+
+| `a7` | Name | Inputs | Effect |
+|---|---|---|---|
+| `1` | `PrintInt` | `a0` | Prints `a0` as a signed decimal. |
+| `2` | `PrintFloat` | `fa0` | Prints the single-precision value. |
+| `3` | `PrintDouble` | `fa0` | Prints the double-precision value. |
+| `4` | `PrintString` | `a0` = address | Prints the null-terminated string. |
+| `5` | `ReadInt` | — | `a0` = integer entered. |
+| `6` | `ReadFloat` | — | `fa0` = float entered. |
+| `7` | `ReadDouble` | — | `fa0` = double entered. |
+| `8` | `ReadString` | `a0` = buffer, `a1` = max length | Stores at most `a1 − 1` characters and a terminating 0. |
+| `9` | `Sbrk` | `a0` = bytes | `a0` = start of the block. The heap starts at `dataBase + 0x4000`. |
+| `10` | `Exit` | — | Stops the run. |
+| `11` | `PrintChar` | `a0` | Prints the character in the low byte. |
+| `12` | `ReadChar` | — | `a0` = first character entered. |
+| `34` | `PrintIntHex` | `a0` | Prints `0x` and 8 hex digits. |
+| `35` | `PrintIntBinary` | `a0` | Prints `0b` and 32 binary digits. |
+| `36` | `PrintIntUnsigned` | `a0` | Prints `a0` as an unsigned decimal. |
+| `40` | `MilliSleep` | `a0` = ms | Logged; no delay is applied. |
+| `93` | `Exit2` | `a0` = exit code | Stops the run and logs the exit code. |
 
 ---
 
 
 ## 11. Keyboard shortcuts
 
+Global shortcuts do not fire while a form field (UART input, address box, find fields) has focus. The unmodified letter and arrow keys act only outside the editor.
+
 | Shortcut | Action | Scope |
-|----------|--------|-------|
-| `F5` | Toggle Run / Pause / Resume | Global / Editor |
-| `F8` | Single Step Forward | Global / Editor |
-| `Shift+F8` | Step Back (Undo Instruction) | Global / Editor |
-| `F9` | Toggle Breakpoint at Cursor Line (Auto-snapping to valid instruction) | Global / Editor |
-| `Ctrl+Enter` / `Cmd+Enter` | Assemble / Compile Source Program | Global / Editor |
-| `Ctrl+S` / `Cmd+S` | Save Source File (`.asm` / `.c`) | Global / Editor |
-| `Ctrl+Space` | Manually Trigger Autocomplete & IntelliSense | Editor |
-| `Ctrl+F` / `Cmd+F` | Open Find & Replace (Focus Find) | Editor |
-| `Ctrl+H` / `Cmd+H` | Open Find & Replace (Focus Replace) | Editor |
-| `Esc` | Close Find & Replace Panel / Dismiss Autocomplete / Close Settings Modal | Global / Editor |
-| `Enter` / `Shift+Enter` | Next / Previous Search Match | Find Box |
-| `Alt+C` | Toggle Case-Sensitive Search | Find Box |
-| `Tab` | Insert `\t` (Cursor) / Indent Selection (Block) / Accept Completion | Editor |
-| `Shift+Tab` | Unindent / Dedent Selected Lines | Editor |
-| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo (CM6 Native Transaction History) | Editor |
+|---|---|---|
+| `F5` | Run / Pause / Resume | Global |
+| `F8` | Step | Global |
+| `Shift+F8` | Step back | Global |
+| `F9` | Toggle a breakpoint on the cursor line (snaps to the nearest instruction) | Global |
+| `Ctrl+Enter` / `Cmd+Enter` | Assemble or compile | Global |
+| `Ctrl+S` / `Cmd+S` | Save the source file (`.asm` / `.c`) | Global |
+| `→` / `←` | Step / Step back; with the single-cycle datapath shown, the next / previous phase | Outside the editor |
+| `J` / `K` / `L` (held) | Press BTNL / BTNC / BTNR while held | Outside the editor |
+| `X`, `Y`, `Z` or `T` held, then `,` / `.` | Accelerometer axis or temperature −5 / +5 | Outside the editor |
+| `Esc` | Close Find & Replace, the open dialog or overlay, or the autocomplete list | Global |
+| `Ctrl+F` / `Cmd+F` | Find & Replace, focus on Find | Editor |
+| `Ctrl+H` / `Cmd+H` | Find & Replace, focus on Replace | Editor |
+| `Enter` / `Shift+Enter` | Next / previous match | Find box |
+| `Alt+C` | Toggle case-sensitive search | Find box |
+| `Ctrl+Space` | Open autocomplete | Editor |
+| `Tab` | Insert `\t` at the cursor, indent a selection, or accept a completion | Editor |
+| `Shift+Tab` | Unindent the selected lines | Editor |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo (CodeMirror history) | Editor |
 
 ---
 
 ## 12. Automated test suite
 
-A Node/jsdom harness lives in [`riscv_simulator_tests/`](riscv_simulator_tests). Every
-suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file
-rather than a copy of its logic. `npm test` runs **18** of them, there is no build step
-and nothing else to run. Four more need things `npm test` cannot assume and are run on
-their own: `test_hdl_native.js` a native Icarus build, `test_verilator.js` native
-Icarus and Verilator builds and a C++ compiler, `test_hdl_folder_browser.js` Chrome,
-and `test_electron_app.js` the desktop app and a display.
-The remaining files there are shared test infrastructure, not suites of their own:
-`godbolt_cache.js`/`.json` mock Godbolt's response for C compilation, and
-`examples_fetch.js` serves `examples/` from disk — both stand in for network access
-jsdom does not have.
+The Node/jsdom harness is in [`riscv_simulator_tests/`](riscv_simulator_tests). Every suite loads the real `riscv_simulator.html`, so the tests exercise the shipped file rather than a copy of its logic. There is no build step. `npm test` runs 28 suites; four more need tools `npm test` cannot assume and are run on their own (`npm run test:native`, `test:verilator`, `test:folder`, `test:app`).
 
-| Test script | Target subsystem & scenarios |
-|-------------|------------------------------|
-| `test_comprehensive_suite.js` | Full system integration: editor proxy facade, Tab precision, breakpoints, assembler, stepping, history undo, FPGA MMIO registers, toolbar layout, and (sections [11]–[12]) every finding of the assembler audit — operand arity, range checks, label rules, register naming in the disassembly, the PC readout and the `ecall` notice. |
-| `test_hdl_mode.js` | **HDL mode, end to end (201 assertions).** Drives the real Icarus/WASM pipeline over the unmodified `RV/*.v` sources — see below. |
-| `test_panel_grid.js` | Dockable-panel 2×2 grid layout, splitters, per-panel column sizing and persistence. |
-| `test_c_godbolt_simulation.js` | Godbolt REST API compilation, bidirectional line mapping, C breakpoints and C stepping. |
-| `test_new_c_simulation.js` | Compilation and execution of `Circle_delay_accel.c` and `ImageDisplay_autoadvance_accel.c`. |
-| `test_baked_examples_full.js` | Compilation and execution of the four heaviest built-in examples, two in assembly and two in C. |
-| `test_statement_stepping.js` | Statement Stepping in both C and ASM, multi-instruction execution and discrete step back. |
-| `test_sim_max_instructions_setting.js` | Run-limit setting and execution-loop throttling. |
-| `test_disassembly_labels_and_warnings.js` | Label header rendering, jump/branch target annotations, FPGA hardware notice. |
-| `test_disassembly_machine_code.js` | Machine-code Byte/Word modes and binary byte grouping. |
-| `test_reset_and_image_display.js` | OLED auto-advance mode 5 rendering fidelity, ASM/C pixel parity, peripheral reset. |
-| `test_tab_and_autocomplete.js` | CM6 key handling, literal Tab insertion, block indent, operand autocomplete, signature help. |
-| `test_breakpoint_highlight_and_snap.js` | Breakpoint snapping from comments/blanks/directives, gutter highlight pill. |
-| `test_all_instructions_v2.js` | RV32GC translation coverage across 90+ instructions and pseudo-ops — that they assemble. |
-| `test_instruction_semantics.js` | **That they are right (136 cases).** Each instruction is executed and its result checked against a value worked out from the spec, exercising encoder → machine code → decoder → execution. Mutation-tested against 12 seeded faults. |
-| `test_execution_programs.js` | Multi-step execution and register assertions for Factorial ($5! = 120$) and Fibonacci ($F_9=34$, $F_{10}=55$). |
-| `test_mobile_keyboard_focus.js` | On-screen-keyboard focus preservation across panel relayout. |
-| `test_m_extension.js` | **RV32M, three ways (21 assertions).** All eight M instructions over six operand pairs, on the JS engine, on `RV/*.v` through Icarus, and against a BigInt reference; plus the stall, and the pre-synthesised `examples/hdl/RV_reference.v`. |
-| `test_jsdom.js` | Boot smoke test under jsdom. |
-| `test_hdl_native.js` | **Native Icarus against WASM (42 assertions).** Two pages, one bridged to `electron/iverilog/<os>-<arch>` (or `HDL_NATIVE_DIR`), one to `vendor/verisim/` run in Node, each load a copy of `RV/` as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also the folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. Not in `npm test`: build Icarus first (`npm run build:iverilog` in `electron/`). Then, on the native page, a Run in chunks: a switch moved while it runs, Pause and Run again, a breakpoint, *Real time*, no trace, the waveform, what the page shows mid-run against showing that point from scratch, and a 90,000-cycle run's waveform window against a run from reset's. |
-| `test_hdl_folder_browser.js` | **The folder picker in headless Chrome (11 assertions).** An origin-private folder stands in for a picked one; checks what loads, re-reading on focus, the handle surviving a reload, *Clear files* forgetting it, and the `webkitdirectory` fallback. Not in `npm test`: needs Chrome (`CHROME_CHANNEL` to choose another). |
-| `test_verilator.js` | **Verilator through the page (70 assertions).** The Simulator setting in a browser (disabled, with its tooltip) and in the app; a build reported on the status line and cached; a 40,000-cycle run recording what Icarus records; an input change, Resume, the Wrapper-only waveform, a compile error, and Reset during a build; live runs (a switch moved while running and the recording checked against a replay of its timeline, Pause under real-time pacing, Resume joined on, a breakpoint, typed UART input, the per-simulator cycle defaults, and a 5,000,000-cycle run trimmed to its last 2,000,000 with an input change joined on afterwards, and the dump of a live run followed flat out stopping at 20 MB); 200,000 cycles timed on both simulators, waveform on and off; then, in a process of its own, checkpoints (Resume, an input change and both waveforms from one, each equal to a run from reset, and a corrupted checkpoint and an `initial` block with `<=` falling back to reset). Not in `npm test`: needs native Icarus and Verilator builds and a C++ compiler (`RVSIM_FORCE_ZIG=1` tests the Zig path). |
-| `test_electron_app.js` | **The desktop app (20 assertions).** Launches `electron/` through Playwright, or a packaged build given by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run from the toolbar lighting the LEDs, Verilator chosen in Settings and run from the toolbar, a switch flipped during a live run showing on the LEDs before Pause, nothing fetched for the engines, and the folder remembered across a restart. Not in `npm test`: opens a window. |
+Shared infrastructure, not suites: `godbolt_cache.js` with `godbolt_cache*.json` answers the Godbolt compile requests for the examples, and `examples_fetch.js` serves `examples/` from disk. Both stand in for network access that jsdom does not have. `cm6_bundle.min.js` is the CodeMirror bundle injected into each page.
 
-### 12.1 Instruction semantics, and why assembling is not enough
+**RTL and engines.** Suites that simulate a processor need its Verilog sources (a Wrapper and core with the standard module names). They read them from the folder named by the environment variable `RVSIM_CORE_DIR`, or from `RV/` beside `riscv_simulator_tests/` when there is one (`core_dir.js`), and skip themselves when there is neither. `test_electron_app.js` runs on the prebuilt core in `examples/hdl/` instead. The prebuilt gate-level core in `examples/hdl/` (`RV_reference.v`, with `Wrapper.v`) needs no sources. The WASM Icarus engine is read from `HDL_ENGINE_DIR`, default `vendor/verisim/` (`ivlpp`, `ivl`, `vvp`, each `.js` plus `.wasm`). The Emscripten modules are ES modules that use `import.meta`, so Node 20 or later is required.
 
-`test_all_instructions_v2.js` proves a long program containing every instruction assembles
-with no errors. That catches a mnemonic falling out of the table — it does not catch a
-wrong `funct7`, a decoder that sign-extends where it should not, or a pseudo-instruction
-whose expansion has drifted. Each of those produces a program that assembles cleanly and
-computes the wrong answer.
+### Suites run by `npm test`
 
-`test_instruction_semantics.js` runs each instruction and checks the result. Because the
-encoder and the interpreter are separate code paths, that one check exercises
-**encoder → machine code → decoder → execution**, and a mistake in either end shows up as
-a wrong number. Expected values come from the RISC-V spec, not from the simulator: a check
-that agrees with the implementation by construction tests nothing.
-
-The suite is **mutation-tested** — its own coverage is measured by seeding faults into the
-simulator and confirming each is caught:
-
-| Seeded fault | Caught |
+| Test script | What it checks |
 |---|---|
-| `SRAI` made a logical shift | 2 cases |
+| `test_tab_and_autocomplete.js` | CodeMirror key handling: literal Tab, block indent, operand autocomplete, signature help. |
+| `test_breakpoint_highlight_and_snap.js` | Breakpoint snapping from comments, blank lines and directives; the gutter highlight. |
+| `test_jsdom.js` | Boot smoke test. |
+| `test_all_instructions_v2.js` | A program containing every supported instruction and pseudo-instruction assembles without errors. |
+| `test_instruction_semantics.js` | Each instruction executes to the result the RISC-V specification gives (§12.1). |
+| `test_execution_programs.js` | Multi-step programs with register checks: factorial (5! = 120) and Fibonacci (F9 = 34, F10 = 55). |
+| `test_comprehensive_suite.js` | Integration: editor facade, Tab, breakpoints, assembler, stepping and undo, MMIO registers, toolbar layout; assembler diagnostics (operand counts, range checks, label rules), register naming in the disassembly, the PC readout and the `ecall` notice. |
+| `test_panel_grid.js` | Dockable panel grid, splitters, per-panel column sizing and persistence. |
+| `test_panel_find.js` | Each panel's row filter; Peripherals has none. |
+| `test_mmio_editability_and_content_column.js` | Read-only MMIO registers ignore writes and are not editable (`UART_RX` excepted); MMIO edits show at once; Content column ASCII/DEC and its signed switch in Memory and Registers. |
+| `test_memory_row_granularity_and_shortcuts.js` | One word per memory row in both modes; trailing `:` on row labels; push-button and accelerometer keys. |
+| `test_mobile_keyboard_focus.js` | The on-screen keyboard keeps focus across panel relayout. |
+| `test_disassembly_machine_code.js` | Machine-code Byte/Word modes, binary byte grouping, the LSB hint. |
+| `test_disassembly_labels_and_warnings.js` | Label headers, jump and branch target annotations, FPGA memory notices. |
+| `test_disasm_immediates.js` | Alternative readings of an immediate field are offered only in spellings a real assembler accepts. |
+| `test_c_godbolt_simulation.js` | Godbolt compilation, line mapping in both directions, C breakpoints and stepping. |
+| `test_new_c_simulation.js` | Compiles and runs `Circle_delay_accel.c` and `ImageDisplay_autoadvance_accel.c`. |
+| `test_baked_examples_full.js` | Compiles and runs the four heaviest examples, two assembly and two C, checking rendered pixels and UART output. |
+| `test_statement_stepping.js` | Statement Stepping in C and assembly, and stepping back over a statement. |
+| `test_sim_max_instructions_setting.js` | The run-limit setting and execution-loop throttling. |
+| `test_reset_and_image_display.js` | OLED auto-advance mode 5 rendering, assembly/C pixel parity, peripheral reset. |
+| `test_oled_swap_race.js` | The warning for pixels written after a present without an `OLED_STATUS` read. |
+| `test_backstep_peripherals.js` | Step back restores LEDs, 7-segment, OLED registers and pages, and both sides of the UART path. |
+| `test_datapath.js` | The single-cycle datapath view agrees with the simulator per instruction, every wire it lights exists in the drawing, and one clock edge executes exactly one instruction. |
+| `test_pipeline.js` | The 5-stage pipeline model matches the functional model with all hazard handling on, computes the wrong result hardware would with a feature off, gives textbook cycle counts for the classic hazards, and supports Step, Back, Run and breakpoints. |
+| `test_hdl_mode.js` | HDL mode end to end (§12.2). Needs `RVSIM_CORE_DIR`. |
+| `test_waveform.js` | `parseVcd()` on a hand-written VCD; then a real VCD from Icarus: hierarchy into submodules, the cycle divisor derived from `CLK`, and the value under the cursor matching the trace. The second half needs `RVSIM_CORE_DIR`. |
+| `test_m_extension.js` | All eight M instructions over awkward operand pairs (most negative, division by zero, mixed signs, full 64-bit products), run on the JS model, on the RTL through Icarus, and against a BigInt reference; plus the multi-cycle stall and `examples/hdl/RV_reference.v`. The RTL part needs `RVSIM_CORE_DIR`. |
+
+### Suites run on their own
+
+| Test script | Needs | What it checks |
+|---|---|---|
+| `test_hdl_native.js` | A native Icarus build (`npm run build:iverilog` in `electron/`, or `HDL_NATIVE_DIR`); `RVSIM_CORE_DIR` | Two pages, one bridged to `electron/iverilog/<os>-<arch>` and one to `vendor/verisim/` run in Node, load the same sources as a folder, run 40,000 cycles of DIP to LED and replay a switch change from a checkpoint; recordings and waveforms must be identical. Also folder selection (testbenches, a Vivado `.runs` copy, a duplicate module), re-reading on focus, a compile error, and Reset killing `vvp`. On the native page, chunked runs: a switch moved mid-run, Pause and Run, a breakpoint, *Real time*, no trace, the waveform, the mid-run display against the same point shown from scratch, and a 90,000-cycle run's waveform window against a run from reset. |
+| `test_verilator.js` | Native Icarus and Verilator builds (`npm run build:verilator`), a C++20 compiler (or `RVSIM_FORCE_ZIG=1` with network access, which fetches Zig); `RVSIM_CORE_DIR` | The Simulator setting (disabled with a tooltip in a browser); a build reported on the status line and cached by content; a 40,000-cycle run recording what Icarus records; an input change, Resume, the Wrapper-only waveform, a compile error, Reset during a build; live runs (a switch moved mid-run checked against a replay, Pause under real-time pacing, Resume, a breakpoint, typed UART input, the per-simulator cycle defaults, a 5,000,000-cycle run trimmed to its last 2,000,000, a live dump stopping at 20 MB); 200,000 cycles timed on both simulators with the waveform on and off; and, in a separate process, checkpoints (Resume, an input change and both waveforms from one, each equal to a run from reset; a corrupted checkpoint and an `initial` block with `<=` falling back to reset). |
+| `test_hdl_folder_browser.js` | Chrome (`CHROME_CHANNEL` selects another); `RVSIM_CORE_DIR` | The folder picker in headless Chrome, using an origin-private folder in place of a picked one: what loads, re-reading on focus, the handle surviving a reload, *Clear files* forgetting it, and the `webkitdirectory` fallback. |
+| `test_electron_app.js` | The desktop app (`npm install` and `npm run build:iverilog` in `electron/`), a display; `RVSIM_CORE_DIR` optional | Launches `electron/` through Playwright, or a packaged build named by `RVSIM_APP_EXE`: `app://` loading, no Node in the page, the folder button with the dialog stubbed, Run lighting the LEDs, Verilator selected in Settings and run, a switch flipped during a live run showing on the LEDs before Pause, nothing fetched for the engines, and the folder remembered across a restart. |
+
+`oneoff_oled_modes.js` is not a suite. It runs the same programs on the JS model and on the RTL's Wrapper through Icarus and compares the two 96×64 frame buffers pixel by pixel, covering 16- and 24-bit colour, `vary_col`/`vary_row`, both auto-advance directions with wrap and repositioning, and the byte-lane rules of each colour format.
+
+### 12.1 Instruction semantics
+
+`test_all_instructions_v2.js` only shows that every instruction assembles. A wrong `funct7`, a decoder that sign-extends where it should not, or a pseudo-instruction with the wrong expansion still assembles cleanly and computes the wrong answer.
+
+`test_instruction_semantics.js` executes each instruction and checks the result. The encoder and the interpreter are separate code paths, so each check covers encoder → machine code → decoder → execution. Expected values come from the RISC-V specification, not from the simulator. Every comparison has boundary cases: equal as well as less and greater, zero as well as positive and negative.
+
+The suite is mutation-tested: each of these seeded faults is caught.
+
+| Seeded fault | Cases that catch it |
+|---|---|
+| `SRAI` made a logical shift | 2 |
 | `SLTI` `<` made `<=` | 1 |
 | `SLTIU` `<` made `<=` | 1 |
 | `BGE` `>=` made `>` | 5 |
@@ -1536,240 +1316,33 @@ simulator and confirming each is caught:
 | `LHU` sign-extending | 1 |
 | `mv`, `neg`, `snez`, `sgtz`, `seqz` expansions corrupted | 1–2 each |
 
-Two of those initially slipped through — `SLTI` and `seqz` — both because no case sat on
-the boundary that distinguishes the correct behaviour from the faulty one. Cases were
-added until all twelve were caught, which is why the suite carries a deliberate boundary
-case for every comparison: equal as well as less and greater, zero as well as positive
-and negative.
-
----
-
 ### 12.2 The HDL suite
 
-`test_hdl_mode.js` is the one that needs real tooling: it loads the page, assembles
-through the normal assembler, asks the page for the artefacts it would hand to Icarus
-(the generic testbench, the memory images, the stimulus files), then runs the **real**
-Icarus pipeline over the unmodified `RV/*.v` sources.
+`test_hdl_mode.js` assembles through the page's own assembler, asks the page for the files it would hand to Icarus (the generic testbench, the memory images, the stimulus files), and runs the WASM Icarus pipeline over the unmodified sources in `RVSIM_CORE_DIR`. jsdom cannot import the Emscripten modules, so the engine is driven from Node, but every file fed to it is the one the page produced. Besides the HDL-mode UI and settings, it checks:
 
-- **Discovery** finds `dut.RV1.RegFile1.RegBank`, and still finds it after the module,
-  the instance and the array are all renamed.
-- **The testbench is program-independent**: byte-identical Verilog for two different
-  programs with different switch settings, and no DIP value anywhere in it.
-- **One compile, many runs**: the same binary gives `LED=0xad` for `+DIP=bead` and
-  `LED=0x72` for `+DIP=0072`, and runs standalone with no plusargs at all.
-- **The trace** starts at the reset vector, never reports a write to `x0`, captures the
-  DIP value landing in a register and the store to the LED MMIO address.
-- **Stepping** reaches the right state either side of the instruction that reads the
-  DIP switches, and **stepping back undoes the register write**.
-- **A mid-run input change** takes effect (`0xad` → `0xff`) while the history before it
-  stays bit-identical — the property the whole interaction model rests on.
-- **MMIO timing, both directions**: an input changed while paused is read by the very
-  next instruction (not the one after it), and the LED shows its new value as soon as
-  the storing instruction completes.
-- **Breakpoints**: Resume stops on the breakpoint line, resumes to the next time that
-  line is reached, and runs to the end of the recording when there are none.
-- **RX_VALID**: both bytes are acknowledged, the FIFO empties on the instruction that
-  reads each one, and stepping back puts the byte back.
-- **Statement Stepping in HDL**: with it off a Step is one machine instruction; with it
-  on a Step covers the whole source line, and Back undoes exactly that.
-- **`HelloWorld`**: `'A'` + CR delivered through `uart_rx.mem` produces the echo *and*
-  the greeting stored in DMEM, exercising `UART_RX`/`valid`/`ack` and `UART_TX`/`valid`.
+- **Discovery** finds `dut.RV1.RegFile1.RegBank`, and still finds the register file after the module, the instance and the array are renamed.
+- **Synthesisability lint** flags delays, `$display`, `real`, `forever`, `casex`, blocking `=` in a clocked block and `initial` with a delay, each with file and line, without false hits on parameter lists, `for` headers, comments, strings or testbench files.
+- **Post-synthesis**: only the core is synthesised, the Wrapper is excluded, and a parameterised `RV` shim lets the Wrapper elaborate; the cross-check compares instructions, memory writes and peripherals, not register writes.
+- **The testbench is program-independent**: the Verilog is byte-identical for two programs with different switch settings and contains no DIP value.
+- **One compile, many runs**: the same binary gives `LED=0xad` for `+DIP=bead` and `LED=0x72` for `+DIP=0072`, and runs with no plusargs at all.
+- **The trace** starts at the reset vector, never reports a write to `x0`, and captures the DIP value reaching a register and the store to the LED address.
+- **Stepping** reaches the right state on both sides of the instruction that reads the switches, and stepping back undoes the register write.
+- **A mid-run input change** takes effect (`0xad` → `0xff`) while the history before it stays bit-identical.
+- **MMIO timing**: an input changed while paused is read by the next instruction, and the LED shows its new value as soon as the storing instruction completes.
+- **Breakpoints**: Resume stops on the breakpoint line, continues to the next time that line is reached, and runs to the end of the recording when there are none.
+- **`RX_VALID`**: both bytes are acknowledged, the register empties on the instruction that reads each one, and stepping back restores the byte.
+- **Statement Stepping**: off, a Step is one machine instruction; on, a Step covers the source line and Back undoes exactly that.
+- **`HelloWorld`**: `'A'` and CR delivered through `uart_rx.mem` produce the echo and the greeting stored in DMEM, exercising `UART_RX`/valid/ack and `UART_TX`/valid.
 
 ```bash
-node riscv_simulator_tests/test_hdl_mode.js
+RVSIM_CORE_DIR=/path/to/core node riscv_simulator_tests/test_hdl_mode.js
 ```
 
-The engine is expected at the path in `HDL_ENGINE_DIR`; point it at a folder holding the
-six engine files to run the full pipeline offline. **Node 20+** is required — the
-Emscripten modules are ES modules using `import.meta`.
-
-All 15 suites above pass against `riscv_simulator.html`.
-
 ---
 
-## 13. Version history
 
-Newest first. Versions before v15.0 are grouped.
+## Licensing
 
-| Version | Milestone description & features implemented |
-|---------|----------------------------------------------|
-| **v24.142 (The Divided-Clock LED Blinks Again)** | LED[8] was lit unless the JS engine's `running` was set, and then showed the parity of the instruction count at each refresh (`clockToggle`, flipped per instruction). An HDL run never sets `running`, so it stayed lit; a JS run refreshes every 10,000 instructions, an even number, so it blinked only when an MMIO write happened to refresh it in between. `updateClockLed` now draws it from the wall clock while any run is in progress (JS, a chunked Icarus run, a live Verilator run, or playback): at the clock's own rate when *Real time* paces a clock of 8 Hz or less, otherwise flickering at 4 Hz, and lit when nothing runs. A 60 ms timer keeps it moving between refreshes and stops with the run. `clockToggle` is gone. **Testing.** `test_hdl_native.js` (42) sees it both on and off during a chunked run and lit after Pause; checked in JS mode too, including 1.49 Hz under *Real time* (a change about every 0.33 s). |
-| **v24.141 (The Live Waveform's 20 MB Stop Stops the Dump)** | A Verilator live run following its waveform flat out was meant to stop the dump at 20 MB (v24.133): the page sent input code 8, which the testbench turned into `$dumpoff`. Verilator compiles `$dumpoff` to nothing (checked on 5.032 and on the app's 5.054, whose runtime has no such call), and `$dumpflush` likewise, so the page stopped reading the waveform while the model went on writing it. Found when a run in the app wrote a 4.5 GB `dump.vcd` into `/tmp`, a RAM-backed tmpfs here, in about 40 s, until the user's quota there ran out. The testbench now calls a context DPI function, `cg3207_vcd`, in the live helper (`LIVE_CPP`), which closes the dump through the generated symbol table's `_traceDumpClose()`, as `$finish` would, or flushes its `VerilatedVcdC`; the 250 ms flush of a followed waveform now happens too. Both rely on members of the generated `__Syms` class, which the bundled Verilator pins. **Testing.** `test_verilator.js` (70) checked only the console message; it now also reads the dump's size twice, 1.5 s apart, during a 20,000,000-cycle live run after the stop, and requires it unchanged (88 MB both times). |
-| **v24.140 (Long Icarus Runs Stay Fast; Post-Synthesis Runs Shorter)** | **Default.** Icarus's *Cycles per Run* goes from 2,000 to 200,000 (about 11 s natively): 2,000 was one chunk, over before an input could be touched. A first Step with no recording records at most 2,000 under Icarus, as it does 100,000 under Verilator. With post-synthesis simulation on, which still records a Run in one go and cannot pause it (§5.14), the budget is remembered separately (`hdlCyclesKey`), 50,000 by default; the setting's description says it cannot be paused, its tooltip and the Run button's give the reason. **The waveform.** A long chunked Icarus run slowed down as it went: measured natively with every signal, 4,000 cycles a second at the start and 450 at 128,000 cycles, with 150 MB of VCD text and about 1.5 GB of heap. Each chunk's join (`hdlStitchVcd`) scanned the whole VCD for the cut and copied it, and since chunks are sized by their own time they shrank as the join grew. With the waveform view open, every chunk also re-parsed the whole VCD. An Icarus waveform is now kept as an `hdlVcdDoc`: the declarations (with the `$dumpall` of parameter values Icarus writes before `#0`), the values at the window's start, and the changes after it in one piece per joined run. A join cuts only the last piece, searching back from its end, and the oldest changes are folded into the starting values once the waveform covers more than 1.25 times `HDL_VCD_WINDOW` (renamed from `HDL_VL_VCD_WINDOW`; 50,000 cycles, as Verilator has kept). The text is put together only to parse or download it. The ids still holding their time-0 value take the newest run's, which keeps the plusarg values right as before. During a chunked run the view re-parses only once ten times the last parse's duration has passed. After: a steady 4,300 to 4,800 cycles a second with the view open, 433,000 cycles in 100 s against 128,000 before, and 60 to 73 MB of VCD. **Following the run.** Showing each chunk replayed the recording from cycle 0, since the join made a new trace and dropped the forward-seek mark: 4.6 s over 547,000 cycles without the waveform. The mark now carries over the join when what it showed is still in the recording, and records how much of the last step it applied, so that what the join adds to that step is applied next time (0.5 s over the same run, about 9,000 cycles a second throughout). That needed `hdlPrepareRun` to stop reloading the program image before every run, which reset the registers and memory shown; the memory images are kept per program and Wrapper (`hdlMemCache`). **Testing.** `test_hdl_native.js` (41): the registers and LEDs shown at three points during a run equal those shown by seeking there afterwards, and a 90,000-cycle chunked run's waveform covers 50,000 to 62,500 cycles and matches a run from reset over what both keep. `test_hdl_mode.js` (201): the post-synthesis budget and its note and tooltip; its checkpoint-join waveform tests run through the new join. |
-| **v24.139 (Icarus Takes Input While It Runs)** | Run with Icarus simulated all of *Cycles per Run* before showing anything, so an input moved meanwhile waited for the end. It now records in chunks of about 300 ms of simulation (`HDL_CHUNK_MS`, sized from the last chunk's speed), each an extension from the checkpoint at the end of the last, and follows each as it arrives: flat out to its end, under *Real time* paced to the clock with the simulation held at most two chunks ahead. An input moved while it runs is stamped at the cycle shown and the recording replayed from the checkpoint before it ahead of the next chunk, as when paused, or left to the next chunk when it falls at the end; Pause and breakpoints take effect between chunks. With the post-synthesis check on, a Run is still recorded in one go, since the check compares one whole run from reset. It works the same in the browser and the app. **The join.** An extension split the whole raw output of the recording and parsed it all again, which chunking would have made quadratic: 2,500 more cycles took 256 ms at 50,000 recorded cycles, 530 ms at 200,000 and 1,040 ms at 500,000. Icarus now joins as Verilator does: the replay prints from the checkpoint, what falls before the join point is compared with the recording record by record (`hdlJoinCheck`), and what follows is parsed onto it, so the same extension takes about 160 ms at any length. `hdlStitch` and the recording's raw output are gone; the post-synthesis re-check keeps the output of a run from reset. `hdlCutTrace` also drops what the last step kept recorded in cycles at or past the cut, which the joined run prints again. A replay from a checkpoint no longer passes `+TRACEFROM`, which only put the testbench's `trace_from` into the waveform. Measured native: 100,000 cycles in 25 chunks in 6.6 s against 5.4 s in one go; WASM in Node, 20,000 cycles in 2.5 s against 1.6 s. **Testing.** `test_hdl_native.js` section 7 (now 38): a switch moved mid-run, its timeline replayed from reset to the same recording, Pause and Run again, a breakpoint, *Real time* at 1.53 kHz, no trace, and the waveform equal to one run's; `test_hdl_mode.js`'s checkpoint tests join through the new functions; `test_electron_app.js` (now 20) clicks a DIP switch in the packaged app during an Icarus run and sees the LEDs follow before Pause. Icarus's "`$finish` called at" line is no longer logged, and "Reusing the compiled design" only for a run's first chunk, so neither repeats per chunk. |
-| **v24.138 (Resume Without the Trace; Honest Run Summaries)** | With *Detail: Fastest* (no architectural trace), Run after Pause or the end of a live Verilator run started a new run from cycle 0: the resume condition required the trace, since Resume had been written around the instruction recording. Without it the recording is the peripheral events and the snapshot they fold into, which carries on the same way, from the newest checkpoint; a recording made with the trace is still not continued without it. The status line's run summary said "0 instructions in 20000000 cycles" without the trace, where nothing counts instructions, and past 2,000,000 cycles counted only the instructions still kept; it now counts from reset (`t.offset` included) and leaves the count out when there is none. **Testing.** `test_verilator.js` (69) resumes a trace-off live run from a checkpoint and checks its length and LEDs. |
-| **v24.137 (The Reference Sources Lint-Clean Under Verilator)** | `verilator --lint-only -Wall` over `RV/` reported 172 warnings; the app's build, with lint and style warnings off, showed the COMBDLY and MULTIDRIVEN among them. **COMBDLY** (`<=` in an `always @*` block), 147 of them in `Decoder.v`, `Wrapper.v`, `RV.v`, `RegFile.v` and `PC_Logic.v`: each is now `=`, alignment kept. **MULTIDRIVEN** in `ProgramCounter.v`: `initial PC <= PC_INIT;` beside the clocked block. The start value is now on the declaration (`output reg [31:0] PC = PC_INIT`), as the Wrapper's registers already had it. The `<=` was harmless in simulation until checkpoints (v24.136): it lands after every `initial` block at time 0, so it overwrote the PC a checkpoint had just restored, and the first replay from a checkpoint started at 0x00400000. The console line for a checkpoint that does not reproduce the recording now names this as a likely cause, with the MULTIDRIVEN warning Verilator gives for it. The build's `-Wno-INITIALDLY` went: Verilator 5.054 has no such warning. Left as they are: PROCASSINIT (a procedural assignment to a reg with a declared start value, which is how the Wrapper gives its registers power-on values) and UNUSEDSIGNAL. `ProgramCounter.v`, `RegFile.v` and `Wrapper.v` are the same files in the CG3207 Asst_02 templates and `examples/hdl/`, and are copied there; the templates' own skeletons had none of these warnings, only UNDRIVEN for what students write, and are unchanged. **Checked.** Yosys `equiv_make`/`equiv_induct` proves the old and new RTL equivalent, `RV` (2,813 cells) and the whole `Wrapper` (6,808). `RV_reference.v` was regenerated with Yosys 0.52 (611 lines against 632, names renumbered); it, the old netlist, the RTL, and the RTL through `synth -top RV` as the page's post-synthesis check builds it, record the same 300,000 cycles of every assembly example under Verilator, and `test_m_extension.js` runs its RV32M program on it to the 48 right results. The testbench's stimulus block no longer sets `RESET = 1'b1` at time 0, which its declaration already does and which, in a process with delays, would also have landed after the restore. **Testing.** `test_verilator.js` gave the warning count something to count by reading the register file with `<=` in its copy of the sources, and checks that the old `ProgramCounter.v` gets a MULTIDRIVEN warning, a replay that does not match, and the right recording all the same. |
-| **v24.136 (Checkpoints for Verilator)** | Verilator's replays started from reset: Resume after each 20,000,000-cycle run replayed everything before it (about 11 s per 20,000,000 cycles of this design without the trace), an input changed while paused replayed up to it, and the waveform built on Pause replayed the whole run. Verilator now has checkpoints (§5.19), every 200,000 cycles, and a recording keeps only its two newest: Resume and building the waveform use only the end of the recording, an input change while paused is usually made there, and an older one would only serve a change made after stepping back. The checkpoint module is Icarus's, generated differently: instantiated in the testbench, writing two files in turn, holding only clocked regs, and with neither block waiting. Measured on 20,000,000 cycles without the trace, native: no module 11.0 s; Icarus's form 13.7 s, of which saving accounted for 9 % and restoring 15 %; a restore on the first falling edge 13.3 s; holding only clocked regs (41 instead of 98) no better, 14.8 s; the restore behind a flag raised by a nonblocking assignment 11.4 s; a plain `initial` restore and a flag-triggered save 11.04 s, which is what is used. A run from a checkpoint is checked against the recording before it is joined on, in a live run too: its records before the join are held aside and compared by cycle, a check made as soon as the model is two cycles past the join, and on a mismatch the run is killed, its late output ignored, and replayed from reset. The testbench gains `+LIVEFROM`, so that a live run's inputs and pacing start at the join rather than at the checkpoint's `+TRACEFROM`. Found on the way: the record splitter dropped the unfinished last line it held when the check passed, which lost a register write a few cycles after the join. Resume of 500,000 cycles takes 2.0 s. **Testing.** `test_verilator.js` section 8 runs in a process of its own, since the pages of the other sections fill one Node heap: checkpoints kept, Resume and a switch moved while paused replayed from them and equal to a run from reset on a page built without checkpoints, the waveform built on Pause and one followed live equal to those of a run from reset in every design signal, and a corrupted checkpoint reported, replayed from reset and turned off. |
-| **v24.135 (Verilator's C++ at -O3)** | The model and Verilator's runtime were compiled with `-Os`, Verilator's own default, which optimises for size. Measured on the `RV/` RTL with the runtime already compiled: a rebuild after an edit 2.7 s at `-Os`, 3.0 at `-O1`, 3.5 at `-O2`, 3.6 at `-O3`; 2,000,000 cycles with the trace 3.26, 2.62, 2.47 and 2.38 s; 5,000,000 cycles without it 2.93, 2.02, 1.79 and 1.58 s. Now `-O3`: about 1.85 times as fast without the trace and 1.37 with it, for about 0.9 s more per build. It matters most where the page is not the limit: live runs under *Detail: Fastest*, the silent replay to a join point when resuming or changing an input while paused, and building the waveform on Pause; a live run with the trace is held to about 285,000 cycles a second by the page. Through the page (`test_verilator.js`): a 5,000,000-cycle live run 17.5 s to 10.7 s, an input change near its end 4.7 s to 3.1 s, 200,000 cycles 0.88 s to 0.69 s with the waveform and 0.66 s to 0.52 s without. The runtime is cached by its flags, so the first build after this compiles it once more. Three of the test's live sections waited a fixed time after Run before acting and now wait until the run is live; one of them ran out of cycles before its switch was flipped once `-O3` made it faster, and has a larger limit. The comment that called `-O2` no faster was wrong: it had compared only `-O0`, `-O1` and `-Os`, on one run with the trace. |
-| **v24.134 (Real Time Behaves Alike in Both Engines)** | Three differences between *Real time* in JS mode and in HDL mode. **The fraction of real time** (`×0.63 real time` in the stats when the simulation cannot keep up with the clock) was measured only by the JS run loop; a live Verilator run never computed it, and the stats asked for it only during Icarus playback. The live run now measures it the way the JS engine does, from the cycles that have arrived over at least 0.5 s or 50 cycles, and the stats show it while a live run is paced. **Following execution line by line** was done by the JS engine at 1 kHz or slower (`CLK_DIV_BITS` 17 and up); in HDL mode every update of a live run or of Icarus playback went through `hdlSeek`'s full refresh, so the highlight stepped through lines at any clock. Both now share one threshold, `RT_FOLLOW_HZ`, raised to 100 Hz (`CLK_DIV_BITS` 20 and up, 95 Hz): above it a running simulation updates the peripherals, the stats and the waveform, and the line, registers and memory catch up when it stops. `hdlSeek` gains a light mode for that. **Icarus playback** replayed the recording from cycle 0 on every frame; it now carries on forward from the last frame. **Without the architectural trace** (*Detail: Fastest*), a live run showed nothing until Pause and its fraction read ×0.00: the testbench prints no instruction records then, the live loop only advanced on instructions, so peripheral events piled up unapplied, and the cycle it measured never moved. It now applies those events as they arrive, folding them into a state snapshot past 100,000 so that a long run holds no more than that, and the helper prints `@@C <cycle>` each time it flushes (every 30 ms), so the cycle count and the fraction move even when no peripheral changes; a seek from a snapshot replays the events recorded after it. Found by driving the packaged app at *Full*, *Balanced* and *Fastest*: at 3.125 MHz the fractions read ×0.12, ×0.20 and ×0.48, and a switch flipped during each run showed on the LEDs before Pause. **Testing.** `test_verilator.js` (now 47) checks that a live run paced to a clock it cannot keep up with shows its fraction of real time, and that without the trace a switch change shows while the run goes and the fraction is not stuck at 0. |
-| **v24.133 (Detail Presets; One Waveform Card)** | The waveform's three settings were in two groups: *Dump a VCD waveform* under Recording & output, *Waveform: Wrapper signals only* under *Cycles per Run / Resume*, and *Waveform: Built on Pause / While running* under *Simulator*. They are one card now, *Record a waveform* with *Signals* and *Built* (Verilator) beneath it, hidden while no waveform is recorded; the stale hint about a toolbar VCD button went with them. A *Detail* selector in the Recording & output group's header sets every option that costs run time at once (§6); post-synthesis simulation moved into that group, beside the cross-check, so that all of them are under it. *Full*, the default: everything, with Verilator's waveform following a live run (which makes *While running* the default; past 20 MB a followed waveform stops with `$dumpoff` and is built on Pause instead, since flat out it grows by about 22 MB per 40,000 cycles); *Balanced*, Wrapper signals only, built on Pause; *Fastest*, no waveform and no architectural trace. The options stay visible and editable, the selector reads *Custom* once one differs, the console lists what a preset changed, and Reset Defaults goes through *Full*. Each costly option's description now gives its cost. The table of costs is in §6 and in the user guide's new *Speed* section. **Verilator's default *Cycles per Run* goes from 1,000,000 to 20,000,000**: a million cycles ran in about a second, too short to interact with, and with the recording trimmed to its last 2,000,000 cycles a longer run costs no more memory. A first Step with no recording, which records a run before it can step, records at most 100,000 cycles under Verilator rather than the whole 20,000,000. **Testing.** `test_verilator.js` (44) checks the 20 MB stop. `test_hdl_mode.js` section 2b (now 199 assertions) checks the three presets, the hidden sub-settings, the console line, *Custom* and the return to *Full*; checked in Chrome at desktop and phone widths. |
-| **v24.132 (Live Runs With Verilator)** | With Verilator in the desktop app, Run is live (§5.19): the model keeps running and inputs take effect as they change, instead of the run being recorded first and an input waiting for Pause. The testbench gains a `` `ifdef VERILATOR `` block that calls a C++ helper through DPI at every rising edge; the helper reads the app's commands from stdin, paces the model to the *Real time* clock, flushes output for streaming, and asks for a stop or a waveform flush. Every input it applies is reported with the cycle it took effect, so the recording equals a replay of its input timeline from reset, which the tests check. The testbench also gains `+TRACEFROM` (no records before a cycle) and `+VCDFROM` (the waveform starts at a cycle): Resume restarts the model from reset with the recorded inputs and joins on at the old end, and an input changed while paused joins on at the change, both without re-recording what is already there. Verilator's recordings are not capped at 2,000,000 cycles: they keep the last 2,000,000 and fold the rest into a state snapshot that seeks start from. *Cycles per Run / Resume* is kept per simulator, 2,000 for Icarus and 1,000,000 for Verilator; a *Waveform* setting chooses between building the waveform on Pause and following the run, and either covers at most the last 50,000 cycles. The trace parser takes input in pieces and shares one empty array between steps with nothing written, and `hdlSeek` can carry on forward from the last seek. Found on the way: the helper first read stdin through `std::cin`, and the model then hung at `$finish`, `exit()` waiting on the lock of the stdin stream the reader thread was blocked in. **Testing.** `test_verilator.js` grows from 21 to 43 assertions and `test_electron_app.js` from 14 to 17, the latter flipping a switch in the packaged AppImage during a live run; `test_hdl_mode` (191), `test_waveform` (98), `test_m_extension` (21), `test_hdl_native` (26), `test_hdl_folder_browser` (11), `test_statement_stepping`, `test_backstep_peripherals`, `test_oled_swap_race`, `test_datapath`, `test_pipeline`, the C and image suites, `test_comprehensive_suite` and `test_jsdom` pass. |
-| **v24.131 (OLED: Repositioning in Auto-Advance; Wrapper Fix)** | The image example drew its first frame correctly and every later one shifted by a pixel, the last column of each row landing at the start of the next: 0 of 6144 pixels in place from frame 2 on, against `Uphill.png`. The program sets `OLED_ROW` and `OLED_COL` to 0 before each frame, and in an auto-advance mode `Wrapper.v` cleared its `autoadvance_col`/`autoadvance_row` flag only on a triggering write in another mode, so the flag stayed armed from the previous frame and the first data write advanced before painting. The JS model has copied that since v24.70, which is when the simulator began showing it; the RTL, and so the board, always had it. **Fixed in the Wrapper**: writing `OLED_COL` or `OLED_ROW` disarms both flags, so the next pixel goes where the position was set, and the model follows. Writing `OLED_CTRL` deliberately does not disarm: the position register holds the last pixel drawn, so disarming on a colour-format change mid-stream would repaint it. **Also in the Wrapper**: `OLED_Data` is initialised to 0, as the FPGA powers it up, so painting by coordinate before any data write gives black rather than x in simulation, matching the model. Not changed: in 24-bit colour, the auto-advance modes trigger only on a write covering byte lane 0, while `vary_pixel_data` triggers on any lane, which lets R and G be written before B paints. The examples are unchanged. Checked absolutely as well as engine against engine: with the fixed Wrapper the original program puts all 6144 pixels of frames 1 to 3 in place in JS mode and on the RTL through Verilator, against 0 of 6144 in frames 2 and 3 with the old Wrapper. `oneoff_oled_modes.js` gains repositioning in both auto-advance directions and `vary_col` before any data write (24 comparisons, all matching). The copies in `examples/hdl/` and the course's Asst_02 templates follow, and the course's peripherals page says what writing `OLED_COL`/`OLED_ROW` does in auto-advance. **Also:** the Credits name Verilator and Zig; user-facing text says "the top-level module" instead of naming `TOP_Nexys.vhd`, and "Wrapper"/"RV" without `.v` (the Clock tooltips, the sources drop zone, the Wrapper warning, the console's memory-depth messages, and the user guide's clock paragraph). |
-| **v24.130 (Verilator in the Desktop App)** | Native Icarus is 1.6× the WASM build, all of it Icarus's own evaluation, so the desktop app gains **Verilator** as a second simulator (§5.19): 200,000 cycles of the `RV/` RTL in 1.6 s against 27.4 s with the waveform on, 1.0 s against 19.5 s with it off, recording the same instructions, register and memory writes. A *Simulator* setting heads the Simulation group; in a browser it is shown disabled, with a tooltip, so the page looks the same in both. `electron/verilator_native.js` calls `verilator_bin` directly and compiles the C++ itself in parallel, so neither Perl nor make is needed; models are cached by content and Verilator's runtime once per compiler, giving 3.6 s for a rebuild after an edit. Verilator is two-state, which the console states; it has no checkpoints (one top level), so its replays start from reset; post-synthesis simulation is hidden while it is chosen; and *Wrapper signals only* is a `tracing_off` scope in a config file, since Verilator ignores `$dumpvars` depth and inlining defeats `--trace-depth`. Builds report their steps on the status line and Reset kills them. **The compiler** is the computer's own when one compiles a C++20 coroutine; otherwise Zig 0.17.1 is downloaded on first use, checked against its SHA-256, and unpacked into the app's data folder, with the console saying why and the status line counting megabytes, rather than shipping 55 to 100 MB in every installer. Measured with a local mirror and no system compiler: 45 s for the first build, 5 s after. The workflow builds Verilator on each runner and runs `test_verilator.js` there; only Linux has been run. The AppImage grows from 146 to 153 MB. The user guide gains a tentative section 6 on the desktop app, saying it is not yet available for download, with what differs from the page: native Icarus, the Verilator choice and its two-state results, the one-off compiler download, and opening an unsigned installer. **Testing.** `test_verilator.js` (21) is new; `test_electron_app.js` (now 14) chooses Verilator in Settings in the packaged AppImage and runs DIP to LED from the toolbar. `test_hdl_native` (26), `test_hdl_folder_browser` (11), `test_hdl_mode` (191), `test_waveform` (98), `test_m_extension` (21), `test_comprehensive_suite` and `test_jsdom` pass. |
-| **v24.129 (Resume Re-runs 16 Cycles; a Wrapper-Only Waveform)** | **Resume.** Checkpoints fell every 1024 cycles, and an extension has to start at least 16 cycles before the old recording's end so the replay can be checked against it, so with the default 2000 *Cycles per Run / Resume* every Resume re-simulated from cycle 1024: 976 cycles of the old recording again before any new ones, and more as the spacing doubled. Choosing a multiple of 1024 would not help, because of those 16 cycles. The checkpoint module now also takes one at `+CKAT`, which the page sets 17 cycles before the end of each run, so an extension starts there whatever the setting: 40,000 to 42,000 cycles takes 0.42 s native. **Waveform: Wrapper signals only**, under *Cycles per Run / Resume* and off by default, limits `$dumpvars` to the testbench and Wrapper levels (§6): the VCD of a 40,000-cycle run drops from 47.8 MB to 9.7 MB and the run takes 23 to 29 % less time on either engine. A replay joins only onto a VCD of the same scope; the trace records which. **Testing.** `test_hdl_native.js` section 6 (now 26 assertions) checks the signals the reduced waveform keeps and drops, that a Resume loads the checkpoint 17 cycles before the old end, and that the resumed recording and waveform equal a run from reset of the same length on both engines. `test_hdl_mode` (191), `test_waveform` (98), `test_comprehensive_suite` and `test_jsdom` pass. |
-| **v24.128 (A Desktop App With Native Icarus; HDL Sources From a Folder)** | **Desktop app** (§5.18): `electron/` packages the unchanged page with Electron 45 and a native Icarus Verilog for each platform, built from source at the commit the WASM engine came from (`c7530db`) by `electron/scripts/build-iverilog.sh` and stripped to 8 MB. `hdlTool()` gains one branch: given `window.rvNative.icarus`, it sends the stage's files and arguments over IPC to `electron/hdl_native.js`, which runs the tool in a temporary directory, and a Reset kills the process. Measured on 40,000 cycles of the `RV/` RTL: compile 40 ms against 180 ms, simulation 5.2 s against 8.6 s, so native Icarus is 1.7× the WASM build; with trace, VCD and checkpoints off it is still 18,000 cycles a second, which puts the remaining time in Icarus itself and makes Verilator, not native Icarus, the route to a faster engine. `.github/workflows/desktop.yml` builds Icarus and the installers on Linux, Windows (MSYS2) and macOS (arm64, x64), runs `test_hdl_native.js` against each build, and attaches the installers to the run, or to a draft release for a `desktop-v*` tag; signing and notarization happen only when the secrets are set. Only the Linux build has been run so far. The app's icon is the page's favicon rendered at 1024 px (`electron/build/icon.png`). **Folder** (§5.17): *folder…* beside *browse…* loads a folder's Verilog, keeping the files whose modules sit under the Wrapper and skipping Vivado's output folders, so testbenches and stale copies are not compiled as extra top levels. It is read again on window focus and before each run from reset, with changes named in the console, and remembered across restarts in the app and across reloads in Chromium (an IndexedDB handle); Firefox and Safari get a one-off `webkitdirectory` copy. The HDL settings note that files are compiled in the browser and must be loaded once per session now says they are compiled on this computer and that a folder is remembered. **Testing.** `test_hdl_native.js` (21), `test_hdl_folder_browser.js` (11) and `test_electron_app.js` (12, also run against the packaged AppImage's contents) are new and outside `npm test`, since each needs a native build, Chrome or a display. `playwright-core` joins the test dependencies. `test_hdl_mode`, `test_waveform`, `test_m_extension`, `test_comprehensive_suite` and `test_jsdom` pass unchanged. |
-| **v24.127 (HDL Replays From Checkpoints; the Engine Off the Page's Thread)** | An input change, or extending the recording, re-simulated from reset to the end of the recording, and the page froze for all of it: a 40,000-cycle recording of the `RV/` RTL took about 5 s each time, the prebuilt core about 3 s per 10,000 cycles. **Checkpoints** (§5.11): a generated `cg3207_hdl_ck` module saves every reg and written memory of the design and the testbench every 1024+ cycles and restores one with `+CKLOAD`; the state is found by walking the sources from the Wrapper. A replay starts from the latest checkpoint before the input timeline changed, is joined onto the old recording and VCD, and must reproduce the old recording over at least 16 cycles first, or the run is repeated from reset and checkpoints stay off for those sources. After an input change the recording now reaches one *Cycles* past it rather than back to its old end. Measured: a DIP change at cycle 38,000 of 40,000 takes 1.4 s instead of 5.3 s (RTL), at 8,500 of 10,000 on the prebuilt core 0.8 s instead of 2.8 s, both joined recordings identical to the run from reset. **The worker**: preprocess, compile and simulate run in a module worker (§5.15), falling back to the page; during a 6 s simulation the page's longest stall was 21 ms. Reset now stops a running simulation, and an input moved during a run is applied where the run stops. HDL test section 15 covers the join, the waveform, an extension, a corrupted checkpoint and the `generate` refusal. |
-| **v24.126 (User Guide: CPI, Multi-Cycle Cycle Counts, Tone)** | `riscv_simulator.md` says that CPI is reported (multi-cycle and pipelined; mispredictions too with prediction on), and describes the multi-cycle model as having a user-configurable cycle count for each instruction type, naming the types (ALU, multiply/divide, load, store, branch, jump, floating point, system) instead of "the cycles set in its table". Remaining advisory and conversational phrasing was made neutral: "as they would in any Verilog simulation", "is a good first step", "which is useful for trying HDL mode", "can be designed as you like", "use the Memory panel for them", and the `ecall` explanation of what an FPGA lacks. |
-| **v24.125 (User Guide Without Course Context, in a Manual's Tone)** | `riscv_simulator.md` is public, so it no longer assumes the reader is taking CG3207: "the board" is introduced as a simulated Digilent Nexys 4 / Nexys 4 DDR / Nexys A7 with a Pmod OLED; `Wrapper` and `RV` are said to be the processor with its memories and memory-mapped I/O, and the processor; `CLK_DIV_BITS` is described as the board template's top-level divider of the 100 MHz clock; the datapath's values are said to come from the drawn datapath's decoder and control logic rather than "the reference design"; the hazard switches are named by what they forward (Writeback to Decode, Writeback to Memory) instead of "W→D" and "the mem-mem copy", and the branch predictor's entries hold a predicted direction rather than "PCSrc". Phrasing throughout is a user manual's: "a lint for constructs that won't synthesise" became a description of what the synthesis checks flag and that they appear in the console as warnings; punchy fragments ("It isn't.", "Start there.", "What catches people out") became plain sentences. One correction: *Typed* UART input arrives much more slowly than *Paste*, not at the same rate. CLAUDE.md's guide rule now says to avoid course context and to keep a manual's tone. |
-| **v24.124 (CLK_DIV_BITS Divides by 2^N)** | `RV/TOP_Nexys.vhd`'s divider counter was `CLK_DIV_BITS downto 0` with `CLK` taken from its top bit, so the CPU clock was 100 MHz ÷ 2^(N+1) and 50 MHz was unreachable: 0 bypassed the divider for 100 MHz and 1 already gave 25 MHz. The counter is now `CLK_DIV_BITS-1 downto 0` and `CLK` is `clk_counter(CLK_DIV_BITS-1)`, so the clock is 100 MHz ÷ 2^N and every power-of-two step from 100 MHz down is available. The `CLK_DIV_BITS = 0` generate branch is unchanged. `clkDivider()` follows as `2 ** clkDivBits`, which needs no special case for 0. At the unchanged default of 5 the CPU runs at 3.125 MHz instead of 1.5625 MHz, so a UART character at 115200 baud is 270 cycles rather than 135; `UART_CHAR_INSTR_DEFAULT`, the Paste box's initial value and its tooltip moved with it. The Clock tooltips now read 0 = 100 MHz, 1 = 50 MHz, 5 = 3.13 MHz, 26 ≈ 1.5 Hz. The OLED present-without-poll warning quoted 24,576 and 192 instructions at the default divider; it now computes the frame wait (15.73 ms) and page copy (122.88 µs) in cycles at the current clock, so it stays right whatever the divider. **Testing.** `test_pipeline.js` checks 100 MHz at 0, 50 MHz at 1, 3.125 MHz at 5 and ≈1.49 Hz at 26, and 540 / 270 UART cycles at 4 / 5; the real-time pacing checks in it and in `test_hdl_mode.js` moved up one step (18, 17, 13) to keep the same frequencies. `test_oled_swap_race.js` expects 49,152 cycles at the default. The user guide's clock and UART numbers follow. |
-| **v24.123 (User Guide Cut to What the UI Doesn't Tell You)** | `riscv_simulator.md` went from 611 lines of UI walkthrough (button tables, panel descriptions, the Settings inventory, waveform zoom controls) to a feature list and the technical behaviour a user would not infer from the screen: memory sizing against the Wrapper, the M-extension/libgcc trap, `ecall` on hardware, what the datapath's values are derived from, pipelined stepping and breakpoints, hazard switches and the BHT, the clock and what real time can keep up with, UART receive timing, the `OLED_STATUS` difference, and HDL mode's record-then-replay model, including that real time there is a playback and that an input change re-simulates from reset. Register-level peripheral detail and the Wrapper requirements now link to the course site's peripherals page and Asst_02 templates instead of restating them; running locally and the link to this document moved to the end. The About dialog and this document's **Live:** link pointed at `nus-cg3207.github.io/labs`, which now 404s; they point at the site root and the simulator's page under `rv_resources/web_sim/`. The feature list says GCC/Clang rather than GCC (Clang is the default), and the HDL engine is "simulated" rather than "cycle by cycle", since §5 explains it is a recording replayed. Only the Wrapper and RV interfaces are said to have to match the templates; the register view needs a 32×32 array inside RV, not a particular register-file interface, which is what §5.6 describes. |
-| **v24.122 (Real-Time Ratio on Slow Clocks)** | A real-time run measured the fraction of real time it reached every 500 ms. On a slow clock that window can hold less than one cycle, so a run that kept up exactly read ×0.00 between cycles at CLK_DIV_BITS 26 and about ×0.93 at 22. The window is now at least 50 cycles long, so only a real shortfall shows; at CLK_DIV_BITS 0 the browser still reaches about ×0.10. |
-| **v24.121 (BranchPred.svg 90 Shorter)** | StallF's label lies flat under the Fetch lanes instead of standing on its wire below them, so the Hazard Unit comes up 90 to just under the Mispredict lane, with StallD, FlushD and FlushE rising beside it. The drawing is 2759 × 1686. |
-| **v24.120 (PCF[k+1:2] Where It Is Taken)** | In `BranchPred.svg` the PCF[k+1:2] label sat on the riser below the PCF + 4 adder's tap, which carries all of PCF. It now sits on the branch into the BHT's RA, the only place the index bits are taken. |
-| **v24.119 (funct3 to PC Logic in the Pipelined Drawings)** | The pipelined drawings fed funct3 only to the Decoder, so PC Logic had no way to tell beq from bne or blt, unlike the single-cycle drawing. The lecture's `Microarch_pipelined.svg` leaves it out on purpose (pipelining is taught on a simplified processor, as the notes say) and stays as it is; the simulator's drawings show the processor it runs. `tools/pdp_build.py` now taps InstrD[14:12] between the RegWriteW riser and the Decoder, runs it over the Decoder and down between PCSD and RegWriteD as funct3D, and through E as funct3E into PC Logic, in `Microarch_pipelined_full.svg` and `Microarch_pipelined_bp.svg`. `BranchPred.svg` gets a funct3D/funct3E stub under PCSD/PCSE; PC Logic moves 50 right to fit the label, so the drawing is 2759 × 1776. The new wires light when a branch is in D (`d_funct3_pc`) or E (`e_funct3`). |
-| **v24.118 (PrPCF and PrTaken)** | The prediction signals are renamed in `Microarch_pipelined_bp.svg` and `BranchPred.svg`: PredPCF is PrPCF, and the BHT's PrPCSrc column, with its reads PrPCSrcF and PrPCSrcE, is PrTaken (PrTakenF, PrTakenE), since it holds a taken prediction rather than a PCSrc value. `tools/pdp_build.py` writes the new names, and the BHT table in the datapath's side column follows. Its Mispredict note reads `(PrTakenE ⊕ TakenE) + TakenE · (PrBTAE ≠ PCNextE)`, using the drawing's TakenE (PCSrcE[1] + PCSrcE[0]) where it had used PCSrcE as one bit, and the Branch prediction tooltip says the BHT predicts whether an instruction is taken rather than its PCSrc. |
-| **v24.117 (BranchPred.svg: the Predictor in Fetch)** | The opened Branch Predictor sat where Execute's ALU had been, right of the E register, so the BHT read as Execute hardware although Fetch is where it is read. The block now sits in Fetch under the instruction memory, as in `Microarch_pipelined_bp.svg`: D, E and PC Logic move right of it, Decode is closed up by 550 units instead of 400, and the lanes, the registers' feet and the Hazard Unit drop 260 units to pass under it. PCF and PCE[k+1:2] rise into it from their lanes; PCSrcE drops into it from the line above the registers; PredPCF, PCNextE and Mispredict keep their lanes to the Fetch muxes, and the separate PCF lane goes. The box is wide rather than tall: the PCF + 4 adder stands left of the BHT, the prediction mux (the Mispredict mux's size) under it, and the table has three rows. Under the table the two Fetch reads and the three writes take five distinct levels, so no read lines up with a write. The figure is 2709 × 1776, against 3030 × 1586 before. |
-| **v24.116 (Bit Indices in Brackets Throughout; the bp Base Mux's Inputs)** | The single-cycle drawing (`Microarch.svg` and the page's copy) named the bits of PCSrc, ALUSrcA and ALUSrcB with bare blue digits beside each split; they are now `[0]` and `[1]`, in the pipelined drawings' size 30, each set clear of its own wire. In the bp drawing and BranchPred.svg the PCE/RD1FwdE mux keeps the full drawing's size, place and wire into the adder, but its two inputs move to where every other 2:1 mux has them, rather than the full drawing's top two of three. |
-| **v24.115 (BranchPred.svg Cut from the bp Drawing; PCSrcE Bit Indices)** | The v24.102 `BranchPred.svg` redrew the fetch side in the pipelined drawing's style, which made it a second, different drawing of the same hardware. `tools/pdp_build.py --export` now also writes it as a crop of `Microarch_pipelined_bp.svg`: the PC, the next-PC adder and its muxes, the Mispredict mux, the instruction memory, the D and E registers, PC Logic and the Hazard Unit are that drawing's own elements, with Decode's interior dropped and the stage closed up by 400 units. The Branch Predictor block is opened where Execute's ALU was. Its ports are the bp drawing's (PCF, PCE, PCNextE and PCSrcE in; PredPCF and Mispredict out), and inside it are the BHT with its two ports, the PCF + 4 adder and the PrPCSrcF mux, and the check. PCSrcE enters as two bits and an OR of `[1]` and `[0]` makes TakenE, the one bit the XOR, the AND and the BHT's write data take, so the narrowing is drawn rather than implied. The PCSrcE selects carry their bits in the full and bp drawings too: `[0]` on the 4/ExtImmE mux; `[1:0]` on the full drawing's three-input base mux and `[1]` on the bp drawing's two-input one. In the figure, E is cut to D's height with PC Logic beside it and PCSrcE run back to Fetch above the registers, so the empty band the lecture's full-height E left is cropped (the figure is 1586 high rather than 2050). The BHT's columns are PrBTA then PrPCSrc, in one size, and each has its write port under it, WD and WE: PCNextE and BTA Mispredicted for PrBTA, Branch Mispredicted and TakenE for PrPCSrc, in that order so the lanes back from the check nest without crossing one another. The table runs down to the BHT's bottom edge and every port of a column is at its foot, named in a band under the rows: RD for Fetch's read (PrBTAF from PrBTA, PrPCSrcF from PrPCSrc), then WD and WE. The address ports are named inside the BHT: RA for PCF[k+1:2], RA/WA for PCE[k+1:2], which addresses both Execute's read and the write. The Hazard Unit sits 70 lower so the lanes clear its input labels. In the bp drawing (and so the figure) the PCE/RD1FwdE mux is now the full drawing's three-input mux less its PCF input: the same size and place, on the same PCE, RD1FwdE and adder wires, with its routes and mux table moved to match. `--embed` now writes the Branch Predictor dialog's copy of the figure as well as the two pipelined drawings and their tables, so `tools/bp_figure.py` is gone. |
-| **v24.114 (Single-Cycle Colours by Stage; Phone Status, Header and Heights)** | The single-cycle drawing coloured by kind (data red, instruction fields purple, control blue) and glowed every block orange, so the data memory lit orange, the Execute colour, at the Memory step, and purple, Memory's colour in the pipeline, meant instruction fields. Every step now lights its wires, blocks, mux paths and value chips in its stage's `PDP_COLOUR` (`dpStageColour`, applied as `--sc`), matching the pipelined drawing, its timeline and the clock strip; a wire keeps the colour of the step that first used it, as a forwarded value keeps its source stage's in the pipeline. Control signals stay distinguishable by weight; unused and don't-care paths stay grey. The Retire edge is red (Writeback) rather than green. **Phone:** the status message had `min-width: 0` and the longer stats line (time, CPI) squeezed it to one character per line; the status row now wraps, the status keeping at least 9em and the stats moving to a line of their own. The pipelined strip header was 43 px tall, the ⚙ button keeping the 36 px touch height meant for the step buttons (which now float) and the other controls stretching to it, and it started its controls at the left; it is now one 25 px row, right-aligned as in single-cycle. Even wrapped, the status took three lines beside a one-line stats run of ~300 px; the stats are now two halves (`.stat-half`) that a phone stacks right-aligned, with the separator between them (`.stat-sep`) hidden, so the status keeps the rest of the row and the block is two lines in every mode. The halves balance: Instr moves to the first half when CPI or Mispredicts lengthen the second. Phone heights also tightened so the datapath fits a 780 px viewport without scrolling: editor 240 → 208 px, panel body 246 → 278 px, toolbar buttons 32 → 30 px, toolbar padding/gap 6 → 5 px, tab-bar buttons 8 → 6 px vertical padding (the find button following, 39 → 35 px). |
-| **v24.113 (One Simulation Tab)** | Settings has three tabs: Compiler, Linker and **⏱ Simulation**, which replaces JS Simulation and HDL Simulation. It opens with what reaches both engines (Statement Stepping, the clock), each now a single control instead of a copy on each tab kept in step; below that, the active engine's settings only (`#simGroupJs` or `#simGroupHdl`, hidden by `refreshSimSettingsScope`), where the JS group used to be dimmed with a note in HDL mode. Switching to HDL with no sources opens this tab, which then shows them. Reset Defaults on it resets the active engine's settings. Messages that pointed at "Settings > HDL" now say Settings > Simulation. |
-| **v24.112 (A Clock, and Real Time)** | **The clock.** ⚙ Settings (both tabs, kept in step) takes `CLK_DIV_BITS` as `TOP_Nexys.vhd` does: the CPU clock is 100 MHz ÷ 2^(N+1), or 100 MHz at 0 (`cpuHz`). The stats bar shows the simulated time of the cycles so far beside the count. The UART's Paste gap is now derived from it, one character at 115200 baud being 8640 clocks of uart.vhd's 100 MHz (`uartCharCycles`: 135 at the default 5), and the box shows it read-only; Typed is still set by hand. UART delivery now counts clock cycles in every model (`uartNow` returns `totalCycles`), which in single-cycle is the same as instructions and in multi-cycle is now correct. **Real time** (the *Run* choice beside the clock; *Max speed*, the old behaviour, is the default). The JS run loop runs, each tick, the cycles the clock has owed since the run began, using the model's own cycle count, and waits for the next one; a tick works for at most 30 ms so the page keeps redrawing. More than a quarter second behind, the debt is dropped and the reached fraction shows in the stats bar (`×0.14 real time`). Measured: single-cycle holds 99.7% at 12.5 MHz, the pipeline 99.4% at 1.56 MHz, and 100 MHz reaches about a tenth. Below 1 kHz each tick also redraws the registers and the current line, so execution can be watched. **HDL playback.** vvp cannot be paced, so a run is recorded as before and then played back (`hdlPlayTo`): every frame seeks to the last instruction that has begun by now at the clock, and Run becomes Pause meanwhile; Step, Back, a new run or an input change stop it, and the run's summary and status are given when it ends. Measured against the reference core at 6.1 kHz: 2,000 cycles in 328 ms. The stats bar reads time, then cycles, then instructions. |
-| **v24.111 (Credit to Harris & Harris)** | Credits names Sarah L. Harris and David Harris, *Digital Design and Computer Architecture: RISC-V Edition*, for the microarchitecture terminology and some general ideas, and says the datapaths here are a different design from the book's. |
-| **v24.110 (Single-Cycle Steps Named by Pipeline Stage; a Clock Beside the Drawing)** | The nine single-cycle steps follow the pipeline's stages, so the two microarchitectures read as one story: Fetch; Decode · Decoder (the field fan-out and the Decoder's outputs, previously two steps), Decode · Register Read, Decode · Extend (split from register read); Execute · ALU and PC Logic (PC Logic's PCSrc moves here from the old Next PC step); Memory; Writeback · Register Write, Writeback · PC Increment (the target adder and its muxes), Writeback · Retire (the clock edge). Each phase carries a `stage`, and the header shows the stage name in the pipeline's colour for it (on a phone only the step name; the clock shows the stage). **The clock**: the single-cycle drawing's viewBox is widened 320 units to the left (`dpClockInit`, which reads the viewBox attribute rather than `viewBox.baseVal`, which jsdom lacks) and one clock period is drawn there: CLK, a rising edge at the top, high for the first half, low for the second, and the next rising edge at the bottom; beside it the nine steps as boxes in their stage colours, the current one solid, those done half-tinted (`dpClockUpdate`). At Retire the bottom edge is lit amber: the transition to the next instruction. Being part of the drawing, it scales with it and costs no height. The "Press ▶ to let the edge happen" sentence is gone from Retire's caption. |
-| **v24.109 (Arrows Walk the Single-Cycle Phases; a Caption That Keeps Its Height)** | With the single-cycle datapath on screen, → and ← move a phase, as the strip's ▶ and ◀ do, and → past the clock edge executes and moves to the next instruction as before; without it, or pipelined, they Step and Back. ◀ (and ←) at the first phase now goes back to the instruction before, at its last phase, instead of doing nothing, and is enabled whenever there is history. On desktop the caption keeps its height when empty: collapsing it at phase 0 gave the drawing its space, so the diagram zoomed in at each new instruction and back out at the next phase. On a phone, where the drawing scales by width, an empty caption still takes no space. |
-| **v24.108 (One Meaning per Key: Arrows Step, J K L Press, , . Nudge)** | → and ← are Step and Back (F8, Shift+F8), outside the editor and form fields. The push buttons, held for a momentary press, move from ← ↓ → to J K L, left to right as BTNL, BTNC, BTNR; the accelerometer nudge, hold X/Y/Z/T, moves from ← → to `,` and `.`, which sit left and right of each other as the sliders move. A first cut kept the arrows as push buttons while running and made them step only when paused, which gave one key two meanings. Stepping is deliberately not mentioned in the UI or the guide; the push-button and accelerometer hints and tooltips name their new keys, and the arrow under each push button is gone. The letters work with Shift or Caps Lock too (`<` and `>` count as `,` and `.`). |
-| **v24.107 (A Cross-Check for Any Microarchitecture; Statement Stepping in the Pipeline)** | **The cross-check** (`hdlCompareWithJs`) stepped the functional model in lockstep with the hardware trace by PC and compared registers after each step. The trace records one step per change of the Wrapper's `PC`, which is the instruction completing in a single-cycle core but the fetch PC in a pipeline, so any correct pipelined core failed: at the first taken branch, whose wrong-path fetches look like a PC divergence, or at the first register rewritten, since its write lands several steps after its fetch. It now compares effects: the sequence of register changes and the sequence of data-memory byte writes, the hardware's taken from the trace's `@@W` and `@@M` records (which now keep their own cycle) and the model's from `lastExecutedRd` and a `writeMem` wrapper during a replay from reset with the run's starting inputs. Both sides treat registers as starting at 0, as the hardware's do, so a first write of 0 is no change on either. The first difference is reported with its cycle, both values, and the instruction and source line that produced the model's; if an input changed during the run, the comparison stops at that cycle. `test_hdl_mode.js` [8a] passes a real single-cycle run, the same run rewritten as a pipeline would record it (every register write four fetches late, wrong-path fetches between), and reports a corrupted value at its own cycle. **A pipelined core** is noticed after a run (`hdlLooksPipelined`: most register writes land in a step whose instruction has a different `rd`), and the console says that Step, Back, breakpoints and the instruction count follow the fetch PC. **Statement Stepping** now works pipelined: a Step clocks until the statement's last instruction has left Write-back (`pipeStatementStep`). The statement is the oldest instruction's, and only W, M and E are consulted after that, since D and F may yet be flushed; a breakpoint entering Execute also stops it. The strip's ▶ still clocks one cycle. |
-| **v24.106 (The Strip's ⚙ Opens Settings; Settings Work From the Start)** | The JS model's Settings controls (the microarchitecture select, the hazard switches, branch prediction) got their `onchange` handlers from `pipeInitControls`, which only ran when the Settings dialog was first built. Until then they changed nothing: ticking branch prediction in the strip's popover before ever opening Settings showed a tick that did not reach `pipeBP`, and the next step ran without it. `initDatapath` now wires them at load. The popover, which moved the Settings card's switches into itself and back, is gone; the ⚙ beside Pipelined opens Settings on JS Simulation, scrolled to the Microarchitecture card (`openPipeSettings`). On desktop the strip's controls stay right-aligned in pipelined mode: the rule that starts them at the left when the instruction slot is empty is now phone-only. |
-| **v24.105 (The Saved Testbench Replays the Run; Only the Chosen Model's Settings)** | Download → Testbench used to save the generic testbench, which reads the program-independent run settings as plusargs and the recorded inputs from `stim.mem` and `uart_rx.mem`; a student got none of those, so the saved file could not reproduce what the page had shown. `hdlBuildTestbench({ run })` now bakes one run in as the defaults: the cycle budget, the switch, button and accelerometer values at cycle 0, and every timed input change and UART byte, written into `stim_mem` and `rx_mem` by an `initial` block, with the header saying what it replays and that `AA_IROM.mem` and `AA_DMEM.mem` go beside it. The plusargs still override, and the page's own runs still use the generic form with everything supplied at run time. Saved in JS mode or before any HDL run, it starts from the inputs as they are, with no timeline (`hdlCurrentInputs`, which leaves the recorded run's base alone). `test_hdl_mode.js` [7b] compiles such a testbench, runs it with only the two program images and no plusargs, and checks that the LEDs show the starting switches and then the mid-run change, identically to the same run through the generic testbench and a stimulus file. Also, the JS model's settings show only what the chosen microarchitecture uses (the hazard and prediction switches for the pipeline, the cycle table for multi-cycle, neither for single-cycle) instead of dimming the rest; the cycle table sits inside the Microarchitecture card, as the pipeline's switches do. |
-| **v24.104 (Single-Cycle, Multi-Cycle or Pipelined)** | The JS model's *Microarchitecture* is a three-way choice. "Single-cycle" used to take its cycle count from the per-category table, which is a multi-cycle model under the wrong name; it now counts one cycle per instruction, Multi-cycle is the table (moved up to sit under the choice, and dimmed otherwise), and the pipeline counts clock edges as before. `jsArch` holds the choice; `pipeMode` is kept as `jsArch === 'pipe'` for the pipeline code, and `pipeSetMode` is a wrapper over `setJsArch`. Switching between any two resets the program, since the count so far belongs to the other model. The stats bar tags the count `single`, `multi`, `pipe` or `hw`, with CPI for multi-cycle as well as pipelined. Multi-cycle has no drawing, so it blocks the Datapath button as an undrawable program does, with its own tooltip; the strip's dropdown still offers only Single-cycle and Pipelined. Also: the Linker tab's "FPGA Hardware Notice:" label is gone, leaving its one line. |
-| **v24.103 (Phone: No Panel Headers; the Floating Steps Fixed)** | On a phone only one panel shows at a time and the lit tab names it, so panel headers are hidden there; the filter they carried, for Registers, Memory, Disassembly and Locals, is a 🔍 at the right end of the tab strip, outside its scrolling part, acting on the current tab (`updateMobileFindBtn`, refreshed by `applyPanelDock`). Desktop keeps its headers, since panels stack and float there. The floating step buttons never appeared on a real phone: `floatOnDpTab` tested `body.dp-open`, which is the desktop strip's state, not the phone panel's (browser checks had passed only because that session had once opened the desktop strip). It now tests the datapath panel's visibility, so the header drops its own ◀ ▶ ▶▶ and fits; its empty instruction and phase slots take no space and the controls start at the left. The phone timeline is as tall as its rows instead of the diagram's 300 px minimum. |
-| **v24.102 (BranchPred.svg Redrawn Again; the Branch Predictor Opens)** | The v24.97 drawing used the pipelined drawing's shapes but not its conventions: labels in several sizes and weights, explanatory text and equations on the canvas, and every E-side signal gathered into a bundle off the BHT's right edge, run across to gates in the far corner. `tools/bp_figure.py` now lays it out as `Microarch_pipelined.svg` is drawn: every wire label 37 regular, placed on the wire at the block it leaves or enters, control and its labels blue, only block names 46 bold, no prose; PC Logic as that drawing's two-line rotated block; the stalls, flushes and Mispredict running down to a Hazard Unit bar. The BHT sits below Execute, so its second port takes PCE, PCSrcE and PCNextE from directly above, the misprediction check (XOR, ≠, AND, OR) is beside it, and the two write enables enter from below; only port 1, the index from PCF and the prediction back to Fetch, runs the width of the drawing, as the lecture drawing's rdE and ResultW do. In the simulator, clicking the pipelined diagram's Branch Predictor block (pointer and tooltip on hover) opens this drawing in a dialog, embedded by `tools/bp_figure.py --embed` so it works offline; Escape or ✕ closes it. |
-| **v24.101 (A One-Row Datapath Header; Captions Below the Drawing)** | On a phone the single-cycle strip spent three rows above the drawing: the instruction with "ready · 9 phases", the dropdowns wrapped below it, and a caption telling the user to press ▶ or ▶▶. The idle status and the hint are gone, and an empty caption takes no space. While stepping, the header shows the phase ("2/9 Decode") on the same row as the instruction and the dropdowns: on a phone the header no longer wraps, its type is a size smaller, the instruction drops its address and gives way with an ellipsis. The caption, single-cycle and pipelined, is now below the drawing (`order: 1` in the strip's column), so nothing sits between the instruction and its picture. |
-| **v24.100 (A Timeline That Fits Across)** | The timeline no longer scrolls sideways. `pdpRenderTimeline` builds the chart with up to 18 cycles, measures it, and rebuilds it with only as many as fit the strip's width, working from the label column's width and the per-cycle width it just measured; at a 500 px strip that is 7 cycles, at 700 px 15. On a phone it shows only the rows in flight (the up to five instructions and any bubbles), starting at the cycle the oldest of them entered, with no addresses in the labels, which alone would have taken the width of several cycles. |
-| **v24.99 (Floating Step Buttons on a Phone; Bubbles in the Timeline)** | **Step buttons float on a phone** (`#floatSteps`, `updateFloatSteps`): a small pill of 36 px buttons at the bottom right, below dialogs in the stacking order. On the Datapath tab it is always there and is the strip's ◀ ▶ ▶▶ (`body.float-dp` hides the header's own copies, which is also what lets the pipelined header fit a phone's width: with them it was 453 px in a 368 px strip, ▶▶ and the speed clipped). Elsewhere it appears once the toolbar's Step is less than 60% on screen (an `IntersectionObserver`): the strip's controls when pipelined, where they step cycles, otherwise the toolbar's Back and Step, which covers HDL mode and its waveform. It mirrors the source buttons' enabled state from `updateToolbarButtonStates`, the HDL override included, so an asynchronous HDL step re-enables it. Stepping also stopped dragging a scrolled phone page back to the top: the executing line was centred with CodeMirror's `scrollIntoView` effect, which scrolls every scrollable ancestor, the window included, whenever the line is outside the editor's view; `centreEditorLine` now scrolls the editor alone. Disassembly's follow-the-PC scroll likewise moves only its panel body, allowing for the sticky header, and now also runs on the phone tab, which its docked-or-floating test had left out. **The cycle count.** The pipelined strip header no longer shows its own count, which crowded the phone header and read one ahead of the log (the header gave the cycle about to be clocked, the log the one just clocked); the timeline's live column is headed **next** rather than numbered, for the same reason. **Bubbles in the timeline.** A stage left empty used to show as nothing, so a stall or a flush looked like four instructions in flight. `pdpRenderTimeline` now works out each bubble from consecutive columns: an empty stage whose predecessor stage held an instruction the cycle before is a nop of its own if that instruction is still there (a stall, or a serial instruction's drain), and that instruction, quashed, if it is gone; a bubble then moves on a stage a cycle. The nop gets a row, "bubble (nop)", between the instructions it separates; a quashed instruction's row goes on, labelled "→ bubble (nop)", its later cells dashed. A serial instruction leaving D by executing, and the pipeline filling or running dry, are just empty. The trace gains a `serial` flag for that, and the chart looks four cycles behind its window so a bubble already in flight at the left edge still has its row. GoatCounter's site code is set (`cg3207sim`). |
-| **v24.98 (Pipeline Controls in the Strip; Phone Layout; Feedback)** | The strip's view toggle, a lone "Timeline" button that was easy to miss, is a Diagram | Timeline switch with the active half lit. A ⚙ beside the Pipelined dropdown pops up the pipeline settings: the Settings card's own hazard switches and branch-prediction controls move into the popover while it is open (`pipePopToggle`) and back when it closes, so there is only ever one set. The timeline was not scrolling itself: with the side-column layout's `align-items: flex-start` it grew to its content and the strip body scrolled instead; it now stretches to the strip and keeps the newest cycle and row in view, its header row opaque above the rows scrolling under it, and rows for instructions no longer in the pipeline are dimmed so the up to five in flight stand out. On a narrow strip the encoding column goes below the drawing instead of above it (`dp-enc-below`), and on a phone the drawing scales to the panel's width instead of a fixed 960 px, the encoding card scrolling sideways within itself. The phone toolbar's second row holds Undo, Redo, Find and Settings as 40 px icon buttons beside Datapath and Download, instead of wrapping Settings onto a row of its own. Credits gains a Feedback button (a `mailto:` assembled at click time, so the address is not in the page for a scraper) and the address as rajesh&lt;at&gt;nus.edu.sg, and a visit count from GoatCounter (open source; no cookies, ads or banners): the visit is counted by its no-JavaScript image request, so none of its script runs in the page, and the page's total is fetched when Credits opens. It is off until `GOATCOUNTER_SITE` holds the site code, and never counts a local copy (`file:`, `localhost`). |
-| **v24.97 (BranchPred.svg Redrawn as Vector)** | The course's `BranchPred.svg` was a PNG wrapped in an SVG. It is now drawn by `tools/bp_figure.py` as plain vector shapes and text, in the style of `Microarch_pipelined.svg` (data black, control blue, and that drawing's mux, adder, register, clock and memory shapes, line weights and fonts), with the original's level of detail (the BHT as a table; the check at gate level with the XOR, the comparator, the AND and the OR), but as the simulator implements it: the target and the recovery PC are both PCNextE from the next-PC adder, (PCE or RD1FwdE) + ExtImmE or PCE + 4, so `jalr` is covered and the figure's correction mux and the PCPlus4 and predicted target carried through D and E are gone; the BHT's second port reads and writes at PCE; each PrPCSrc is one bit or a 2-bit counter; and Mispredict selects the PC and drives FlushD and FlushE. |
-| **v24.96 (Branch Prediction for the Pipeline)** | An option of the pipelined microarchitecture, off by default, set in Settings with a 1-bit or 2-bit predictor and 4 to 256 entries; changing any of it resets the program. A BHT indexed by PC[k+1:2], untagged, read in F before decode, so every instruction is predicted (`pipeBhtIndex`, `pipeBhtTaken`): each entry holds a predicted PCSrc (one bit, or a saturating counter whose top bit is the prediction) and a predicted target. F fetches PrBTAF when PrPCSrcF, else PCF + 4. The next-PC adder's result for the instruction in E, PCNextE (its target if PCSrcE, else PCE + 4), is both the recovery PC and what the predicted target is checked against: Branch Mispredicted = PrPCSrcE xor PCSrcE, BTA Mispredicted = PCSrcE and PrBTAE != BTAE, and either flushes D and E (the flush switch reads "Flush on misprediction") and loads PCNextE. The 1-bit entry is written on a branch misprediction and the target on a BTA misprediction, as in the course's BranchPred figure; the 2-bit counter steps on every instruction in E, which is what "every instruction is predicted" makes of a counter. Unlike the figure, the prediction is not carried through D and E: a second read port at PCE gives E the same entry F saw, since the table only changes when that instruction mispredicts (flushing everything younger) or, for a counter, by a step that cannot flip its top bit. A serial instruction (FP, `ecall`) executes in D and never reaches E, so with prediction on it always redirects to its own next PC, dropping a fetch that may have followed a wrong prediction made for it. The BHT is copied whole into each Step's snapshot. With every switch on the model still matches the functional engine retirement by retirement, with 1-bit, 2-bit and a 4-entry table, and the hand-worked counts hold: a 10-iteration loop takes 46 cycles unpredicted, 32 with 1-bit (the first taken and the exit), 34 with 2-bit from 00; a nested loop mispredicts 6 times with 1-bit and 5 with 2-bit; a 4-entry table ping-pongs between a branch and the instruction sharing its entry. The stats bar counts mispredicts and the Timeline marks them. **The drawing** (`Microarch_pipelined_bp.svg`, also embedded): a Branch Predictor block below the instruction memory, as the Hazard Unit and PC Logic are blocks, with PCF, PCE, PCNextE and PCSrcE in and PredPCF and Mispredict out; a Mispredict mux in front of the PC, which moves 40 units right to make room, clock line and all (it is a wire in the source, not a shape, so it has to be moved with the wires); the next-PC adder's PCF input gone, its base mux now PCE or RD1FwdE; and the hazard unit's PCSrcE input relabelled Mispredict. The PCF + 4 adder and the PrPCSrcF mux are inside the block rather than drawn, because as separate parts the recovery path and the prediction path had to cross in front of the PC; the side column lists the BHT live, with the entries F and E read marked, and the Mispredict equation. The drawings are now built by `tools/pdp_build.py` (`--embed` rewrites them and their route tables in the page, `--export` the standalone SVGs), reconstructed after the scratch copy was lost and checked to regenerate the embedded full drawing element for element and `Microarch_pipelined_full.svg` byte for byte. `BranchPred.svg`, the course's figure, is committed alongside. Also: the encoding grid's bit columns went from 10 to 13 px, so narrow fields' names (`funct3`, B-type's `imm[4:1|11]`) are no longer clipped; the control table had already widened the card. |
-| **v24.95 (The Control Table Beside the Single-Cycle Datapath)** | Below the instruction's encoding, left of the single-cycle drawing, the Decoder's truth table as slide 24 gives it (`dpControlTable`, from `DP_CONTROL` in the lecture's row order): opcode, PCS, MemtoReg, RegWrite, MemWrite, ALUSrcA, ALUSrcB, ImmSrc and ALUControl, with the ALUControl[0] footnote. The row the instruction selects is lit, and a DP row also shows the ALUControl its funct3/funct7 work out to. MemtoReg stays x for store and branch here, as in the single-cycle design; only the pipeline decodes it as 0. The encoding and the table form one column, beside the drawing when the strip is at least 900 px wide and above it otherwise, the rule the pipeline's encodings already used; the corner-fitting placement it replaces (`DP_ENC_CORNER`) could not hold the taller column. |
-| **v24.94 (The Editor Up a Second Sooner)** | A load trace showed the page idle for most of a second before the editor came up: CodeMirror was requested from jsDelivr first, and jsDelivr can only serve this repository while it is public, so every load waited for that request to be refused before trying `vendor/codemirror/`. The vendored copy is now first, with a `<link rel="preload">` in `<head>` so it downloads while the page is still parsing, and jsDelivr is the last resort. The datapath strip no longer renders while hidden (`dpSync` and `dpPlaceEncoding` return early; showing it syncs with force), which took a forced reflow out of every boot with the strip off. Locally, LCP went from about 2.0 s to 0.3 s and the editor is interactive at about 0.9 s instead of 1.9 s. Also removed what the pipeline's iterations left behind: the unused `pipe.sig` and trace `drain` fields, the pipelined encoding-corner constant `dpPlaceEncoding` never reaches, the waveform header's click-to-unfold handler (there is no folded bar any more), and the select branch of the hazard switches, which are all checkboxes now. The panel refreshes still run a few times each during boot (Disassembly six times), but together cost about 20 ms. |
-| **v24.93 (Visualisation on a Toolbar Button; Off for Programs It Cannot Draw)** | The datapath (JS mode) and the waveform (HDL mode) are one toolbar button, **⧉ Datapath** or **∿ Waveform** by engine, instead of strips folded to a header bar at the bottom: off means gone, and each strip's ✕ hides it. On a phone the button shows or hides the panel tab. The diagrams are a view, not a condition for running: `dpBlocker()` scans the assembled text segment with `dpUnsupported`, and a program with any instruction neither diagram draws (`mul`/`div`, byte and half-word loads and stores, anything without a decoder row: FP, atomics, `ecall`, `fence`) disables the button, with the first such line in its tooltip, and closes the strip until a drawable program is assembled, when it comes back if it was asked for. The in-diagram notes for those instructions are gone with it. Of the assembly examples, `Circle_delay_accel` and `ImageDisplay_autoadvance_accel` (`lbu`) and `fibonacci` and `rars_syscalls` (`ecall`) are not drawable. |
-| **v24.92 (A 5-Stage Pipeline, Cycle by Cycle)** | A second microarchitecture for the JS engine, chosen in Settings → JS Simulation or in the datapath header; switching resets the program. **The model** (`pipeEvaluate`/`pipeClock`) is cycle-accurate rather than a timing overlay: values travel through the D/E/M/W registers and the hazard unit (ForwardAE/BE, Forward1D/2D, ForwardM, lwStall, StallF/StallD/FlushD/FlushE) is evaluated every cycle, with the register file and data memory written on the same edge as the stage registers. `pc` is PCF. That is what lets each part of the hazard unit be switched off and give the wrong answer the hardware would (no E forwarding reads the stale register; no load-use stall forwards the load's *address* from ALUResultM; no branch flush executes both instructions behind a taken branch). It is the lecture's pipeline with three corrections: lwStall stalls only for a register the instruction in D really reads, not for rdE = x0 and not for a store's data, which ForwardM delivers (as written it stalled every `sw` behind its `lw`, so ForwardM could never fire); MemtoReg is 0, not x, on stores and branches, since lwStall and ForwardM read it as "this is a load" and an x resolving to 1 would forward garbage into memory; and an ALUSrcA mux, a 4 on ALUSrcB and a PCF/PCE/RD1 base for the target adder (PCSrcE two bits) carry `lui`, `auipc`, `jal` and `jalr`, which the lecture's drawing has no hardware for. `mul`/`div` take one cycle in E; anything else (FP, atomics, `ecall`, `fence`) waits in D with StallF/StallD/FlushE until E, M and W are empty and is then executed there by `decodeAndExecute`, as a trap would serialise it; a flush takes priority over that wait, and a taken branch still loads the PC during it. With every switch on the model matches the functional engine retirement by retirement (`test_pipeline.js`: a hazard-dense program, plus four examples for 1,500 retirements) and gives the textbook cycle counts (n + 4, +1 for a load-use, +2 for a taken branch or jump). **Integration.** Step and Back are one cycle (the pipe is snapshotted per step; stage records are immutable, so a shallow copy is the snapshot); Statement Stepping and the CPI table are dimmed; the stats bar shows `pipe` cycles, retired instructions and CPI; the UART's character time is counted in cycles (`uartNow()`); a breakpoint stops the run when its instruction enters E, the first point at which it cannot be flushed; the program finishes on the exit `ecall` or once the pipe has drained with PCF on no instruction. The editor gets a stage gutter and Disassembly stage badges. **The diagram.** `Microarch_pipelined_full.svg`, new: the lecture's `Microarch_pipelined.svg` with the corrected hardware drawn in (a 140-unit gap opened in Execute for the ALUSrcA mux, which sits beside the ALU in line with ALUSrcB's; ALUSrcB's and the PC base mux with three inputs; PCE, 0, 4 and RD1FwdE wires; ALUSrcA's control on the upper line so ALUSrcB's comes down without crossing it), no wire drawn through a stage register, and bus labels raised clear of a lit stroke. The embedded copy is built by script: every wire exploded into straight pieces and split at T-junctions and at each stage register's edges, routes given as waypoints whose pieces are found by coverage. One step is one clock, drawn whole: each stage in its colour (a forwarded value in its source stage's), the hazard unit's active outputs and why, each stage's instruction above it, and the five encodings beside it in program order. An earlier cut split each cycle into phases and offered the lecture's drawing as a variant; both went. **Timeline** swaps the drawing for the pipeline chart, stalls hatched and flushed instructions struck out, from a per-cycle trace kept as a linked list pruned to 256 cycles so Back restores it for free. |
-| **v24.91 (The Lecture's Datapath, Animated One Phase at a Time)** | A **Datapath** strip under the editor in JS mode (a panel tab on a phone, as the waveform is) shows the lecture's single-cycle microarchitecture - `Microarch.svg`, the slide-23 diagram with link and `jalr` - and takes the instruction at the PC through it in nine phases: fetch, decode, control, register read, execute, memory, write-back, next PC and the clock edge. Values travel along their wires as labelled chips and park beside them; data wires light red, instruction fields purple, control blue; a value that no mux or enable lets through is drawn dashed, and a don't-care control dotted grey. Muxes draw the path their select bit chooses. **▶** advances a phase, **◀** goes back one, **▶▶** plays the rest; stepping past the clock edge executes exactly one instruction (Statement Stepping is ignored for that step), which is the only moment state changes, as in the hardware. **The values are computed, not borrowed.** `dpEvaluate()` implements slide 24's decoder table and slide 25's PC Logic, which `RV/Decoder.v` and `RV/PC_Logic.v` match row for row, plus `Extend.v` and `ALU.v` including how the flags come from the adder whatever the op. It does not read the functional model's result, so the diagram shows what that hardware does; `test_datapath.js` then holds it to the simulator instruction by instruction over a program that exercises all nine decoder rows, all ten ALU operations and every branch condition both ways, and a one-off run over six of the example programs found no disagreement in about 1,500 instructions. The drawing is embedded with a `viewBox` and a `data-e` index on each element; `DP_ROUTES` maps the flat PowerPoint export's segments to named wires by hand, with park points where a bus has no room beside it. Each route runs from its net's source, so a trunk is lit by whichever branch uses it and an unused branch is dashed only from its junction on. That needs every drawn segment to end at a junction, and ten of the original's ran straight through one (the PC out, RD1, RD2, ExtImm, ALUResult, funct3, and the ALUSrcA/ALUSrcB/PCSrc buses): an `addi` greyed out all of ALUResult because its branch to data memory was unused, lit the whole ExtImm vertical down to the PC adder, and lit the PC bus all the way to the ALU. The embedded copy splits those segments into `a`/`b` halves at the junction, and `test_datapath.js` checks that no wire segment runs through another's junction. The two select buses also carry each bit on its own route, so `ALUSrcA = x0` shows bit 0 as a real select and only bit 1 as a don't-care. **The instruction's encoding** sits beside the diagram: its format, the 32 bits grouped into that format's fields (coloured by destination: Decoder, register file, Extend), bit positions, what each field decodes to, and the immediate `Extend.v` gathers. Shift-immediates show their real funct7/shamt split, since bit 30 is what makes `srai`. It is HTML rather than part of the drawing, so it stays at UI text size at any zoom: `dpPlaceEncoding()` puts it over the empty corner left of the Instr bus when it fits (maximised, on a laptop-sized window or larger), in the margin beside the diagram when the drawing is narrower than the strip (the default strip), and above the diagram otherwise (the phone tab). An earlier version drew it inside the SVG, where 32 bits across the 750-unit corner came out near 11 px. Instructions the diagram cannot show - `mul`/`div` (MCycle), byte and half-word loads and stores, `ecall`, anything with no decoder row - say why in the caption, and ▶ executes them anyway. The strip follows the page through the toolbar and register refreshes, comparing a state stamp first so an unrelated refresh costs nothing; a new instruction restarts at phase 0 and a register edit re-evaluates the current phase in place. It stands down in HDL mode, where the waveform owns that slot. `test_panel_grid.js` and `test_hdl_mode.js` each list the panel tabs and now include it. |
-| **v24.90 (Every Encoding Checked Against GNU as; One FP Register File; the Open Items Closed)** | The items v24.89 left open, and what closing them turned up. **Encodings.** A one-off sweep assembled every mnemonic in `INSTRUCTIONS`, plus the optional operand forms, with both this assembler and GNU as 2.42 (`-march=rv32imafd_zifencei`). It found three more classes of wrong machine code, each self-consistent with the simulator's own decoder and so invisible until compared: the RV32A table held funct5 in the funct7 field, so `lr.w` encoded as `amoadd.w.aq` and every AMO was shifted two bits; FP instructions with an rm field encoded rne where GNU as writes dyn; and a bare `fence` encoded `fence 0, 0` rather than `fence iorw, iorw`. The sweep also showed that the three-operand `jalr rd, rs1, imm` - the form the Native column prints for every `call` and `tail` - **dropped the immediate**, so a callee not 4 KB-aligned from its call site was missed. All 122 now match, and the words are kept in `riscv_simulator_tests/gnu_encodings.json`, which `test_comprehensive_suite.js` [17] replays so the check no longer needs a toolchain. An optional rounding-mode operand is accepted wherever the rm field exists; arithmetic still rounds to nearest even, the conversions to integer honour it. `fence` takes its pred/succ sets. **One FP register file.** F and D had separate arrays, so `fld` then `fmv.x.w` read a different register than it wrote. There is now one 64-bit register per f register, over one buffer, with singles NaN-boxed: a single read from a register that is not boxed reads as the canonical NaN, `fsd` of a single stores the box, and loads, stores, moves and sign injection work on the bits rather than round-tripping through a JS number, which would lose a NaN's payload and the box with it. fmin/fmax return the non-NaN operand. The FMA group shares one expression. **Atomics.** `sc.w` always succeeded; there is now an lr.w reservation, spent by the sc.w that uses it and captured in back-step history. `sc.w` no longer reads memory first, which on an MMIO address would have consumed a UART byte. **MMIO.** The two if-chains of `handleMMIORead`/`handleMMIOWrite` are gone: each entry of `MMIO_REGISTERS` carries its own `read`/`write` and the Peripherals section it unfolds, the handlers pick the lanes an access covers, and the register addresses are `const`. An access that straddles into the MMIO window, or across two registers, was classified by its first byte alone; it now goes byte by byte, each byte to where its own address decodes. An MMIO word with no register behind it was shown as editable scratch memory while every write to it was dropped; it is now read-only with a tooltip saying why, and a byte inside a read-only register is refused as the whole register is (only the word's first byte was checked). In HDL mode the MMIO rows would have thrown on an unmapped word, whose read-only title dereferenced a register that was not there. **Smaller.** `la`/`call`/`tail` are encoded through `pushInstr`, so their rows carry the immediate readings every other row has. `li` with a label is always `lui` + `addi`, as GNU as makes it, so the two passes cannot size it differently. A Memory-panel edit to OLED DATA after a present no longer raises the race warning meant for programs. **Checked, not changed.** `DIP_to_LED.asm` needing `auipc` for `lw s3, delay_val`: the shipped `RV/AA_IROM_DIP_to_LED.mem`, which RARS built, contains the same `auipc`, word for word what this assembler produces, and `RV/Decoder.v` decodes `auipc`. [17] now asserts the two images stay identical. |
-| **v24.89 (A Second, Line-by-Line Pass: Silent Wrong Answers, a Dead Editor Layer, and Some Hot-Path Work)** | The v24.88 audit was driven by pattern searches; this one read the whole script. **Every defect below produced a wrong result with nothing on screen to say so**, and each now has a check in `test_comprehensive_suite.js` [16] that fails against v24.87. **Assembler.** `%lo()` subtracted `hi20 << 12` from the address, and for anything with bit 31 set the shift comes out negative, so `%lo(0xFFFF0064)` was 2<sup>32</sup> + 0x64 and the line would not assemble; it is now the low 12 bits read as signed. `li t0, nosuch` fell through to `Number('nosuch')`, which is `NaN`, and emitted `lui x5, 0` / `addi x5, x5, 0` without a diagnostic; it now reports the unknown symbol, and a value past 32 bits is refused rather than truncated. `li` also went through a different parser in each pass, so `li t0, 0b101` was sized as two instructions and emitted as one; `parseImm()` now reads `0b` literals and both passes call the same expansion. A line holding only values continues the data directive above it, but pass 1 recognised that for every data directive and pass 2 only for seven of them: after `.short`, `.long`, `.int` or `.quad` the continuation line was an "unknown mnemonic" and every later label pointed at the wrong bytes. Both passes now read one `DATA_DIRECTIVE_WIDTH` table. `.space 0x10` reserved nothing, because its size went through `parseInt(…, 10)`. **Execution.** `amomin.w`/`amomax.w` compared memory read back unsigned against a signed register. `fclass.s` shared `fmv.x.w`'s funct7 case, which required funct3 = 0, and `fclass.d` had no case at all, so neither ever wrote rd; `fclass` itself put +∞ in the qNaN bit and a NaN in the sNaN bit, and had no subnormal class. The FP-to-integer conversions truncated and then wrapped through the `Int32Array` instead of saturating, and ignored the rounding mode. Worse, **`fcvt.wu.s` and `fcvt.s.wu` were encoded with the funct7 of `fcvt.w.d` and `fcvt.d.w`** - the unsigned variants are told apart by rs2, which the table had no field for - so `fcvt.wu.s` executed as a double-precision conversion of the D register file. The table now carries rs2, the conversions round per their rm field (rne when none is written, since frm is never set) and saturate, and `fcvt.w[u].{s,d}` take an optional rounding-mode operand, as GCC emits for a C cast. **Editing.** Committing an edit to any of x16-x31 also wrote `dregs[idx - 16]`, so changing a7 overwrote an FP register. The register and memory-word popups treated any string of hex digits as hex, so `42` typed into the decimal column became 66; `0x` now means hex, plain digits decimal, and a letter still makes bare hex unambiguous (`parseEditedWord()`). Resetting the Linker tab wrote the defaults into the live layout, so the Apply that followed compared the new layout with itself, saw no change and did not reassemble; it now fills the fields and leaves Apply to commit them. Resetting the Compiler tab changes its controls from script, which raises no change event, so it now retires the compiled program itself. The waveform strip's **Turn it on and re-run** called `hdlResimulate()` without a position (seeking to `NaN`) or with no recording at all (a `TypeError`); it now queues the same replay an input change does. A step that threw left `stepOnce()` without a history entry, so Back could not undo what it had written first; the entry is now recorded either way. **Removed.** A whole editor layer from before CodeMirror: its autocomplete popup (markup, 160 lines of CSS, a dozen functions and their `window` exports) and the Tab/Enter/comment/move-line/bracket handlers, all keyed on an `asmEditor` id no element has. Also the unused 4 MB `memory` buffer, which `initializeState()` reallocated on every reset and therefore on every HDL seek; the `MMIO_GETC`/`MMIO_PUTC`/`MMIO_STATUS` aliases (written, never read, and mapped to the wrong registers); `highlightSyntax()`, `resetCompilerConfig()` (unused, and with defaults contradicting the page's), and other write-only state. **Refactored.** One `downloadTextFile()` for the four copies of the Blob-and-anchor download; one `dumpSegment()`; one padding and alignment helper per pass in place of seven hand-written copies; one path for `op reg, symbol, rt` loads and stores; the C data-size estimate reuses the assembler's section and width tables; the register completion entries (previously 12 of the 64 FP names) are generated from `ABI_NAMES`. The `.text`/`.data` hover text gave 0x10000 and 0x20000 as the defaults. **Performance.** A UART transmit no longer repaints the whole transcript per byte during a run (quadratic in the output length, with a forced layout from reading `innerText` back), and RX delivery no longer re-renders the peripherals and memory panels per byte mid-run; a run refreshes both once per batch. MMIO reads and writes no longer touch the DOM. The waveform grid steps by its label spacing when cycles are narrower than 4 px (a fitted 2M-cycle trace drew one line per cycle) and finds the first visible transition by binary search. Disassembly split the C source once per row; completion and hover re-scanned the document for labels on every event; a splitter drag wrote localStorage on every pointermove. |
-| **v24.88 (A Pass Over the Page: Four Defects, Some Dead Weight, and Comments That Were Changelog)** | A mechanical and by-hand audit of `riscv_simulator.html`. **Four things were actually wrong.** `resolveAddrRef()` parsed a symbol offset with `parseInt` and no radix, while the regex feeding it accepted `[0-9a-fxX]+`: `la t0, msg+1f` silently resolved to `msg+1`, thirty bytes off, with no diagnostic. It goes through `parseImm()` now - the assembler's own number syntax - and a bare-hex offset is rejected rather than truncated, while `0x1f` and `31` still work. **`la`, `call` and `tail` printed an `auipc` operand that `auipc` cannot encode**: `signedHex(hi20 << 12)` is the address the upper half stands for, so `la t0, msg` read `auipc x5, 0xfc10000` where the `lw`/`sw` symbol expansions, built from the same `pcRelHiLo()`, read `auipc x5, 64528`. The encodings were identical and always had been - `0fc10297` either way - but a student reading the Native column saw an instruction that would not assemble, and saw the two expansions of the same idea spelled differently. Both halves now print the field, decimal, matching the load and store paths; `signedHex()` had no other caller and is gone. **`escapeHtml()` escaped `&`, `<` and `>` but not quotes**, and eight of its callers interpolate into a double-quoted attribute - waveform signal paths and uploaded file names among them, which is where a quote could realistically come from. It covers `"` and `'` now; every call site builds `innerHTML`, so nothing renders an entity as text. **`updateToolbarButtonStates()` still managed `btnDumpTxt` and `btnDumpData`**, buttons that left the page when the Download menu was unified; the section is gone and the ones after it renumbered, which also resolves a duplicate "3.". **Dead weight removed**: three `.header .subtitle` rules and three `.mo-icon`/`.mo-word` rules, all matching no element since the redesigns that took the markup out; `formatNativeInstruction()`, a one-line wrapper with no caller; six Settings shims that were neither called nor exported, so nothing could reach them - the two that *are* exported stay, with a comment that says what is true; and `INSTR_ARITY` entries for `fence.i`, `fmv.x.d`, `fmv.d.x` and `lr.d`, mnemonics the assembler rejects as unknown before arity is ever consulted. **Comments.** The five identical three-line "Belt and braces" blocks above five identical `stateIsReplayed()` guards say it once, at `stateIsReplayed()` itself. Four comments narrated a previous version rather than the current code and were rewritten or dropped: a length mismatch that "threw the whole order away", a mask that "silently dropped" what did not fit (now conditional, which is rationale rather than history), a read mux that "now does too", and hooks that keep "exactly the behaviour it had". One comment had become false - the immediate popover's claim that `escapeHtml()` does not touch quotes - and now gives the actual reason the JSON travels percent-encoded. **Checked and clean**: no duplicate element ids, no `var` outside the CDN loader, loose equality only inside doc strings and one regex, no duplicate keys in the instruction tables, no `TODO`/`FIXME`, no listener attached by a function that can run twice, and every other `getElementById` id either in the markup or created by the code that looks for it. `addw` and friends assembling on an RV32 target is deliberate and documented at the table. `test_comprehensive_suite.js` gains section 15: symbol offsets in both legal spellings and the illegal one, a round trip that feeds every operand the Native column prints for `la`/`call`/`tail` back through the assembler and requires it to come out unchanged, and `escapeHtml` both by character and by parsing its output back out of an attribute. It fails against the previous version. Full battery green; the toolbar, header, example menu, memory titles, immediate popover and mobile layout all checked in a browser. |
-| **v24.87 (Back Step Unwinds the Peripherals Too)** | **⏮ Back** restored registers and memory and left every peripheral where the step had put it: an LED pattern stayed lit, the 7-segment display kept its digits, a character stayed in the UART terminal and a pixel stayed on the OLED, all while the PC and the register file said the write had not happened yet. The guide had claimed peripheral state was restored since the feature existed. **It never was.** Back step unwinds from `stepWriteLog`, which `writeMem()` fills - and `writeMem()` returns to `handleMMIOWrite()` *before* the journal, a line present in the first commit of the file, so a peripheral write was never recorded. No version in the history snapshotted peripheral state into `execHistory`. HDL mode was never affected: `hdlStepBack()` goes through `hdlSeek()`, which resets the peripherals and replays every `@@` event from cycle 0, so the same button behaved differently in the two engines. **The state splits in two and so does the fix.** The scalars - LED, 7-segment, the four OLED registers with their auto-advance flags and page pointers, and the whole receive path - are snapshotted whole once per step by `capturePeriphState()`, which is one small object per single-step and puts the undo in one place instead of a hook at every write site; a peripheral added later only has to be listed there. The OLED's two 24 KB pages are the exception, too big to copy per step, so they get a journal of their own: `writeOledPixel()` records the four bytes it is about to overwrite and `oledPresent()` records the page its copy will overwrite, replayed backwards by `restoreOledPages()`. `stepBack()` then repaints the panel, which it never did either. **The receive path is why this was a correctness bug and not a cosmetic one.** `uartTickDelivery()` moves a byte out of `uartPending` when `instructionCount` reaches its delivery instant, and `stepBack()` already rewound `instructionCount` - so back-stepping over an arrival and stepping forward again delivered the *next* byte and dropped one, silently. A read of `UART_RX` consuming the held byte had the same shape. Both now unwind. **Transmit unwinds as well**, so a character back-stepped over leaves the terminal: a terminal is a transcript and an argument could be made either way, but with the receive side rolling back, a transmit side that did not would be an inconsistency to explain rather than a behaviour to rely on. `test_backstep_peripherals.js` is new, 30 checks: each peripheral written and stepped back over, a present and the page copy under it, both receive cases including the re-step that used to lose a byte, and a round trip asserting the whole snapshot is identical after back-and-forward. It steps by address rather than by counting instructions, because two of its cases passed vacuously while a `li` expansion put the step count one short of the write. Against the previous version it fails 18 checks. Driven in a browser on the real **⏮ Back** button: the LED row goes dark, the OLED canvas pixel returns to black, `OLED_COL`/`OLED_ROW`/`OLED_CTRL` return to 0, the terminal empties and the 7-segment markup comes back byte-identical. |
-| **v24.86 (A Symbol Load Reaches Its Symbol PC-Relatively, Like Every Other Toolchain)** | `lw s3, delay_val` expanded to `lui` + `lw` - the absolute form. GNU as expands it to `auipc` + `lw`, verified here against binutils, which emits `R_RISCV_PCREL_HI20` / `R_RISCV_PCREL_LO12_I` for exactly that line; RARS does the same. More to the point, **this assembler's own `la` already expanded PC-relatively**, so `lw rd, sym` and `la rd, sym; lw rd, 0(rd)` built the address two different ways. Both forms land on the same address here, so nothing was computing a wrong answer - what was wrong was the idiom, and a student who meets `auipc` in the compiler's output for a global and `lui` in the assembler's for the same operation has been shown two different languages. All three expansion sites move to the `auipc` pair - a load with an explicit scratch register, a load using `rd` as its own scratch, and a store, which still requires the register to be named - sharing one `pcRelHiLo()` that carries into the upper half when the low 12 bits come out negative. The scratch-register diagnostic no longer offers `lui t1, %hi(...)` as the thing it would have assembled to, and the eight instruction-help entries that said "via lui + lb" and so on say `auipc`. **Checked end to end, not by mnemonic**: `DIP to LED` - the only shipped example using the symbol form - now assembles to `auipc x19, 64528` / `lw x19, -20(x19)` at `0x400014`, which resolves to `0x10010014 - 20 = 0x10010000`, and `s3` loads **4**, the value of `delay_val`. The two encodings, `0fc10997` and `fec9a983`, are byte-identical to what binutils emits for the same pair. `test_comprehensive_suite.js` pinned `^lui x7,` and `^lui x19,`; both were rewritten rather than relaxed, and now also recompute `auipc.address + (hi20 << 12) + lo` and require it to equal `dataBase`, so the mnemonic changing again would not be enough to pass. **One consequence worth naming:** the starter example now needs `auipc` in the processor where `lui` alone used to do. The reference `Decoder.v` has it (opcode `7'b0010111`) and the full 168-test HDL suite passes through Icarus, but a student whose own decoder has not reached `auipc` yet will see `DIP to LED` stop working where it previously did not. |
-| **v24.85 (Immediates Read Back Three Ways on Hover; a Shorter Mobile Editor)** | An immediate in the **Native instruction** column now carries the other readings of the same encoded field, on hover and on tap. The column's text is untouched - the operand still appears exactly as it was written - and only the tokens with something to add get a dotted underline, so the marker means "there is more here" rather than decorating every number. A three-way toggle in the column header was designed first and dropped: it would have had to rewrite the whole column to be consistent, and the column is a source echo rather than a disassembly. **The legality question turned out to be the interesting part.** The worry was that `sltiu x1, x2, 0xFFFFFFFF` is illegal where `-1` is legal. Run against binutils, the opposite holds: `0xFFFFFFFF` and `4294967295` both assemble, and **`4095` does not**. GNU as takes a 12-bit signed immediate spelled as the signed value in [-2048, 2047] or as its full 32-bit two's complement, and rejects everything between - so the one unusable reading is *the raw field width read unsigned*, which is a number that appears nowhere in the machine. Every reading offered is therefore the 32-bit value: `-1`, `0xffffffff`, `4294967295`, all three of which assemble. Fields that are genuinely unsigned get no signed reading at all, because they have none: `slli x11, x5, -1`, `lui x9, -0x1` and `auipc x10, -1` are all rejected, so a shift amount reads 0..31 and a `lui` immediate 0..1048575, each with a hex spelling and, for U-type, the value it actually loads or adds (`0xfffff000`). Branch and jump targets give the resolved address and the distance, and keep their `<label>` badge. The field is decoded from the encoded word rather than from the source token, so a value written in hex, the same value written in decimal and one a pseudo-op computed all read alike. **Touch is why this is a popover and not a `title`**: `title` shows nothing on a phone. The span carries **no `title`**: the browser would draw its own tooltip alongside the popover, and two tooltips for one token is worse than either, so the text lives on `aria-label` instead. One shared fixed-position element serves hover and tap, bound to `click` rather than `touchstart` so dragging the panel still scrolls it, and dismissed by the next tap, a scroll, Escape or a resize. A latent trap surfaced on the way: `escapeHtml()` escapes `&`, `<` and `>` but **not quotes**, so the JSON of readings terminated its own attribute at the first `"`; it travels percent-encoded instead. **Mobile** gives the editor's height to the panels - `.editor-wrapper` 300px to 240px and `.panel-body` 186px to 246px - so the panel is now slightly taller than the editor above it rather than a little over half its height. `test_disasm_immediates.js` is new, 42 checks: which operand is marked for each format, what each field reads as, that nothing is marked where there is nothing to add, that every row's text is unchanged, the popover's open/close paths, and - where a RISC-V assembler is installed - **every offered spelling fed back through it**, plus the three illegal readings confirmed rejected *and* confirmed never offered. |
-| **v24.84 (Pausing a Run Highlights Where It Stopped)** | The editor highlight follows `currentExecLine`, and the run loop wrote it on only one of its exits: the assignment sat at the bottom of `runBatch()`, in the `else` that runs when there is no next batch to schedule. **Pausing does not go that way.** `toggleRunPause()` clears `runTimerId`, so the pending batch never runs and `finishRun()` is never reached, leaving `currentExecLine` at whatever assembly set it to - `firstExecutableLine()`. A program paused after ten thousand instructions therefore still highlighted its first instruction, while the registers, memory, stats and status line beside it were all correct, which is what made it read as a highlighting fault rather than a stale variable. **Two exits were missing the write, not one**: the early return at the top of `runBatch()` has the same gap, reachable by anything that stops a run without cancelling the timer. The assignment moves into `finishRun()` ahead of its branches, so every exit sets it and the two with something better to say still override - `-1` once the program has ended and there is no instruction to point at, and the breakpoint line when it stopped on one, which is the same value anyway since a breakpoint stops before executing. `toggleRunPause()` sits outside the closure and cannot call `finishRun()`, so its pause branch sets the line itself. Checked in a browser on all four exits: the user's pause, the instruction-budget pause, completion (highlight cleared, no `.cm-execLine` in the document) and a breakpoint. `test_breakpoint_highlight_and_snap.js` gains a fifth case that runs `dip_led`, which loops and so spans several batches, pauses twice, and requires the highlight to agree with the PC at each stop and to have left the first instruction at least once. Against the previous code it fails with *highlight on line 47, PC on line 53*. |
-| **v24.83 (The Simulator Says When a Program Is Racing the OLED Present)** | `OLED_STATUS` bit 0 reads 0 unconditionally here and `oledPresent()` exchanges and copies in the same call, so the poll costs nothing and a program that never polls renders identically. The board is not so forgiving, and in two ways rather than the one the docs described. A present waits for the scanout to reach the end of a frame - **up to 15.73 ms, 24,576 instructions at `CLK_DIV_BITS = 5`** - during which `back_page` has not moved, so pixels written then land in the page about to be displayed and the copy afterwards carries them forward rather than discarding them. Then the copy runs for 12288 clocks, 123 us or **192 instructions**, and in that window `porta_we` is `(copying and copy_phase) or ((not copying) and write_dly)` - `write_dly` is not in the expression at all while the copy owns the port, so **a pixel write is dropped with nothing to observe**. The guide said only that skipping the poll "tears on hardware", which covers neither. **Modelling the delay was considered and rejected.** It is the v24.74 UART move, but the number is different in kind: 24,576 instructions against the circle example's ~2,500 of drawing would make every OLED example ten times longer in JS mode and unusable in HDL mode, where Icarus runs a few thousand cycles per Run. It would have to be an opt-in mode, and the student who skips the poll would be in the default and still unwarned. Modelling only the 192-instruction copy was rejected too: passing a check that exercises 1/128th of the window implies a guarantee it does not give. **So the page says it instead.** A present arms `oledSwapUnpolled`, a read of `OLED_STATUS` clears it, and the first pixel written while it is set logs once per run with both consequences and both numbers. It fires in either engine: HDL mode had no way to see a *read*, so the generated testbench gains `@@P`, keyed on `dut.MemRead && dut.dec_OLED_STATUS` - both combinational in the fixed Wrapper, like the `MemWrite_out` the trace already reaches for - and emitted only when the Wrapper has the double-buffer ports. The warning survives `hdlSeek()`, which replays every event from cycle 0 on each step: the replay clears the observation and keeps the *warned* flag, so stepping does not repeat it. `test_oled_swap_race.js` is new, 15 checks: a real assembled program that presents and draws, the same one with the poll, one that never presents, the HDL replay path including a re-seek, and the testbench's two conditional emissions. Every absence check also asserts the pixel actually landed, because two of the three passed vacuously before that was added. Verified by mutation: removing either half of the poll tracking fails two checks. |
-| **v24.82 (The Wrapper Leaves the Download Menu; Compiler Explorer Credited)** | v24.78 added `Wrapper.v` to **⭳ Download** so that a student could take away the copy the page had just sized for their program. The depths are the problem: a saved Wrapper carries the `IROM_DEPTH_BITS`/`DMEM_DEPTH_BITS` of whichever program was loaded when it was saved, and a student who keeps it and moves to a larger program gets a build that fails for a reason nothing on screen explains. **The entry is gone**, and sizing the Wrapper is the student's job again - which is the position the rest of the flow already takes, since a Wrapper the student loads is only ever checked, never rewritten, and a program that does not fit is refused with both numbers named. Auto-customisation stays exactly where it belongs, on the **Prebuilt processor** in ⚙ Settings → 🔌 HDL Simulation: that Wrapper is ours, it is re-fetched rather than kept, and it exists so that a student without a working Wrapper can still run something. Its console line pointed at the download and now points at the student's own file instead. The menu is `AA_IROM.mem`, `AA_DMEM.mem`, the testbench and the waveform. `test_comprehensive_suite.js` checked that the menu contained a list; it now checks the menu is **exactly** that list, so the Wrapper reappearing would fail rather than pass. The user guide's ⭳ Download line drops the Wrapper, and the Wrapper section says the two depths need checking per program. **Credits** gain [Compiler Explorer](https://godbolt.org/), which is what compiles every C program the page runs and was the one dependency the modal did not name. |
-| **v24.81 (The OLED Frame Buffer Goes Back Into Block RAM)** | Double buffering had cost the design 1.8 ns of setup slack at 100 MHz, and the timing report said why: the failing paths ended at `RAMA`/`RAMB`/`RAMC` pins of `bitmap_reg_r1_*`/`bitmap_reg_r2_*`, which are **SLICEM distributed RAM, replicated twice** - 64 entries by 3 bits at a time, for an array that is 196,608 bits. Logic delay was 2.1 ns of the 11.2; the other 9.0 was routing to reach a memory smeared across the die on address nets of fanout 576. v24.70 claimed the two-phase copy kept the array inferring as true dual-port BRAM. It did not, and the reason is one line it did not account for: `pix_data_out` was read unconditionally, outside the `if copying` it sat above, so the array was offered **three read addresses** - the caller's, the scanout's, and the copy's - where a true dual-port block RAM has two. Vivado's only way to serve three is to replicate into LUTs, and `_r1`/`_r2` in the endpoint names is that replication. The copy engine's read is the one double buffering added, so the regression is real, just not about clock speed. Port A now takes **one muxed address and one read**, shared between the caller and the copy engine, with `pix_data_out` driven from that single registered read; port B keeps the scanout. `ram_style = "block"` is attached to the array so a future fallback is a warning rather than a silent 1.8 ns. Halving the module clock or gating it with a clock enable and a multicycle path were both considered and rejected: 11.2 ns fits in 20 ns, so either would have closed timing while shipping a ~2,300-LUT implementation of something six BRAMs hold, and keeping the congestion. **A second defect fell out of writing the testbench.** The page bit is concatenated onto the 13-bit pixel address, so a page is an 8192-entry slot, but the array was declared `0 to 12287` - two pages of 6144. Columns 64..95 set address bit 12, so any pixel in the right third of the screen on page 1 indexed past the end: 12287 is the bound and column 80, row 60 wants 13372. Simulation of the committed version dies there outright. The array is now `0 to 16383`, sized for the address width, which costs two more RAMB36 out of the 135 on the part and keeps adders out of the RAM address path. **Testing.** `RV/test_pmodoledrgb_bitmap.vhd` is new, self-checking under GHDL, and runs the module at `CLK_FREQ_HZ => 1000000` so the power-up delays - which all scale off that generic - pass in a few hundred thousand cycles. It writes both pages, presents, and checks that the copy carried the frame across, that a partial update lands on the new page without disturbing its neighbours, and that a second present carries everything back. One of its two pixels is at column 80 precisely to exercise the address bit above, so the suite fails against the previous version rather than merely passing against this one. |
-| **v24.80 (Pan Buttons for the Waveform)** | **The waveform had no pointer-free way to move along the time axis.** Zoom had `−` `+` `Fit`, but panning was shift+scroll or a drag on the canvas, neither of which a touch screen offers - a drag there fights the panel's own scrolling, and the one gesture that did work was undiscoverable. `wavePan(dir)` moves `waveStart` by half a window and runs it through the same `waveClampStart()` as every other viewport change, so it stops at cycle 0 on the left and with the last active cycle on screen on the right rather than scrolling into empty time. Half a window rather than a whole one leaves an overlap to line the new view up against. The `‹` `›` buttons sit left of the zoom controls in both layouts, since the desktop dock is no better served by a hidden gesture. At 40px each they cost 84px of the mobile header, which measured out at one row down to a 320px viewport - the 360px case has 45px spare. **A breakpoint-crossing leak, found in the live check.** The waveform panel is `mobileOnly`, and `updateWaveformPanelAvailability()` hides its chip above the breakpoint, but nothing called it on `resize` - `applyPanelDock()` reaches `syncWaveformPanelHost()` and not the chip. Widening the window from a phone layout therefore left a sixth tab in the desktop grid showing an empty panel while the dock was already back at the bottom. The resize handler now calls it. **Testing.** `test_waveform.js` gains a section that drives the real pan path over the VCD the Icarus run produced rather than an invented end cycle: half-window steps, that presses accumulate, that zoom is untouched, and both clamps. |
-| **v24.79 (The Instruction Count Was Counting Data; Mobile Toolbar and a Waveform Panel)** | **The reported instruction count included every `.data` row.** `assembleOnly()` counted `mc.filter(i => !i.error)`, which is every assembled item, so `Image Display & Accel` reported **183 instructions when it has 53** - the other 130 are the rows of pixel data. Every example was wrong by its data size, just less visibly: DIP to LED said 17 for 13, Circle 138 for 136, Hello World 50 for 48. Both paths now go through `countInstructions()`, which keeps only items below `dataBase`. `test_baked_examples_full.js` compares `mc.length`, which is unaffected and is a real regression signal, but its messages said "instructions" for what is a count of assembled items, so they say that instead. **Mobile toolbar.** Both `<select>`s were sized by their longest option rather than by what they display: the example picker took 165px of a 374px row and the Download menu 189px of its 283px half, for a label reading `⭳ Download`. Capped at 104 and 96, and row 2's grid went from `auto 1fr` to `1fr 1fr`, the reclaimed width goes back to the controls - Open and Save 30px to 65px, Undo/Redo/Find 25/25/28 to 60/60/58, and those three plus Settings get their words back rather than staying icon-only. Two cascade traps on the way, both the kind `css-hide-rules-lose-to-specificity` describes: the `.dl-select` cap sat *before* the rule setting `flex` on the same element at equal specificity and was silently ignored, and raising the example picker's flex-basis pushed HDL row 1 into a second line, since flexbox wraps on hypothetical size before it shrinks - fixed by keeping the basis at 60px and capping with `max-width`. **The waveform strip becomes a sixth panel on mobile.** As a full-width dock at the bottom it is right on desktop, where its width is what limits how many cycles are visible; on a phone it meant scrolling the toolbar - and the Step and Run controls - off the screen to look at it. The dock element is now *moved* into `#tab-waveform` rather than duplicated, so every existing handler, id and drawing path still applies, and moved back on widening. Its chip follows HDL mode the way Locals follows C mode, and the toolbar's Waves button is hidden where the panel exists. Two things it ran into: `updateWaveView()` returns early unless `body.wave-open`, which a panel never sets, and the mobile `.panel-hdr-btn { display: none }` rule hid `+ Signal` and the zoom controls - the only way to use the thing. The general rule this came from is now in `CLAUDE.md` under a new **UI** heading: a result you step through must not live where reaching it scrolls its controls away. Two things followed from actually using it there. The default span of **40 cycles** was written for a full-width dock; the panel's canvas is 248px on a 390px screen, so a clock was **6.2px** wide. It is 12 cycles where the layout is narrow, which is 20.7px, and the span follows the layout until the reader zooms - after that it is theirs. And the waveform's own controls were 20px borderless glyphs, so `+ Signal` and the zoom buttons were there but not reliably hittable; in the panel they get a 40x36 target and a border. `+ Signal` gains a boundary on desktop too, keeping its colour: it was the one control in that header that reads as a label rather than a button. **The first run after a Reset reveals the waveform** - the dock on desktop, the tab on mobile - since it is the one thing a run produces that no other panel shows. It needs no state of its own: Reset discards the recording, so the Run button's fresh-trace branch already means "first run since Reset", and only that branch reveals. **The toolbar's Waves button is gone.** In HDL mode the strip is now always on the page and closing it folds it to its own 29px title bar, which is then how it comes back - a control beside the thing it controls, rather than one in the top bar for a panel at the bottom. `✕` became a chevron that flips with the state. The fold had to clear `setWaveHeight`'s inline `style.flex` rather than style around it: an inline declaration outranks any rule, so the dock stayed 240px tall with its contents hidden. The waveform header's readout - `cycle N · showing a-b of c` - said nothing the cycle ruler above CLK does not, and its width was what pushed the zoom buttons onto a second row on a phone. The ruler's own column now carries the word `cycle`, and the readout is kept only for the two things that are not visible anywhere else: that the PC has stopped advancing, and that a chosen signal is missing from this run. Empty, it hides itself - a zero-width flex item still claimed a row of its own. In the mobile toolbar the example `<select>` was 28px against the row's 32px buttons, because `#exampleSelect` sets its own height and an id outranks the class rule meant to override it; Open and Save get their words back now that the row has the width. HDL mode with no Verilog loaded is the one state that still wraps to two rows: six labelled controls plus an 83px `⚠ no Verilog` chip do not fit 374px, and that is the state you are meant to act on. `examples/index.txt`'s preamble is cut from 20 lines to 14, dropping the row-count guidance and the restatement of what the depths default to. |
-| **v24.78 (One Example Index, Carrying the Memory Depths Each Program Needs)** | `examples/asm/index.txt` and `examples/c/index.txt` become one `examples/index.txt`, with a `Lang` column and, new, an `IROM` and a `DMEM` column: the `IROM_DEPTH_BITS` and `DMEM_DEPTH_BITS` that program needs. **Selecting an example sets both Linker segment sizes from its row**, and the stack pointer the C startup shim loads follows from the data size, so a program arrives with a layout it fits in. The values were measured rather than guessed - Circle is 10/9 in assembly and 11/9 compiled, Image Display 9/14 and 10/14, everything else 9/9. `IROM_DEPTH_BITS` and `DMEM_DEPTH_BITS` are both **9 by default** now; DMEM had been 14, which was why the image example worked without anyone having to think about it. In HDL mode the depths are checked against the Wrapper that is loaded and **a program that does not fit is refused rather than half-loaded** - the image would have stopped at the end of the memory and the core fetched whatever lay past it, which reads as a bug in the processor. The Wrapper the student uploads is only ever checked; the one that ships with the prebuilt processor is ours, so its two localparams are rewritten to whatever the selected program needs, said in a status line, and the adjusted file offered under ⭳ Download. Each example now states its two numbers at the top of its source, and the two standing warnings that did the same job by hand ('requires more than 128 instructions', 'the data memory size should be higher than default') are gone. The four dead `#define`s in every C example - `IROM_BASE`, `DMEM_BASE`, `DMEM_SIZE`, `STACK_INIT` - go too: nothing has referenced them since the `sp` initialisation moved into the startup shim. **Downloads are one toolbar menu**: `AA_IROM.mem`, `AA_DMEM.mem`, `Wrapper.v`, the generated testbench and the recorded waveform, each greyed until it exists. That retires `💾 Dump Text`, `💾 Dump Data` and the `⭳ VCD` button from the toolbar and *Save testbench* from the sources panel, where it never belonged. **Dump a VCD waveform** is on by default. **Reference core** is renamed **Prebuilt processor**, which says what it is rather than what it is for. Three suites had example line numbers hard-coded and broke on the new headers; they derive the line from the source now instead of being re-pinned, and the comprehensive suite's toolbar check lists the controls it expects rather than counting buttons, having counted two that are now menu entries. Its code-overflow check used to rely on `circle_accel` not fitting the default segment, which is exactly what this change fixes, so it shrinks the segment deliberately instead. |
-| **v24.77 (The Reference Core Gains the M Extension, and a Pre-Synthesised Copy for Students)** | Four changes to `RV/`, and one new thing in `examples/`. **(a) ALU and Shifter.** `Shifter.v`'s five cascaded `shiftByNPowerOf2` instances - a barrel shifter written out by hand - are replaced by `<<`, `>>` and `$signed(...) >>> ...` in one `case`, 81 lines down to 51. `ALU.v` had **a real combinational loop**, which Verilator names outright (`UNOPTFLAT: Circular combinational logic: 'ALUFlags'`): `ALUResult` was multiplexed from `ALUFlags`, and `N` and `Z` were then read back out of `ALUResult`. Breaking it by deriving `N` and `Z` from the adder output instead also **fixes `slt` and `sltu`, which were wrong**. Their arms of the `case` never set up the subtraction, so the flags they consumed described `Src_A + Src_B`; `slt(0x80000000, 0x7FFFFFFF)` answered 0 and `sltu(1, 0xFFFFFFFF)` answered 0, both the opposite of the truth. `sub`, `slt` and `sltu` now share one arm that selects the subtracting operands, so the one adder serves all three and the flags mean what their names say. Branches were always correct and are unchanged. Also deleted: a duplicated 32-line licence header, a stale "todo: make shifter connections here" above the connections, and the manual sensitivity list. Both files are clean under `verilator --lint-only -Wall`. **(b) `MCycle.v`'s divider**, which was a one-cycle stub returning its operands. Restoring division, one quotient bit per cycle, `width` cycles: the running remainder lives in `temp_sum` (kept at `2*width` bits so `2*remainder + 1` cannot overflow the comparison) and the dividend shifts out of `shifted_op1` as the quotient shifts in underneath it. Signed division works on magnitudes with the signs reapplied at the end, and the three results RISC-V specifies rather than leaves to the implementation all fall out of that: `x / 0` is all ones because nothing is ever subtracted, `x % 0` is `x`, and `-2**31 / -1` is `-2**31` because the magnitude `2**31` is its own negation. The one subtlety is that a zero divisor must not have the sign applied to the quotient afterwards, or `-1` would come back as `1`. Two structural changes beyond the algorithm. The compute block is guarded by `n_state == COMPUTING`, because the cycle in which `Busy` falls - the one the processor writes back in - used to run another iteration over the result; for multiply that was harmless (the multiplier has shifted to zero by then), for divide it corrupted the remainder. And **the clocked process now assigns only with `<=`**: the algorithm needs to read and rewrite `temp_sum` and the two shifted operands several times within one cycle, which it did with blocking assignments inside `always @(posedge CLK)` - correct, but exactly what the page's own synthesis lint warns about, and what a student would reasonably copy. The steps now run in a combinational block over `n_temp_sum`, `n_shifted_op1` and the rest, and one clocked block registers all of them. The sequence reads the same, the divide branch is still a single `else` that can be cut back to a stub in one edit, and `MCycle.v` no longer appears in the lint panel at all. Nor does anything else: `Extend.v`'s `always@(ImmSrc, InstrImm)` became `always@(*)` for the same reason, and **the reference design is now lint-clean**. That list happened to be complete, so nothing was actually diverging - the regenerated netlist is byte-identical, which is itself the proof that Yosys had been reading it as `@*` all along - but the hazard the warning names is real: add a signal to the `case` and simulation silently stops matching synthesis. `test_hdl_mode.js` asserted that the only hit was that warning; it now asserts there are none, and the "names a file and a line" property moved onto the deliberately-bad module below, where it is not vacuous. `parameter IDLE`/`COMPUTING` became `localparam`, removing the Vivado warning the file's own comment apologised for. **(c) Integration.** `Decoder.v` gains three outputs (`MCycleEn`, `MCycleOp`, `MCycleHigh`) decoded outside the existing case, so the RV32I table is untouched: the M instructions share its R-type arm and are simply multiplexed in afterwards. In `RV.v`, `MCycle` is instantiated on `Src_A`/`Src_B` - the ALU's own operands - `WE_PC` becomes `~MCycleBusy` and `WE` becomes `RegWrite & ~MCycleBusy`, so the instruction is held and written back once rather than once per cycle. **`MCycleOp` widened from two bits to three**, so that `mulhsu` is an ordinary mode rather than a special case: `[2]` says divide rather than multiply and `[1]` and `[0]` say, per operand, whether it is unsigned. So 000 is signed multiply, 011 unsigned, 100 and 111 the two divisions, and **001 is the signed x unsigned multiply `mulhsu` needs**. The old encoding's `[0]` meant "unsigned" for both operands at once, which is why it had no room for a mixed one. The change costs almost nothing inside MCycle - each operand's extension now reads its own bit - and the cycle count still keys off `[0]` alone, correctly: a multiplier that is unsigned is zero above bit `width` and there is nothing left to add after `width` iterations, whether or not the multiplicand was sign extended. RV32M has no mixed-sign division, so 101 and 110 are never generated, though the divider handles them anyway. All eight M instructions are supported, and `RV.v` needs nothing for `mulhsu` beyond the result multiplexer it already had. Every instantiation in `RV.v` moved to named association. **(d) `examples/hdl/RV_reference.v`**, built by `examples/hdl/build_reference_core.sh`: the whole core through Yosys, flattened to one module with every internal name discarded (`_017_`, `u42_`), **except `RegFile`, which is kept as a module with its `reg [31:0] RegBank [31:0]` intact** so that register discovery still resolves `dut.RV1.RegFile1.RegBank` and the Registers panel still works - the one thing that would otherwise be lost, and the reason the flattening stops there. Synthesis resolves `PC_INIT` away, so the netlist's top is given the parameter back and a `generate` that instantiates a deliberately non-existent module, named for the problem, if it is ever passed anything but `0x00400000`; silently running from the wrong address is the failure that would be hard to diagnose. **Reference core** in Settings → HDL Simulation fetches it together with a copy of the fixed `Wrapper.v` and replaces the loaded sources. It is a button in the row that already held **Clear files** and **Save testbench**, with its explanation in its tooltip and in the user guide: a first attempt gave it a row of its own plus a three-line hint beside it, which cost 79px of the Processor sources panel every time that tab was open. **(e) Tests.** `RV/test_MCycle_self_checking.v` is new: 233 checks per width, run at 4, 5, 8, 16 and 32, against a scoreboard rather than a waveform. `test_MCycle.v` needed its `MCycleOp` widened to three bits and its two op codes restated; its four stimuli still produce 1, 2, 225 and 210. `riscv_simulator_tests/test_m_extension.js` is new and three-way: a generated program running all eight instructions over six operand pairs, executed on the JS engine, on `RV/*.v` through Icarus, and against a BigInt reference, with the three compared word for word - so the two engines agreeing on something wrong still fails. It also checks the stall itself: no PC executed twice in a row, one write per M instruction, and a signed multiply taking 65 cycles. `MCycle.v` was added to the design list in three suites. |
-| **v24.76 (Mobile Toolbar Sized to Its Content; Double Buffering Spelled Out)** | The first toolbar row overflowed at 390px - 379px of content in a 368px box in HDL mode with no Verilog loaded. The cause was `.toolbar-group-file-mode button { flex: 1 1 0 }`, which shared the row equally instead of by need: `C` was given the same 37px as `ASM`, while `⚠ no Verilog`, `📂 Open` and `💾 Save` were each crushed to 23px with their text clipped away. Buttons are now sized by content, the two toggles lost 4px of padding a side, and Open/Save give up their words on mobile. A button that drops half of itself below 800px now says so in its markup - `<span class="btn-ico">` / `<span class="btn-text">` inside it, and `mo-icon` or `mo-word` on it, hiding whichever half the other one can carry alone. That alone still left the example `<select>` at 51px, showing `DIF` where the option reads `DIP to LED (start here)`, so **the word "Example:" is hidden below 800px too**; the selected option names the example and the label keeps its tooltip. Row 1 now fits on one line in all three states it has - JS, HDL with sources, HDL without - with nothing clipped, and the select measures 157 / 105 / 70px against 90 / 78 / 78 before. **Row 2 had the same disease and a worse case of it**: the grid gave Undo/Redo/Find and Dump/Waves/VCD/Settings half the width each regardless of how many buttons were in them, so the right half held up to five against the left's three, and the fix had been to shrink the font to 9.5px and let `white-space: normal` wrap `Dump Text` onto two lines - which is what made that row 34px tall and `⚙ Settings…` clipped. The grid columns are now `auto 1fr` so the Editor group takes only what it needs and the other gets the rest; the font goes back to 11.5px on one line; Undo, Redo, Find, Waves, VCD and Settings keep their glyph (`mo-icon`) and the two dumps keep their word (`mo-word`, since `💾` is the same on both and already sits on Save). Every row is a single 32-34px line at 390px with nothing clipped, in the worst case there is - HDL, sources loaded, Waves and VCD both showing. Desktop is untouched. Verified by measuring `scrollWidth` against `clientWidth` for every group and button in each state, in a 390px iframe; the browser's screenshot capture stopped responding partway through, so row 2's final look is confirmed by geometry rather than by eye. The **Arrival** selector's tooltip was rewritten as well. It had been three labelled fragments in one run-on line - "Paste: back-to-back at 115200 baud... Typed: at human speed. Forgiving: waits for your program" - which named the modes without saying what the setting actually controls or how the modes differ in kind. It now leads with the fact that the control sets the gap shown in the `instr/char` box beside it, states the property that separates the first two from the third (Paste and Typed keep to the gap whether or not the previous byte was read, which is why a slow loop loses characters; Forgiving holds each character until it was), and drops "at human speed", which said nothing a reader could act on. The user guide's table follows the same three-way split and now also says that the gap box is editable for Paste and Typed and greyed out for Forgiving, which nothing had mentioned. Separately, three documentation gaps the same prompt raised: `RV/peripherals.md` and the user guide now say that **both pages start as the same page and the first bit-3 write splits them**, that there is no way back to single buffering short of a reset, and that a bit-3 write ignores bits [7:4] and [2:0] rather than overwriting the mode. The `peripherals.md` UART and OLED sections were also rewritten into the register the rest of that page uses - terse bullets, flat declaratives - replacing the flowing paragraphs they had arrived as; `CLAUDE.md` gained the rule that made that necessary. |
-| **v24.75 (Comment Audit: History Out, Two False Claims and a Dangling Selector Found)** | A pass over `riscv_simulator.html`'s 1,557 comment lines for prose that only makes sense to someone who has seen a previous version. Ten rewritten. The genuinely historical ones went entirely - "are no longer mutually exclusive", "which used to crash applyPanelDock", "which previously clipped the rightmost panel", "everything else it used to do here", "each of these used to open its own overlay before v17", "exactly like the pre-v22 tab strip" - keeping whatever current rationale they were wrapped around. Two were past-tense descriptions of what the *absence* of a guard would cause (`PSEUDO_ARITY_OVERRIDE`, `INSTR_ARITY`); those are rationale, not history, and were moved to the conditional. Comments contrasting the code with a design *alternative* rather than with an older version were left alone, which is most of the "instead of" hits. The audit turned up three things worth more than the wording. The panel-dock header said "The four panels (Registers / Memory / Peripherals / Disassembly)" when `PANEL_DEFS` has had five since Locals. `syncScroll()` was an empty no-op whose comment claimed it was "still called by the test suite" - nothing calls it, so both went. And `.editor-container textarea` survived the move to CodeMirror as a **dangling selector glued to the next rule**: written as `.editor-container textarea,` immediately above `/* Toolbar */ .toolbar {`, it silently gave that phantom element every toolbar style, with a second copy grouped onto `.console` in the mobile block. Harmless only because no such element exists. Both removed. The Settings compatibility shims kept their comment's claim that `applyMemSegments` and `resetMemSegments` are "exercised by riscv_simulator_tests" - they are not, and nothing in the page calls the six of them either, so the comment now says that instead of inventing a dependency. Also checked and clean: no duplicate element ids, no `var`, and all fifteen loose-equality uses are `== null` or text inside doc strings. |
-| **v24.74 (UART Receive Models the Hardware: One Byte, Paced Arrival, and Overrun)** | The console held received bytes in an unbounded array, so a polling loop that could not keep up simply accumulated characters and looked correct - while the board, which has **one holding register and no FIFO anywhere** (`uart.vhd` buffers nothing; the single byte lives in `TOP_Nexys.vhd:455-471`), discards the *newer* character, keeps the older, and raises no flag. HDL mode was lossless too, by a different route: the generated testbench held a byte until `UART_RX_ack` before offering the next, which is back-pressure a wire cannot apply. The receive path is now two-sided, as the real one is: `uartPending` is the PC's transmit buffer, and `uartRxByte`/`uartRxFull` is the FPGA's single register. Delivery is paced - **one character is 8640 clocks at 115200 baud, which is 135 instructions at the default `CLK_DIV_BITS`** - and a byte arriving while the register is full is dropped, oldest kept, counted, and reported in the console with the reason. Pacing is not separable from the register depth: with instant delivery a one-deep register would keep only the first byte of any send, so the two had to land together, and the reframing is what makes it coherent - the queue is the PC clocking bytes out at baud rate, not a receive FIFO. The **Buffer** checkbox and its instruction-delay box are replaced by an **Arrival** select: *Paste* (baud rate, the default), *Typed* (human speed), *Forgiving* (waits for the program, never drops - not what the board does, kept for debugging logic rather than timing). An *Instant* option was considered and rejected: against a one-deep register it would deliver one byte and drop the rest, which is not an escape hatch but a trap. The testbench's RX feed now mirrors `TOP_Nexys` - arrival on timestamp, discard on overrun - and `hdlSyncRx()` stamps pending bytes a character apart instead of all at cycle 0, so the two engines agree. Two `Wrapper.v` fixes went with it, both local to `RV/`: the read mux returned `ACCEL_DReady` for a read of `UART_RX` with nothing waiting, now a defined 0; and `UART_RX_ack` could stay high across two back-to-back loads, which `TOP` edge-detects on the faster clock as a single ack, leaving the second load's result dependent on when `TOP` got round to clearing valid. Adding `&& !UART_RX_ack` gives every load that sees valid its own edge. That last one was going to be *modelled* in the simulator until it became clear it is a race rather than a behaviour - modelling it would have presented timing-dependence as determinism - so it was fixed instead, and the simulator needs nothing for it. `test_hdl_mode.js` [10] and [13] fed two bytes at `cycle: 0` and relied on the old back-pressure; they now space them realistically, which is the point of the change rather than a casualty. |
-| **v24.73 (OLED Swap Status as a Badge; OLED_STATUS_OFF in the Examples)** | The Peripherals panel showed `OLED_STATUS` as a 32-bit hex row, which read as data rather than as the status flag it is. Replaced with a `SWAP PENDING: 0` badge in the section title, matching how `DREADY`, `RX VALID` and `TX READY` are already presented. The buffering line below it stays, and is the more informative of the two in the simulator: the badge is always 0 because no scanout is modelled, whereas the page state changes as a program presents. `OLED_STATUS_OFF 0x30` was added to the offset block of every example that carries one - four C files and three assembly files. `Circle_delay_accel.asm` and `ImageDisplay_autoadvance_accel.asm` are raw compiler output with no `.eqv` block and `fibonacci`/`rars_syscalls` have no MMIO block at all, so they were left alone. `DIP_to_LED.c` is also embedded in `riscv_simulator.html` as the baked example, and the two copies must stay byte-identical or `installGodboltCache()` stops matching and the suites fall through to the live API; both were changed together and all six C examples were confirmed to still hit the cache. An unused `#define` generates no code, so the cached assembly stays valid. |
-| **v24.72 (OLED Swap Status Moves to Its Own Register, OLED_STATUS)** | v24.70 read the swap-pending flag back through `OLED_CTRL`, which made one address mean two unrelated things depending on direction. Split out to **`OLED_STATUS` at `0xFFFF0030`**, read-only, bit 0 set while a present is outstanding; `OLED_CTRL` goes back to being purely write-only, and a read of it echoes the control byte the way the other write-only OLED registers already do. `0x30` was the next free offset in the OLED block and needed only a `localparam`, a `dec_` signal and a read-mux arm in `Wrapper.v` (plus adding it to `dec_MMIO_read`, which is unused today but enumerates the readable registers). The Peripherals panel gained the matching row, so every OLED register now has a visible counterpart, and beside it a line naming the buffering state - `Single buffered` or `Double buffered · showing page N, drawing into page M`. That second line is the more useful of the two in the simulator: `OLED_STATUS` is always 0 here because no scanout is modelled, whereas the page state actually changes as a program presents. Also corrected a comment in `Wrapper.v`: the one-cycle `OLED_Swap` pulse was justified as "one CLK cycle is 64 CLK_undiv cycles", which is false when `CLK_DIV_BITS` is 0 and the two are the same net. The conclusion holds for a better reason - `CLK` is derived from `CLK_undiv`, so every `CLK` edge lands on a `CLK_undiv` edge and the pulse is never shorter than the single fast cycle the controller's edge detector needs. `Circle_delay_accel.c` polls the new address; its Godbolt cache entry was regenerated again (299 instructions) and re-verified at 2533 lit pixels. |
-| **v24.71 (The Circle Example Presents Its Frames)** | `examples/c/Circle_delay_accel.c` is the one program in the repo that visibly tears on hardware: it repaints its circle straight into the page the panel is scanning out. It now presents each frame with `*OLED_CTRL_ADDR = OLED_SWAP;` followed by the status poll, which is the whole cost - the drawing stays partial at ~2.5k cycles per frame rather than becoming a 6144-pixel repaint, because the controller copies the presented page back. `delay(50)` stays: the poll returns immediately in the simulator, which models no scanout, so it paces nothing here. The Godbolt cache entry was regenerated (1149 → 1327 asm lines, 286 → 297 instructions) and the result checked the way the last bad recompile was caught - by the rendered output, not the instruction count: 2533 lit pixels in one colour, identical to before. `test_baked_examples_full.js` gained that pixel assertion for the C circle, which previously checked only the instruction count and the UART greeting and so would not have noticed double buffering swallowing the drawing entirely. |
-| **v24.70 (OLED Double Buffering)** | `OLED_CTRL` gains a **present** bit and becomes readable. A write with **bit 3** set presents the page just drawn and the remaining bits are ignored; a write with bit 3 clear configures as before. Splitting the write this way means software never has to remember the mode in order to present, which matters because the register cannot be read back - and because bit 3 is then never *stored*, `OLED_ctrl_reg[3]` stays 0 and the existing `case (OLED_ctrl_reg[3:0])` mode decode needed no change at all. The only casualty is mode value `8`, an unreachable alias of `vary_pixel_data` that `0x00` already provides. A **read** of `0xFFFF002C` now returns `{31'd0, swap_pending}` instead of falling off the end of the Wrapper's else-chain and silently returning `ACCEL_DReady`. **The controller copies front to back after each exchange**, which is the decision that makes the feature usable: a plain ping-pong would leave the back page holding the frame before last and force every program into a full 6144-pixel repaint, ~30k cycles against the circle example's ~2.5k. The copy is safe without arbitration because it sits inside the window software already has to wait out, and costs ~6144 cycles at 100 MHz against a 15.73 ms frame. Backward compatibility comes from the state machine rather than an enable bit: **both pages start as page 0**, so a program that never presents is bit-identical to before - verified, with the circle example still at 2533 lit pixels and the image at 6144. Hardware side (local to `RV/`, which is not committed): `Wrapper.v` gains `OLED_Swap` (a one-cycle pulse; one `CLK` cycle is 64 `CLK_undiv` cycles, so the controller can edge-detect it without a four-phase handshake) and `OLED_SwapPending`; `pmodoledrgb_bitmap.vhd` doubles its `bitmap` array, prefixes both RAM ports with a page bit, creates the vsync it did not have (`read_addr` wrapping 6143→0 has no side effect and `OLED_FSM` never leaves `refreshing`), and runs the copy as an explicit two-phase read/write so port A does one thing per cycle and the array still infers as true dual-port BRAM. In the simulator there is no scanout to align to, so a present applies at once and the status read is always 0 - a program that skips the poll therefore looks right here and tears on the board, which the user guide says plainly. **The generated testbench now binds `Wrapper` by name rather than by position**, and includes the two new ports only when the uploaded `Wrapper.v` declares both, so a Wrapper predating them keeps working with double buffering simply unavailable. `test_hdl_mode.js`'s port-order assertion was rewritten to check every port is bound rather than to pin the old positional text. |
-| **v24.70 (OLED: Auto-Advance Arming and Out-of-Range Columns Now Match the Board)** | An audit of `RV/TOP_Nexys.vhd` and `RV/pmodoledrgb_bitmap.vhd` - the OLED's real interface, added to the repo after v24.69 - against the model turned up two more divergences, both confirmed by running the same program on the JS engine and on `Wrapper.v` through Icarus. **(a) Auto-advance was one step ahead.** `Wrapper.v` arms an `autoadvance_col`/`autoadvance_row` flag on the *first* data write in that mode and gates the increment on the flag's previous value, so the first pixel lands on the column you addressed and, after N writes from column C, `OLED_Col` holds `C+N-1`. The model advanced after every write, ending at `C+N`. The painted run is identical either way, which is why the earlier pixel comparison passed; the difference only surfaces when a program leaves auto-advance and writes again, where the hardware repaints the last pixel and the model painted the next one. Restructured to advance *before* painting and only when armed, with the flags cleared by a triggering write in any other mode, exactly as the Wrapper does - the two now agree on the residual register as well as the run. **(b) Out-of-range columns were wrapped rather than folded.** The model did `oledCol = (val & 0xFF) % 96`. The hardware truncates (`OLED_Col <= WriteData_out[6:0]`) and then the panel folds, addressing with `(pix_col(6) and not pix_col(5)) & pix_col(5 downto 0)`, which maps 96..127 onto 32..63 and leaves everything below 96 alone. So column 96 lands on 32, not 0; 100 on 36, not 4; and 128 on 0, not 32. `oledCol` now holds the raw 7-bit register (the Wrapper's own `>= 95` auto-advance comparison depends on that) and a new `oledPanelCol()` applies the fold at paint time. HDL mode shared the bug from the other side: `hdlApplyPer` dropped any `@@O` with a column ≥ 96 instead of folding it, so the two engines disagreed with each other *and* with the board; it now uses the same helper. The dead `oledCol > 95 ? 95` clamp went with it. Neither change affects the two examples that were already known good on hardware: the circle still renders 2533 lit pixels in one colour and the image 6144 in 81, unchanged. Not changed, and documented in the user guide instead: the panel is physically 16-bit (`pix_data_in <= pix_data(23 downto 19) & pix_data(15 downto 10) & pix_data(7 downto 3)` with `BPP => 16`), so 24-bit mode discards the low 3/2/3 bits of each channel on the way to the display. The canvas keeps painting the full 8-8-8, a difference of at most ~3% per channel that costs nothing to leave alone and would only make the simulator dimmer than it needs to be. `oneoff_oled_modes.js` grew from 13 to 18 cases and now folds the column the way the panel does. |
-| **v24.69 (OLED Colour Now Matches the Wrapper Exactly)** | A one-off cross-check (`riscv_simulator_tests/oneoff_oled_modes.js`, deliberately **not** in `npm run test:all`) ran the same program on the JS model and on the real `RV/Wrapper.v` through Icarus and compared the two 96×64 frame buffers pixel by pixel, across all five trigger modes, all three colour formats, both auto-advance wraps and the sub-word write rules. Trigger and auto-advance logic matched exactly, including both wraps. Colour did not, in three ways, and 12 of 13 cases differed. **(a) Narrow components were scaled to full range instead of left-aligned.** The Wrapper builds `OLED_Data` as `{D[7:5], 5'd0, D[4:2], 5'd0, D[1:0], 6'd0}` (8-bit) and `{D[15:11], 3'd0, D[10:5], 2'd0, D[4:0], 3'd0}` (16-bit), so 3-bit full red is `0xE0` and 5-bit full red is `0xF8`; the model computed `r3*255/7` and `r5*255/31`, giving `0xFF` for both. Every non-24-bit pixel therefore differed, and — the part that makes it a defect rather than a preference — **the same program rendered different colours in JS mode and HDL mode**, since the HDL path paints the Wrapper's own already-resolved `OLED_Data`. **(b) The store width was ignored.** The Wrapper gates 8-bit on `MemWrite_out[0]`, 16-bit on `MemWrite_out[1] && [0]`, and 24-bit per byte lane; the model treated every write as a full 32-bit replacement, so an `sb` in 16-bit mode wrongly repainted the pixel and an `sb` in 24-bit mode wrongly cleared the other two lanes instead of updating one. **(c) Colour was resolved at paint time, not write time**, so a mode change between writing `OLED_DATA` and triggering (`vary_col`/`vary_row` paint some writes later) retinted a stored colour. Fixed by making `oledDataVal` hold the resolved 24-bit register exactly as the Wrapper does, with a new `oledStoreData(offset, val, size)` applying the byte-enable rule for the current mode at write time and `writeOledPixel()` reduced to painting it. All 13 comparisons now match. Visible consequence: the shipped OLED examples render slightly darker but hardware-true — the image example's channel values are now the eight legal multiples of 32, topping out at `0xE0` rather than `0xFF`. The MMIO read-back of `OLED_DATA` (a write-only register; read-back is a Memory-view convenience) now returns the resolved 24-bit register rather than the raw word last stored. |
-| **v24.68 (HDL Memory Legend Drops "Editable")** | v24.67 made registers and every memory segment read-only in HDL mode, but the Memory panel's legend still read "Editable" (or "Editable except RO" on MMIO) over cells that no longer were. In HDL mode the note is now dropped entirely, along with its `·` separator, rather than replaced by a second read-only message next to the existing text-segment one - there is nothing segment-specific left to say once the whole view is replayed state. |
-| **v24.67 (Panel Filters Find Labels; Registers and Memory Are Read-Only in HDL Mode)** | Two unrelated corrections. (1) **Labels were the one thing the v24.62 row filter could not find**, which is close to the one thing worth searching for. Memory's row text never included them at all, so a `.data` word visibly rendered as `myvar:` did not match `myvar`; a `memRowNames()` helper inside `emitMemRow()` now folds in both user labels (scanning all four bytes of the word, in the stack view's direction where that applies) and an MMIO register's own name, in the single place all four render branches already funnel through. Disassembly matched a label only against the one instruction sitting exactly on its address, which is not what asking for `loop` means; it now carries the *nearest preceding* label down the block, so a label search returns the block under it, and the heading row — previously suppressed outright while filtering — is kept for whichever rows survive. A label referenced in an operand still matches its own row, so searching `helper` usefully returns both the call site and the target. (2) **HDL mode showed registers and every non-text memory segment as editable when they are not.** `hdlSeek()` rebuilds state by replaying the recording from reset, so an edit survived only until the next Step and then silently reverted; `vvp` cannot be paused and resumed from an altered state, so there is nothing to write an edit into and making it real is not available. A `stateIsReplayed()` predicate now renders those cells `readonly-code` with a `REPLAYED_STATE_TITLE` tooltip explaining why and pointing at the Peripherals panel, which is the input path that does work (it re-simulates). The five edit entry points (`startRegEdit`, `popRegEditModal`, `startMemByteEdit`, `startMemWordEdit`, `startMemWordCellEdit`) also refuse and say so, so a stale row or a keyboard route cannot slip past the markup. The pre-existing text-segment read-only tooltip was factored out to `TEXT_RO_TITLE` and now competes with the replay one rather than claiming "text segment" over a data row. |
-| **v24.66 (Waveform: Scroll/Zoom Split, Picker on the Left, Halt Masking, Register Waveforms)** | Four corrections from using the strip. (1) **A plain wheel no longer zooms.** It is left alone so it scrolls the signal list, which is what a wheel does everywhere else; zoom moved to **ctrl+wheel** (also what a trackpad pinch reports as) and pan to **shift+wheel**, with a dim always-visible hint in the header saying so. The alternative considered was moving the scrollbar to the left so the pointer would naturally sit over the gutter to scroll, but that fixes the collision by hiding it rather than removing it, and leaves the wheel meaning two different things depending on x. (2) **+ Signal moved from the right of the header to just after the title**, which puts it directly above the name gutter it edits, and — more to the point — well away from the ✕ that closes the whole strip, which it previously sat beside. The picker itself now anchors left, gained a "SIGNALS TO SHOW / Reset / Done" header so there is an obvious way out, and closes on a click anywhere outside it. (3) **The waveform now stops where the PC does.** `waveActiveEndCycle()` takes the last recorded step's cycle: once the program halts or spins on one instruction the trace records nothing more, so the remaining cycles are the same instruction repeating, and drawing them implies there is something left to step to. Beyond it the canvas is masked and labelled "PC not advancing past here", `Fit` and the viewport clamp to it (span included, or a re-run that halts sooner leaves "showing 0–39 of 7"), and the cursor is pinned to it — the header then reads `cycle 200, PC last advanced at 6`, since the hardware genuinely keeps counting while the waveform does not. (4) **Register waveforms.** `$dumpvars` does not write Verilog arrays, so the register file was absent; the testbench now declares 32 named aliases `wire [31:0] x<n>_<abi> = <regbank>[<n>];`, gated on the same resolved `regBankPath` as the rest of the architectural view, so they are picked up by the existing `$dumpvars(0, ...)` with no change to it. Naming them `x5_t0` rather than `x5` or `t0` means either spelling finds them in the picker. |
-| **v24.65 (Waveform Signal Picker, Zoom/Pan, and Click-to-Seek)** | **+ Signal** opens a filterable list over every signal the VCD carries. A flat filtered list, not an expandable tree: the hierarchy runs seven levels deep, so typing `alu` beats clicking down four scopes, and showing the full path on every row is what keeps two instances of the same module apart. Rows toggle inclusion (✓ when shown), a ✕ on each gutter label removes one, and the chosen set is persisted to `rvsim.waveSignals.v1` and re-resolved against each new VCD — paths that an edited design no longer has are dropped, but **counted and reported in the header** rather than silently vanishing, and a "back to the defaults" escape appears if the set ends up empty. The picker is **absolutely positioned over** the strip rather than stacked above it: a dropdown that reflowed the dock would squeeze the very waves it exists to add to. **Zoom** via wheel or −/+/Fit, anchored on the cycle under the pointer (not the left edge) so zooming stays about what is being looked at; **pan** by dragging. A press that stays within 3px is a **seek** instead: it maps x to a cycle, finds the last instruction that had started by then, and calls `hdlSeek()`, so clicking a suspicious edge moves registers, memory and the disassembly there too — the reverse direction of the lockstep added in v24.64. Because zoom and pan place the window deliberately, they route through `updateWaveHeaderAndDraw()` rather than `updateWaveView()`, which would snap straight back to following the cursor. The canvas is now sized to the rows' natural height (`WAVE_AXIS_H + n × WAVE_ROW_H`) with `.wave-body` scrolling and `.wave-names` `position: sticky`, so more signals than the strip is tall stay reachable without labels sliding out of step with their traces. `.wave-picker[hidden]` needs its own `display: none`, the same class-beats-UA-`[hidden]` trap as `.panel-find` in v24.62. |
-| **v24.64 (Waveforms, In the Page, in Lockstep With Stepping)** | A **📈 Waves** button (HDL mode only, hidden otherwise the way the Locals chip is outside C mode) opens a waveform strip spanning the **full window width** at the bottom of the page, below `.main` rather than among the side panels: how many cycles fit across is the binding constraint on a waveform, and the bottom strip is the only place with enough width. Drag-resizable through `initWaveResizer()`, a near-copy of `initConsoleResizer()` with its own `rvsim.waveHeight.v1` key and double-click-to-default; on mobile the handle is hidden and the height fixed at 190px, and opening the strip scrolls it into view since the whole page scrolls there. The viewer is **written here, not embedded**: `parseVcd()` plus a `<canvas>` pass, no new dependency and nothing added to `vendor/`. Surfer was evaluated and rejected — its stable postMessage surface is `LoadUrl`/`ToggleMenu`/`InjectMessage` with `InjectMessage` documented as unstable, so cursor-follow (the entire point) would ride the unstable path, and `LoadUrl` needs a URL the iframe can fetch, which a cross-origin `app.surfer-project.org` cannot do for a `blob:` — forcing a self-hosted Rust/trunk build with no npm or CDN artifact. `vcdrom` ships as a PWA with no library API, `vcd-stream` is archived and parser-only, and WaveDrom draws static WaveJSON diagrams rather than viewing a VCD. No second simulation is run: the testbench already dumps `dump.vcd` behind `+VCD`, `hdlSimulate()` already reads it back out of the Emscripten FS into `hdlLastVcd`, and `hdlTrace.steps[i].cyc` is the same cycle count the VCD timestamps — so the cursor is just `hdlCurrentCycle()`, updated from the single `updateWaveView()` call added at the end of `hdlSeek()`, which every Run, Resume, Step and Back already funnels through. The window follows the cursor only when it leaves view, so stepping within view does not scroll under the reader. **Cycles, not nanoseconds, are the unit on screen, and the divisor is derived from CLK's own period rather than hardcoded** — the stock testbench is `1ns/1ps` with `always #5 CLK`, which makes a cycle 10000 VCD ticks, not 10, and an edited clock would otherwise slide the cursor off the instruction it marks without any visible symptom. The VCD header is parsed **token-wise rather than line-wise**, since Icarus wraps `$timescale` and can wrap `$var`, and a line-at-a-time reader would drop declarations depending only on how long a signal's name happened to be. Because the testbench dumps with `$dumpvars(0, ...)`, every scalar and vector at every depth is present (239 signals, 7 levels, `dut.RV1.ALU1.*` included) with no testbench change; array-typed signals — `RegBank`, the IROM, the DMEM — are absent, since Icarus dumps an array only when each word is named explicitly, which the Registers and Memory panels already cover. Empty states are explicit rather than a blank canvas: VCD off offers an inline "turn it on and re-run", VCD on with nothing run asks for a run. Also fixed here: `hdlDiscardTrace()` left `hdlLastVcd` set and `#hdlVcdBtn` visible, so a discarded run kept offering the previous run's waveform and download as if current. |
-| **v24.63 (Markup Fix: `#tab-peripherals` Was Never Closed)** | The Peripherals panel's `<div class="tab-content" id="tab-peripherals">` was missing its closing tag, so the parser nested `#tab-disassembly`, the empty-state hint and `#panelStack`'s and `.right-panel`'s closers one level too deep, and `.main` swallowed everything to the end of the document. It had no visible symptom because `applyPanelDock()` reparents every `.tab-content` into `#panelStack` on its first run, silently repairing the tree before anyone could see it — which is also why it survived this long. It only surfaced when something needed to be a **sibling** of `.main` rather than a panel: a new element written after `.main`'s apparent closer landed inside it instead, and inherited `.main`'s row layout rather than the column layout of `.container`. Worth keeping in mind when reading this file's markup: indentation here is not evidence of nesting, and the runtime reparenting means a structural mistake in the panel region can stay invisible indefinitely. |
-| **v24.62 (A Row Filter in Every Panel That Has Rows)** | Registers, Memory, Disassembly and Locals each get a 🔍 button in their panel header, immediately left of ⧉, opening a one-line filter bar between the header and the body; typing narrows that panel to matching rows and shows an "N of M" count. Peripherals is deliberately excluded — it has controls, not rows. The button and bar are added once, in `ensurePanelChrome()`, gated on a `PANEL_FIND` set, so all four panels get it from a single place; `onFloatDragStart()` already ignored `.panel-hdr-btn`, so the new button does not start a panel drag. Matching is a case-insensitive substring against a per-row string each renderer builds explicitly, rather than against rendered HTML — the latter would match `title=` and `onclick=` attribute text and produce phantom hits. Memory's hex and ASCII go into that string as two separate runs so `dead` matches the hex and `Hell` matches the characters. Filtering happens at build time inside `updateRegisters()` / `updateLocalsView()` / `updateMemoryView()` / `updateDisassembly()`, so filtered rows are never created rather than created and hidden; Memory's four emit branches were funnelled through one `emitMemRow()` helper, which is where its filter applies. Two deliberate behaviours: Disassembly's label heading rows sit out an active filter (a heading whose instructions were filtered away is a heading for nothing), and Memory filters the rows its address window is already showing rather than scanning the segment, which its placeholder says. Filter text is per-panel and session-only — not persisted, since a filter silently surviving a reload reads as missing data. State is signalled twice over: the bar stays open while text is non-empty, and the 🔍 button carries an `.active` tint. On mobile the `@media (max-width:800px)` rule that hides every `.panel-hdr-btn` gets a single exception for `[data-panel-act="find"]`, on the grounds that a short viewport is exactly where narrowing a long list pays off most. One CSS-specificity trap worth recording: `.panel-find { display: flex }` is a class selector and so outranks the UA's `[hidden]` rule, leaving the bar visible in its closed state until `.panel-find[hidden] { display: none }` was added — the same class of bug as v24.60's `.mem-view-mode-btn` and v24.61's `#pbContainer`, and one jsdom cannot catch since it reads the `.hidden` property rather than computed style, so the new `test_panel_find.js` asserts the rule's presence in the stylesheet instead. |
-| **v24.61 (Peripherals Panel Sections Fold, and Auto-Unfold When a Program Actually Uses One)** | Each Peripherals section (LEDs & DIP, Push Buttons, 7-Segment, UART, Accelerometer, OLED — Cycle Counter excepted, it has nothing to fold, all its content already lives in its one-line title) now collapses to its title bar on click, so the panel can stay compact and the user can focus on whichever peripherals their program actually drives. Implementation is CSS-only for the fold itself — `.periph-section.periph-folded > *:not(.periph-title) { display: none !important }` (the `!important` needed to beat a couple of bodies' own id-selector `display` rules, e.g. `#pbContainer`) — so no section's existing markup needed restructuring into a body wrapper; a chevron is an absolutely-positioned `::before` on the title so it never disturbs a title's own `flex; justify-content: space-between` layout. Default: LEDs & DIP Switches starts expanded, everything else starts folded. `markPeripheralReferenced(addr)`, called from the real (non-`peekOnly`) path of both `handleMMIORead()` and `handleMMIOWrite()`, auto-unfolds a section the first time the running program touches an address in its range — folded-by-default sections come open the moment they're actually used, not before. If the user folds a section back down themselves, that specific fold is remembered (`userFolded`) and suppresses further auto-unfolding for it — until the next successful assemble/compile, which resets every section back to the class defaults via `resetPeriphFoldState()`. That reset is *not* wired to `resetAll()` (the ⟲ button) — re-running the same already-assembled program isn't "switching" it, so a Reset leaves whatever the user folded alone. |
-| **v24.60 (Three Narrow-Layout Fixes: Disassembly Toolbar, Memory's Dec Toggle, a Real Mobile CSS Bug)** | Three related fixes to how the Disassembly and Memory toolbars hold up when narrow (a docked 2×2 grid quadrant, or mobile). (1) Disassembly: `.mem-view-mode-btn`'s mobile size reduction (`padding`/`font-size` in the `@media (max-width:800px)` block) was silently losing to the desktop rule's own `!important`, since the override didn't carry one too - the Byte/Word toggle was never actually shrinking on mobile at all. Fixed, and pushed further: "Show Hex"/"Show Binary" are now just "Hex"/"Binary" in a tighter `.disasm-show-group`, and the toolbar's own gap/font-size trimmed on mobile - between the two, "LSB TO THE RIGHT" now shares the first row with the checkboxes and the Byte/Word toggle down to a 320px-wide panel (previously wrapped to its own row below ~390px even before accounting for the `!important` bug). (2) Memory: the Content (DEC) column header's `±/U` sign-toggle could wrap onto its own line under the label text whenever the column was at its `fit` width - a real, reachable case (a docked 2×2 grid gives Memory's last column exactly 122px, its old `fit` value) since a column never shrinks below `fit`, it only grows past it or the row scrolls. Root cause: that `fit` (122px) was originally sized for "Content (ASCII)" alone, from before the sign-toggle existed in this column - never revisited for the longer "Content (DEC)" + toggle combination that Word mode actually shows. Raised to 145px; the `.sign-toggle` widget itself (shared with Registers and Locals, which have their own headroom and were never affected) was also shrunk slightly across the board. `test_panel_grid.js`'s hardcoded Memory column-width-sum assertion updated to match. |
-| **v24.59 (User Guide: Style Pass and Two New Facts)** | Another editorial pass on `riscv_simulator.md`, this time on prose style rather than content selection: 53 em dashes across ~390 lines read as generated text ("too many em-dashes and AI like flavour"), rewritten with varied punctuation (periods, commas, colons, semicolons, parentheses) instead of one construction throughout; down to zero. Two facts added along the way: hovering a C variable while it's in scope (not just opening the Locals panel) surfaces its memory location, and HDL mode's input-timing story is now told in full — a change only takes effect once a Run actually stops (its *Cycles* budget runs in one uninterruptible Icarus pass, so the browser is essentially frozen for its whole duration), unlike JS mode where an input can change at any point mid-run, and the real trade-off that follows: a smaller *Cycles per Run/Resume* buys more frequent chances to change an input at the cost of clicking Run more times through a long program (an OLED image display, for one). |
-| **v24.58 (Memory Toolbar Flows Instead of Fixing Two Rows)** | The Addr/subtabs/refresh row and the Rows/Byte-Word row were two hardcoded `.mem-toolbar-row`s, and the legend line below them a third, fixed block — three rows of vertical height taken whether or not the panel was wide enough to need them. Replaced with one `.mem-toolbar` flex-wrap flow: Addr (label+input), the region subtabs, refresh, Rows (label+input), the Byte/Word toggle and the legend are each one atomic group (`flex: 0 0 auto`, `white-space: nowrap` on the legend) that packs left to right and only spills onto another line when it doesn't fit — never splitting a label from its own control or wrapping the legend text mid-line. A wide panel fits everything on one row; a typical mobile width fits Addr/subtabs/refresh/Rows on one and Byte-Word/legend on a second (down from three rows); a very narrow one falls back toward one group per row rather than wrapping any of their text. The border that used to sit under the legend moved to the bottom of `.mem-toolbar` itself so it stays a clean full-width rule regardless of how many lines the content wraps onto. |
-| **v24.57 (User Guide Rewritten for Its Actual Audience; Locals Hides Outside C Mode; Memory Legend and Disassembly Toolbar Trimmed)** | User-guide and in-app copy pass, aimed at matching the guide's real audience (a 3rd-year CG3207 student) rather than a first-time-computer-user register it had drifted into across many incremental edits. `riscv_simulator.md`: dropped the ASCII-art screen diagram and the assembler-errors catalogue (missing/surplus operands, a duplicated label, ... — things any assembler obviously rejects; kept the one genuinely non-obvious item, a store to a bare label needing a named scratch register, then cut that too as still self-evidently "wrong code doesn't assemble"); the same "needs `http://`" caveat, previously spelled out in full four separate times, now states it once (§10) and points back to it elsewhere; removed the prose pointers to `riscv_simulator_specs.md` ("for the full specification, see...") throughout the body; "### The screen" became a table, matching the doc's existing table-heavy style, in place of prose bullets. Added: a **Locals** panel row now that it exists, links to the course's own [memory map](https://nus-cg3207.github.io/labs/rv_resources/rv_memmap/) and [peripherals reference](https://nus-cg3207.github.io/labs/rv_resources/peripherals/) at the Peripherals section, and a link to the [wrapper template](https://github.com/NUS-CG3207/labs/tree/main/docs/code_templates/Asst_02) (which also has the other modules needed for the eventual Nexys 4/4 DDR/A7 build) in place of the Wrapper port-list's old reference-manual link. In the app itself: the **Locals** panel chip (and the panel, if it happened to be open) now hides outside C mode instead of sitting there to explain it doesn't apply — `updateLocalsPanelAvailability()`, called from `setLanguageMode()` and once at boot. The Memory panel's legend dropped "each row = one 32-bit word" (a relic of the old two-words-per-row layout, long since one row per word) and its "Data/Stack/MMIO: editable (Text: read-only)" line is now one word for whichever region is actually showing — "Editable" for Data/Stack, "Read only" for Text, "Editable except RO" for MMIO — instead of naming every region regardless of which one is on screen. The Disassembly toolbar's "Native stream after pseudo-instruction expansion. Blue row = instruction at current PC." hint is gone (a screenshot and its caption say the same thing the columns and highlighting already show), and **Show Hex** / **Show Binary** can no longer both end up unchecked — unchecking the second one snaps back rather than leaving the machine-code column blank. |
-| **v24.56 ("All Panels Hidden" Message Simplified, Locals Panel No Longer Shows Garbage Addresses Before the Prologue Runs)** | Two fixes. (1) The mobile "all panels hidden" hint named all four original panels by name (`Registers, Memory, Peripherals, or Disassembly`) — now five with Locals; rather than keep the list in sync, it just reads "the various panels." The now-unused `.panel-stack-empty-panels` CSS rule went with it. (2) A function's Locals rows (and its variables' hover tooltips) computed `s0 + offset` from whatever `regs[8]` currently held, even before that function's own prologue had set `s0` up — for the first few instructions of a call, that is still the *caller's* frame pointer (or, for the outermost call, `x8`'s power-on value), so a variable could briefly show an address like `0xfffffff0` that means nothing. `buildCVariableLocations()` now also records where each function's `addi s0, sp, N` prologue instruction sits; both the Locals panel and the hover tooltip check current PC against it and show a plain notice ("its locals will show correct addresses once execution reaches 0x...") instead of a live table until PC is strictly past it. |
-| **v24.55 (Trimmed the Example Set, Removed the Redundant `sp`-Init from Every Remaining C Example, Seeded `ra`, `.md` -> `.txt`)** | Four cleanup items from the same pass. (1) **Example set trimmed**: 9 example files removed (`examples/asm/{basic,factorial,io_mext,loop_array}.asm`, `examples/c/{basic,factorial,loop_array,matrix_multiply,peripherals}.c`) with their rows dropped from both `index` files and every test that referenced them (`basic`/`fib`-swap and equivalent across `test_jsdom.js`, `test_breakpoint_highlight_and_snap.js`, `test_disassembly_labels_and_warnings.js`, `test_hdl_mode.js`, `test_disassembly_machine_code.js`, `test_sim_max_instructions_setting.js`, `test_comprehensive_suite.js`, `test_execution_programs.js`, `test_statement_stepping.js`, `test_c_godbolt_simulation.js` — `fibonacci`/`fibonacci_c` mostly took over the "simple algorithmic example" role, `dip_led_c`'s DIP-mirrors-LED behavior replaced `peripherals_c`'s MMIO check); down to 7 assembly / 6 C examples (§9.1/9.2 updated). (2) **The `sp`-hardcoding inline asm removed from the 4 remaining C examples that still had it** (`HelloWorld.c`, `Circle_delay_accel.c`, `DIP_to_LED.c`, `ImageDisplay_autoadvance_accel.c`, plus the baked `BAKED_C_EXAMPLE` copy of `DIP_to_LED.c`) — the same redundant-and-harmful pattern v24.52 fixed in `HelloWorld_jal_jalr.c`, latent here since none of these `main()`s called a second, non-inlined function that would alias with it, but removed on the same reasoning regardless. Refreshing the four programs' Godbolt cache entries by live-recompiling turned out to be unreliable — one recompile of `ImageDisplay_autoadvance_accel.c` came back with a visibly smaller `.text`/`.data` than before for reasons that were never pinned down (a Compiler Explorer/compiler-version difference, not a bug in this codebase) and silently rendered a wrong 8192-pixel image against an expected 6144 instead of erroring; caught only because the pixel-count assertion in `test_baked_examples_full.js` failed. Fixed by patching the *previous, proven-correct* cache entries surgically instead — deleting exactly the asm line(s) the removed C line produced (either a bare `li sp, N` or, for two of the four, clang's own `lui sp, N` / `addi sp, sp, N` pair) and decrementing every subsequent `.loc` line number by one — rather than trusting a fresh compile to reproduce byte-identical output. (3) **CRT0 seeds `ra` with `__halt`'s address** right before `j main` (`la ra, __halt`, 2 more instructions ahead of user code) — closes the gap v24.53 knowingly left open: a C example whose `main()` actually `return`s now lands cleanly on the `__halt` trap instead of jumping to `ra`'s uninitialized reset value. Verified live: `regs[1]` (`ra`) and `pc` both read `__halt`'s address after `fibonacci_c`'s `main` returns, `a0` still holds the correct `34`. (4) **`examples/asm/index.md` and `examples/c/index.md` renamed to `index.txt`** (content unchanged, still the same `\| key \| label \| file \| description \|` table) — a static site generator hosting this repo would render `.md` through its own Markdown pipeline instead of serving it verbatim, breaking the page's `fetch('examples/*/index.md')`; `.txt` is never touched that way. All references updated: the one `fetch()` call in `riscv_simulator.html`, `examples_fetch.js`'s test shim (already extension-agnostic by regex, just its comments), and prose in this file, `riscv_simulator.md` and `riscv_simulator_tests/README.md`. |
-| **v24.54 (C Variable <-> Memory Location Correspondence: Locals Panel, Hover, Disassembly Tags, Click-to-Focus)** | New best-effort way to see where a C local actually lives, directly motivated by debugging v24.52's aliasing bug the hard way (by hand, reading `s0`-relative offsets out of the disassembly). Not real DWARF — Compiler Explorer's JSON response doesn't hand back a parsed location table, and parsing the raw DWARF byte stream it embeds as `.byte`/`.uleb128` directives is its own project — so `buildCVariableLocations()` instead leans on how clang at `-O0` actually behaves: every local is spilled to a fixed `s0`-relative stack slot, and `cLineToPcsMap` (already built for statement stepping) already maps each source line to the instruction(s) it produced. A light regex scan of the C source (good enough for the simple, single-line-signature style every bundled example uses, not a general C parser) finds each function's line range and its declared locals/params; each local's declaration line (or, if uninitialized, its first assignment) is matched back to the `s[bhw]`/`l[bhw]` instruction that reads or writes it, and the stack offset is read straight off that instruction's own operand text. Four surfaces share this one table: (1) a new **Locals** panel (5th tab, alongside Registers/Memory/Peripherals/Disassembly) listing the current function's variables with live Address / Content (Hex) / Content (Dec) columns — the Dec column gets the same signed/unsigned toggle as Registers and Memory, refreshed on every step by piggybacking on `updateRegisters()` so no existing call site needed touching; (2) hovering a variable name in the C editor extends the existing `riscvHoverTooltip` (previously ASM-only) with its stack offset and live Hex/signed-Dec/unsigned-Dec value; (3) the Disassembly panel's Native column tags each stack-relative load/store with `; varname` (`.disasm-cvar-tag`, green, matching the existing blue `.disasm-target-label` styling); (4) clicking a variable name in the C editor brings the Locals panel forward (desktop: shows it; mobile: switches the active tab to it) and flashes its row. Verified on `HelloWorld_jal_jalr.c` (matches the v24.52 investigation's hand-derived offsets exactly) and on `Circle_delay_accel.c` (4 functions, up to 10 locals each, including MMIO pointer locals) — the heuristic generalizes past the one example it was built against. Known limitation: regex-based, not a real parser — multiple declarations on one line, struct/array locals, and multi-line signatures aren't handled; falls back to simply not showing that variable rather than showing something wrong. |
-| **v24.53 (C-Mode CRT0: `j main` Instead of `call main`, `__halt` Moved to the True End of `.text`)** | The CRT0 shim `compileAndAssembleC` prepends before Godbolt's own output used `call main` (linking `ra`) then `li a7,10; ecall; __halt: j __halt` as a fallback if `main` returned — but that whole block sat *before* the user's compiled code in `.text`, so `__halt` was never near where a program's own instructions actually end. Every example's `main` is `while (1) { ... }` and is not expected to return, so `call` is now `j main` (no link set up) and the dead `li a7,10; ecall` was dropped; `__halt: j __halt` now gets emitted *after* all of Godbolt's own `asm` output (a `.text` directive re-opens the section first, since the compiled output usually ends mid-`.rodata`), so it is the true last instruction of the segment — PC running off the end of the real program for any reason lands on this trap instead of unmapped memory. Net 3 fewer instructions ahead of user code (`call`'s 2-instruction `auipc+jalr` shrinks to `j`'s 1-instruction `jal`, minus the 2 dropped exit instructions); `circle_accel_c` 289→286, `image_display_c` 661→658 (test counts updated). Caught two accidental uncommitted deletions of 8 example files (`examples/asm/{basic,factorial,io_mext,loop_array}.asm`, `examples/c/{basic,factorial,loop_array,matrix_multiply,peripherals}.c`) while chasing a test failure — all 8 still listed in their `index.md` manifests and used by the test suite, so this was breakage, not a removal; restored from HEAD. Known follow-up: the handful of C examples whose `main` actually does `return` (`basic_c`, `factorial_c`, `fibonacci_c`, `loop_c`, `matrix_c`, `peripherals_c`) now run off to whatever garbage is in `ra` (`0x0` observed) after that `ret`, rather than reaching `__halt` — harmless for the result already computed and stored in `a0` by that point, but not a clean stop; flagged for the user, not yet addressed. |
-| **v24.52 (`HelloWorld_jal_jalr.c`'s Greeting Only Printed Once)** | `main()` started with `asm volatile("li sp, %0" : : "i" (STACK_INIT));` to set up the stack pointer — redundant, since the simulator's own startup code already sets `sp = STACK_INIT` before calling `main`, and harmful: it ran *after* the compiler's own prologue for `main` had already decremented the real `sp` by 32 to carve out `main`'s frame, so the inline asm silently undid that reservation, resetting `sp` back to the very top of the stack. The next non-inlined call — `print_string(greeting)` — then computed its own frame starting from that same top-of-stack address, landing its locals (`s`, the loop counter `k`) at the identical addresses as `main`'s own locals (`greeting` among them). The first call still worked (it reads its own already-copied `s` argument), but by the time it returned, `k`'s final value (23, the string length) had overwritten the memory slot `main` was using for `greeting` — so the second call read that garbage back as the string pointer, dereferenced unmapped memory that reads as `0`, and the print loop's `s[0] != '\0'` check failed immediately, matching the reported symptom exactly ("goes to the function, but doesn't proceed to print"). Fix: removed the inline asm line from `main`; verified via live Godbolt compile that the greeting now prints correctly across 4 successive "A"+Enter triggers in a row. The same `asm volatile("li sp, ...")`-as-first-statement pattern is copy-pasted into `HelloWorld.c` and `DIP_to_LED.c` (harmless there — neither calls a non-inlined function from `main`) and into `Circle_delay_accel.c` / `ImageDisplay_autoadvance_accel.c` (both do call functions from `main` repeatedly — same latent bug, not yet fixed; flagged for the user). |
-| **v24.51 (Memory's Signed/Unsigned Toggle Was Missing on Mobile — the Whole Column Header Was)** | `.mem-col-header` (Addr / Content (Hex) / Content (ASCII or DEC), the last of which carries the ±/U switch) had `display: none` on mobile — a pre-existing rule from before that column had a toggle in it, there to hide the drag-to-resize handles that make no sense on a touch screen. Those handles (`.col-resizer`) already have their own, separate `display: none` on mobile, so hiding the whole header on top of that was hiding the labels and the switch for nothing they were protecting. Removed; Memory's header — switch included — now shows on mobile exactly as it does on desktop, and behaves identically (hidden in Byte mode, toggles `memDecSigned` in Word mode). Verified no horizontal overflow, on the longest MMIO labels included. |
-| **v24.50 (Mobile Editor Trimmed Further, Handed to the Panels)** | The editor dropped another 24px (300px, was 324px) and the active panel's bounded height (v24.47) grew by the same 24px (186px, was 162px) — a direct transfer, not two independent tweaks, so the mobile page's total height budget is unchanged. |
-| **v24.49 (`test_hdl_mode.js` Runs the Real Engine Again)** | Its default `HDL_ENGINE_DIR` was a hardcoded absolute path into one specific Claude Code session's `/tmp` scratchpad — worked only inside that one session, and reported "Engine present: false" everywhere else, including this repo's own CI-less local runs. `vendor/verisim/` is the repo's own vendored copy of the identical engine (see `vendor/README.md`) and was sitting there fully populated the whole time; the default now points there instead. All 159 assertions in that suite — including the ones that only run when the real Icarus/WASM engine is reachable — pass again. |
-| **v24.48 (Memory's "Code" Tab Renamed to "Text"; Dump Buttons Get Their Space)** | The Memory panel's read-only region — the `.text` segment — was labelled `Code` on its tab, in the legend (`Code: read-only`), and in every read-only-cell tooltip/status message; all renamed to `Text`, matching the `.text` terminology already used in Settings → Linker, without touching the source editor (still "Code Editor" in those same messages — a different thing). `💾 Dump txt` / `💾 Dump data` are now `💾 Dump Text` / `💾 Dump Data`. |
-| **v24.47 (Mobile: Bounded Scrollable Panels, Fixing a Latent Sticky-Header Bug Along the Way)** | The active panel (Registers/Memory/Peripherals/Disassembly) grew to its full content height and let the whole page scroll to reveal it; now its body is capped at roughly half the editor's height (162px) and scrolls independently, matching the desktop docked panels. That surfaced a real, pre-existing bug rather than a new one: `position: sticky` on a `<th>` alone stops holding once its panel is actually short enough to need scrolling — masked until now because Registers' and Disassembly's desktop panels were rarely short enough to trigger it (Memory's header is a plain `<div>`, unaffected). Fixed generally (not mobile-only) by putting `position: sticky` on the `<thead>` as well, not just its cells. |
-| **v24.46 (Mobile: Smaller Editor and Console, Freeing Up Room)** | The code editor's height dropped 10% (360px → 324px) and the console's by about 1.5 lines (80px → 55px) — both were sized generously before the panel area below them was made to scroll independently (v24.47), when every extra pixel there meant less of the page visible without scrolling. |
-| **v24.45 (Mobile Toolbar: Six Buttons Share a Row, Freeing One)** | Undo/Redo/Find and Dump Text/Dump Data/Settings were each a full-width row of their own; combined into one row split into two halves, with Assemble/Run/Step/Back/Reset moved to take the row that freed up — now the last action row, directly above the status line. Desktop is untouched: the trick is `display: contents` on the two row wrappers so their groups become direct grid items of `.toolbar` itself (a `display: grid` two-column grid on mobile only), which lets two groups from *different* wrapper rows land in the same visual row via explicit `grid-row` placement — something plain flexbox `order` cannot do across separate parents, and this needed no DOM changes for desktop to fall back to its own unrelated layout untouched. |
-| **v24.44 (Guide Notes HDL Input Doesn't Apply Mid-Run)** | The user guide already documented that flipping a switch while paused replays the run with the change stamped at that cycle; it did not say that this only works while paused. A Run computes its whole *Cycles* budget in one pass through Icarus — there is no interactive injection point partway through a batch, so an input changed during an active run is queued and only takes effect once that run stops. Documented, with the workaround: a smaller *Cycles per Run/Resume* makes pauses come around more often. |
-| **v24.43 (Memory Content(Hex) Widened to 140px)** | v24.40's 112px default was sized for the column header, but the longest MMIO labels (`UART RX VALID (RO):`, `UART TX READY (RO):`, ~132px) then wrapped onto two lines by default — still correctly aligned (v24.41), just not the tidiest look for the common case. Widened back to 140px so those labels render on one line again, same value the column briefly held under v24.32. |
-| **v24.42 (Sign-Toggle Stayed Visible and Clickable in Byte Mode)** | `updateMemoryView()` correctly set the toggle's `hidden` attribute in Byte mode, but nothing happened — `.sign-toggle { display: inline-flex }` is unconditional author CSS, and author styles win over the browser's own `[hidden]` handling regardless of specificity, so the toggle stayed visible and interactive when it was meaningless (Byte mode shows ASCII, not a signed/unsigned number). Added `.sign-toggle[hidden] { display: none }` to actually enforce it; verified hidden in Byte mode, visible in Word mode, hidden again switching back. |
-| **v24.41 (A Wide Label Broke That Row's Column Alignment)** | `.mem-row-label-anchor` sized itself to whichever was wider, the label or the word/byte content beneath it. Two labels sharing an address (`DMEM, delay_val:`) are wider than any hex content, so that one row's Hex column rendered wider than every other row's — left-aligning the shorter content inside the now-oversized box, and shoving that row's Content(ASCII/DEC) block further right than every other row's, since each row lays out independently. Fixed by pinning the anchor's width to the column's (`var(--mem-hex-w)`, same as every row) and letting a long label wrap onto extra lines within that fixed width instead of stretching it — a wide label now only costs that row some height, never its alignment. Verified pixel-for-pixel: every row's Hex/Content blocks land at identical `left` coordinates regardless of label length. |
-| **v24.40 (Memory Content(Hex) Narrowed to 112px)** | Measured the real constraint in a live browser instead of guessing: MMIO labels don't wrap by design and the data cells self-protect via `min-width: max-content`, so the only thing that can actually wrap is the header text - empirically 108px. Set `fit: 112` (was 140, from v24.32) for a small margin over that. (Widened back in v24.43 once wrapping the MMIO labels themselves turned out to matter more than the narrower default.) |
-| **v24.39 (Registers Content(Hex) Drops the `0x` Prefix; Name → ABI Name)** | The header already says "(Hex)", so `0x00000000` shortened to `00000000` in both the inline cell and the double-click edit modal's pre-filled value — both edit paths already stripped an optional `0x` on commit, so typing it back in still works either way. Memory's Addr column keeps its `0x` prefix and its header still doesn't say "hex" anywhere, so nothing there needed to change. The `Name` header is now `ABI Name`; its column widened (72px → 92px) to fit the longer label without wrapping. |
-| **v24.38 (Decimal Default Is Signed - Fixed a Toggle Direction Bug)** | The default (`regDecSigned`/`memDecSigned = true`) was always signed, but the ±/U switch's thumb slid to the *wrong* side when checked: default (signed) parked the thumb next to "U", visually implying unsigned was selected. Swapped the checked/unchecked thumb positions so checked (signed) now sits next to "±" and unchecked (unsigned) next to "U" - matching what's actually active. |
-| **v24.37 (Registers & Memory: Every Header and Content Cell Centre-Aligned)** | Both panels' columns (`#`, ABI Name, Content Hex/Dec for Registers; Addr, Content Hex, Content ASCII/DEC for Memory) switched from left-aligned to centre-aligned, headers and data cells alike. Disassembly, sharing the same header CSS, was left untouched. |
-| **v24.36 (Registers Header Still Wrapped - a CSS Cascade-Order Bug)** | v24.32's `.reg-table th { white-space: nowrap }` override was declared *before* the shared rule that sets `white-space: normal` on all three panels' headers - same specificity, so the later (shared) rule kept winning and the override silently did nothing. Moved it to after that shared block, where it actually takes effect; also bumped the Hex column's `fit` (116px → 124px) to close a residual ~5px overflow. Verified this time by checking `getComputedStyle(...).whiteSpace` and the rendered line count in a live browser, not just by re-reading the CSS. |
-| **v24.35 (Accelerometer Gets a Help Caption; Steps by 5 Instead of 1)** | The X/Y/Z/T keyboard shortcut (v24.31) had no on-screen hint at all, unlike the push buttons' key captions; added one matching line, `X \| Y \| Z \| T — hold, then ← → to adjust`, under the accelerometer's preset buttons. Each keyboard press also moved its axis by only 1 of a 256-wide range (or 1 of 126 for temperature) — barely visible on the slider; raised to 5 per press. |
-| **v24.34 (Memory Content(DEC) Left-Aligned, No Padding)** | The Word-mode decimal cell was right-aligned via `padStart(11, ' ')` — with one word per row (v24.28) there is no longer another number on the same line for it to align against, so the leading spaces just pushed the digits away from the Hex column next to them. Now unpadded and explicitly `text-align: left`, matching the "every column starts at its own left edge" layout used everywhere else in Registers and Memory. |
-| **v24.33 (Registers Panel: Value → Content, Matching Memory)** | `Value (Hex)` / `Value (Dec)` renamed to `Content (Hex)` / `Content (Dec)`, so the two data panels that both show a register/word's content in hex and decimal use the same word for it. |
-| **v24.32 (Registers & Memory: Hex Column No Longer Stretches Past What It Holds)** | Both panels' Hex column had `grow: 1` (Registers) or a `fit` sized for the old two-word-per-row layout (Memory, 244px — see v24.28), so on a wide panel it claimed far more width than `0x00000000` or one 8-digit word actually needs, pushing the Dec/Content column away from it. Registers' `hex` column is now `grow: 0` (fixed at its `fit`, 104px) so all surplus goes to `dec` instead, whose text sits flush against Hex rather than centred in a stretched column. Memory's `hex` column `fit`/`min` dropped from 244/200 to 160/130 — enough for the longest MMIO label (`UART RX VALID (RO):`) plus margin, not the two-word width it no longer renders. |
-| **v24.31 (Accelerometer Keyboard Shortcut: Hold X/Y/Z/T, ← / →)** | Hold `X`, `Y`, `Z` or `T` and press `←`/`→` to nudge `accelX`/`accelY`/`accelZ`/`accelTemp` by one step, clamped to the same range as its slider (`-128..127`, or `-40..85` for temperature) — the same held-key idiom as the push buttons (v24.16), so a quick tweak doesn't require reaching for a slider. `heldAxisKeys` tracks which letters are currently down; the arrow-key handler checks it *before* the plain push-button arrows, so a chord never also presses BTNL/BTNR on the same keystroke, and releasing the letter hands `←`/`→` straight back to the push buttons. Each slider gained a matching hover tooltip. |
-| **v24.30 (Push-Button Wording Revised Again; Centre Button Now ↓)** | v24.26 shortened every push-button tooltip/caption to "click to toggle or use arrow keys"; reworded again to name the actual key per button — `"BTNL (bit 2) — click to toggle; hold ← to press"` — since a generic "arrow keys" no longer says which arrow. The centre button (`BTNC`) moved from `↑` to `↓`, in the key hint, every tooltip, and the actual `keydown`/`keyup` binding: `←`/`↓`/`→` share a row on most keyboards, `←`/`↑`/`→` do not. |
-| **v24.29 (Memory View Labels Get Their Colon)** | A label above a memory row — a code/data symbol from `labelAnnotationHtml`, or an MMIO register's name from `mmioLabelAnnotationHtml` (v24.21) — now ends in `:`, e.g. `main:`, `DIP (RO):`, matching how a label actually reads in the program. |
-| **v24.28 (Memory View Is One Word Per Row, Not Two)** | Word mode packed two 32-bit words into one row; on a narrow panel the row's Hex cells (both words) and Content cells (both words) could each wrap independently, so a wrapped layout interleaved word 1's decimal value with word 2's hex on the visual line below it — the two words' Hex and Content became impossible to match up by eye (screenshot: `wrapping.png`). Each row is now exactly one word, in both Byte and Word mode and in every region (Code/Data/Stack/MMIO); a wrap now only ever drops that one row's own Content cell below its own Hex cell — the same row, never a different word's. `Rows` now means what it says: with one word per row, `Rows: 64` shows 256 bytes instead of the previous 512. The now-unused `.wordgap` spacer (there is only one word per row to space from) was removed. |
-| **v24.27 (Memory View's ASCII Column Wraps by Word, Not by Character)** | In Byte mode, each byte's ASCII character was its own independent inline element, so a narrow panel wrapped the column wherever a character happened to run out of room — scattering one word's four characters across two lines with no relation to the Hex column's own word grouping above it, unreadable. The four characters of a word are now wrapped in one atomic, non-breaking unit (`.mem-ascii-group`), mirroring `.mem-row-bytes`'s grouping of the hex nibbles — so a wrap, when the panel is too narrow to fit everything, now happens *between* words, one word per line, the same place the Hex column would wrap. |
-| **v24.26 (Mobile Console Pinned Small; Push-Button Tooltips Simplified)** | The status/console strip between the code editor and the tab bar could inherit a desktop drag-resized height — up to 70% of the viewport, previously entirely reasonable on a wide screen — because `setConsoleHeight()` writes it as an inline style, which a plain `.console { max-height: 110px }` mobile rule cannot override. Pinned to a fixed 80px (~4 lines) on ≤800px viewports with `!important`, so no persisted or dragged height can grow it past that; the drag handle is hidden there too, since there is nothing left for it to resize. Old messages are still there — `overflow: auto` on `.console` was already scrollable, just previously with too much of the screen to need scrolling for. Separately, the push-button tooltips and captions ("BTNL (bit 2) — click to toggle, hold ← to press") shortened to "— click to toggle or use arrow keys" throughout — the peripherals panel, its title tooltip, and each button's own title. |
-| **v24.25 (Word-Mode Content Column Is Decimal, With a Signed/Unsigned Switch)** | The Memory panel's third column now tracks the Byte/Word toggle instead of always reading ASCII: **Content (ASCII)** in Byte mode, exactly as before, and **Content (DEC)** in Word mode — one decimal number per 32-bit word, clickable to open the same word-edit overlay as its hex cell, in place of the eight loose per-byte ASCII characters that mode showed previously (MMIO rows in Word mode showed no third column at all before this — see v24.23). A compact ±/U switch sits in the column header, shown only in Word mode, next to the label it toggles; it defaults to signed. Applies uniformly to Code, Data, Stack and MMIO — all four shared the one `updateMemoryView()` word-mode path already, so this did not need four separate fixes. |
-| **v24.24 (Registers Panel Gets the Same Signed/Unsigned Switch)** | **Value (Dec)** showed only the signed interpretation before, with no way to see `x5 = 0xFFFFFFFF` as `4294967295` without doing the arithmetic by hand. The same compact ±/U switch from the Memory panel (v24.25) now sits in that column's header; editing a value by typing decimal is unaffected either way, since committing a value already re-derives the sign from what was typed rather than from which mode was showing. |
-| **v24.23 (MMIO Memory-Tab Edits Now Visibly Stick)** | Editing an MMIO register from the Memory tab — LED, 7SEG, UART TX, OLED, ... — always took effect internally, but nothing on screen showed it until something else happened to call `updatePeripherals()` again, usually the next **Step**; reported as the edit "not sticking." Root cause: the Peripherals panel's DOM (`#led0`, `#dip0`, `#pbBtnL`, ...) is built lazily by `initPeripherals()`, which for most of this project's history only ever ran the first time a user opened that tab (`refreshPanel('peripherals')`) — so `updatePeripherals()`, called right after the edit as it always has been, was updating classes on elements that did not exist yet whenever the Memory tab was opened first. `initPeripherals()` now also runs once during `bootSimulator()`, so the DOM — and every `updatePeripherals()` call from then on, MMIO edits included — has somewhere real to write to regardless of which tab is opened first. The same latent gap explained why a prior session's keyboard-pushbutton tests (v24.16) needed to call `initPeripherals()` manually before checking button state; that workaround is now redundant but harmless. |
-| **v24.22 (Read-Only MMIO Registers Are Actually Read-Only)** | DIP and PB are read-only on real hardware, but `handleMMIOWrite()` had branches for both that happily overwrote `dipSwitches` / `pbState` from a program `sw`, or from an edit in the Memory tab — silently corrupting the very switch/button state those registers exist to report, until the next toggle click or keypress overwrote it back. Both branches are now no-ops, matching what real hardware does with a write to a read-only register. The Memory tab now also renders every read-only MMIO cell the same way it already rendered the read-only Code segment — greyed out, not editable, with a tooltip — for the whole read-only set (DIP, PB, UART RX VALID, UART TX READY, ACCEL DATA, ACCEL DREADY, CYCLECOUNT), plus matching guards in each edit-commit function as defence in depth for anything that reaches them another way. `UART RX` is the one deliberate exception: writing it has always meant "inject a byte into the RX queue," a simulator-only input mechanism rather than a real register write, and stays editable on purpose — now spelled out in a comment next to the new registry entry that decides this (`MMIO_REGISTERS`, one array now shared by the label, the edit gate and the write gate, replacing three separately-hand-maintained copies of the same address list). |
-| **v24.21 (MMIO Register Name Moves Above Its Cell, Like a Label)** | Two MMIO registers sharing one 8-byte row (LED + DIP, UART TX_READY + TX, ...) used to render as chips appended after the row's hex and ASCII columns — readable, but not where a user's eye goes first, and still identified by address (`DIP RO 0xFFFF0064`) despite the address being exactly what picking that row already told you. Superseding that (v24.18's chip fix), each register's own name and access type now sits directly above its word cell, the same anchored-label placement already used for user-defined symbols in Code and Data (`labelAnnotationHtml`) — just in MMIO's purple rather than label-orange, so the two kinds of annotation read as different things at a glance. No address: `DIP (RO)`, `UART TX (WO)`, not `DIP RO 0xFFFF0064`. |
-| **v24.20 (User Guide and Reference Manual Swap Names; Guide Leads With What the Simulator Is)** | `riscv_simulator_user_guide.md` is now `riscv_simulator.md`; the former `riscv_simulator.md` (this reference manual) is now `riscv_simulator_specs.md` — the short, task-oriented document gets the short, obvious filename. The guide opens with a **▶ Start the Simulator** button (opens `riscv_simulator.html` in a new tab) instead of a paragraph explaining `file://` and local servers before saying anything about what the simulator does; that explanation still exists, just moved to a new §10 at the end, since most readers open the page and never need to run a local server at all — leading with instructions only some of them need was solving the less common case first. Every cross-reference between the two files, and from `riscv_simulator_tests/README.md`, was repointed to match. |
-| **v24.19 (Renamed; Long Bug-fix Comments Trimmed)** | The header and `<title>` now read **NUS-CG3207 RISC-V Functional and HDL Simulator**, and the `RV32GC — Assembler + Simulator` subtitle line is gone. Found in the process: a top-level block right after `loadFile()` was still setting a hardcoded demo program into `editor.value` and logging "NUS-CG3207 RISC-V Simulator loaded" — dead weight, since `editor.value`'s setter no-ops until CodeMirror exists at that point in boot, and everything it did was overwritten by `bootSimulator()`'s own `loadExample()` moments later; only the `initSplitter()` / `initPanelDock()` calls it also made were load-bearing, so those are what remain. Also trimmed several comments that had drifted into narrating a bug's history rather than documenting the code as it stands now — the `.word`/`.half`/`.dword` alignment fix (v24.12) picked up three multi-line "used to..." comments in the course of getting it right; cut to one or two lines each, keeping the *why*, not the debugging log. |
-| **v24.18 (Each MMIO Register Its Own Chip)** | The Memory panel's MMIO tab already named every register — including DIP, at `0xFFFF0064` — but two registers sharing one 8-byte row (LED + DIP, UART TX_READY + TX, OLED COL + ROW, ...) were joined into one string, `[LED WO 0xFFFF0060 · DIP RO 0xFFFF0064]`, so the second name read as trailing text after the first rather than its own label. Registers that don't share a row, like PB or 7SEG, already got their own clean bracket and were never in question. Each register now renders as its own small chip, so DIP (or whichever register is second) is exactly as visible as if it had the row to itself. |
-| **v24.17 (DIP to LED's Godbolt Cache Split Out)** | `DIP_to_LED.c`'s captured Godbolt output now lives in its own file, `riscv_simulator_tests/godbolt_cache_dip_led.json`, separate from the other ten C examples in `godbolt_cache.json` — it is the one C example baked into the page rather than fetched, so its cache entry was never really part of the same "one file per fetched example" set as the rest. `godbolt_cache.js` merges both into one lookup table; nothing outside that file needs to know they're two files on disk. |
-| **v24.16 (Push Buttons Operable from the Keyboard)** | `L` / `C` / `R` can now be held with **←** / **↑** / **→** — each button shows its key in a small caption underneath. Keyboard is a **momentary** press: down on `keydown`, up on `keyup`, matching a real push button. Mouse click is unchanged: still a **toggle**, latching until clicked again — the two are deliberately different mechanisms sharing the same three state bits. Excluded while the code editor has focus, where these keys move the cursor instead; a `window blur` listener also releases all three, so alt-tabbing away mid-press cannot leave a button stuck down. The focus check needed its own look: the codebase's usual way of asking "does the editor have focus", `e.target.id === 'asmEditor'`, checks an id that is not actually assigned to anything — a pre-existing dead branch, harmless there because CodeMirror's own keymap already owns Tab/Enter/comment-toggle independently, confirmed by testing that Tab-to-indent works despite it. Not touched, since it does not affect any current behaviour, but the new keyboard handling was written against the one element that is real, `cmEditor.contentDOM`. |
-| **v24.15 (Example Menu Driven by index.md, Not Hardcoded)** | `EXAMPLE_MENU` and `EXAMPLE_FILENAMES` are no longer JS objects written out in `riscv_simulator.html` — they are parsed at page load from `examples/asm/index.md` and `examples/c/index.md`, one markdown table row (`\| key \| label \| file \| description \|`) per example. **Adding a program is now a row in one of those files plus the file itself — no HTML change at all**, addressing the entire reason the previous hardcoded menu existed. Both tables are sized for up to 15 rows, matching what the dropdown's layout is designed for; nothing enforces that as a hard limit. Until the fetch resolves — permanently, over `file://` — the menu falls back to the one baked example in each language rather than sitting empty. Building this exposed a genuine jsdom test-harness bug, not a flaky one: eleven suites installed their `window.fetch` shim (`examples_fetch.js`) *after* `new JSDOM()` returned, which is too late now that the page's own top-level script fetches `index.md` immediately on load — with `runScripts: 'dangerously'`, that fetch fires synchronously *during* `new JSDOM()`, before any code placed after it runs. Every one of those suites silently fell back to the two-entry default menu and 404'd on every real example. Fixed by moving the install call inside each `beforeParse(window)`, the only point that reliably runs before the page's own script does; `loadExample()` also now `await`s the index-load promise before building a fetch URL from `EXAMPLE_FILENAMES`, closing the same race from the page's side regardless of test timing. |
-| **v24.14 (HelloWorld Rewritten Without `goto`; a New Function-Call Example)** | `hello_world_c` no longer uses `goto` or a callee function, matching `HelloWorld.asm`, which predates `jal`/`jalr` in the course and inlines everything into `main`. The three-stage `goto` chain became one `while(1)` loop with a single state variable (`gotA`), which also fixed a size regression the `goto` version had already hit once before (v24.9): writing the echo sequence out twice, once per stage, doubled its cost at `-O0` and pushed the program over the default Code segment again. Added **`hello_jal_c`**, a new example translating `HelloWorld_jal_jalr.asm` — same loop, but the greeting is printed by a real function, `print_string(const char *s)`, taking the string the way `PRINT_S` takes it in `a0`. Both were checked against every branch of the protocol Godbolt compiles to, not just the happy path: a repeated `A` (absorbed, matching `WAIT_CRorLF`'s own re-check), and a byte that is neither `A` nor Enter (abandons the attempt, matching the fall-through to `WAIT_A`) — the second is the one branch that never printed anything in either the original `.asm` or these translations, so it is the one most likely to silently break. 22 examples now (11 in each language). |
-| **v24.13 (DIP to LED Baked In, Not Basic)** | The one example guaranteed to load with the page opened straight from disk is now **DIP to LED**, in both languages, not Basic — `dip_led` replaces `basic` as `BAKED_ASM_EXAMPLE`, and `dip_led_c` becomes the first C example ever baked in, as `BAKED_C_EXAMPLE`, alongside it. Compiling a baked C example still needs Godbolt regardless — baking only means its *source* survives a `file://` open with no fetch, the same guarantee `dip_led` already had. Two call sites had hardcoded the old default and needed to follow it: `setLanguageMode()`, which reloads a starting example on every ASM↔C switch, and `initCodeMirrorEditor()`'s first-paint fallback, which turned out to already be dead code — a stale reference to a **local** `examples` object that stopped existing in v24.10, silently falling through to its own separate literal copy of the Basic program every time. That's the bug behind "the baked C program doesn't load anymore": switching to C mode called `loadExample('basic_c')`, which had just become a fetched example, so with the page opened over `file://` it failed exactly the way every other non-baked example was already documented to. Two files the test suite reads directly from disk (`Circle_delay_accel.c`, `ImageDisplay_autoadvance_accel.asm`/`.c`) had also moved to `examples/` outside this change, breaking `test_new_c_simulation.js` and `test_reset_and_image_display.js` at the fixture-path level; repointed both. `examples/asm/basic.asm` did not exist yet either — `basic` had been baked when the split happened in v24.10, so nothing had ever extracted it — three suites that loaded it with no fetch shim broke the same way as a real `file://` user switching examples would have. Documented **how to run the page locally with every example available**: `python3 -m http.server` from the repository root, in both the reference manual and the user guide, not just in `vendor/README.md` where it lived before. |
-| **v24.12 (`.word`/`.half`/`.dword` Now Align Themselves)** | A label immediately followed by one of these directives used to land wherever the previous directive happened to leave off, not on the boundary its own width needs — `var1: .word 1` right after a 23-character `.asciz` landed on an address that was word-aligned purely by chance of the string's exact length, and the shipped `DIP_to_LED.asm` says so in its own comment: *"Food for thought: what will be the address of `var1` if `string1` had one extra character? Hint: words are word-aligned"* — a hint the assembler was not actually honouring. Fixed for real, not by padding around the label: alignment is now applied *before* the label captures its address, so `var1: .word 1` names wherever the word actually ends up, matching what every other assembler does by default. That needed care in both passes — pass 1 tracks which labels are still "pending" (defined since the last real byte was placed) and slides them forward if what follows aligns past them; pass 2 emits the identical padding as real zero bytes, not just a skipped address, so the two passes' addresses never disagree. Verified against the exact scenario in the file's own comment (adding the third `.` moves `var1` from `DMEM+0x1C` to `DMEM+0x20`, not `DMEM+0x1D`) plus a `.byte`→`.half`→`.word` chain and a label alone on its own line before the directive that aligns it. |
-| **v24.11 (Credits Expanded)** | The Credits pop-up (v24.8) now names every open-source project the simulator actually runs, not just RARS: **CodeMirror 6** (the editor), **Icarus Verilog** — the upstream compiler/simulator HDL mode runs, compiled to WebAssembly by the **verisim** project — and **Yosys** — the upstream synthesiser post-synthesis simulation runs, compiled to WebAssembly by **YoWASP**. Both engines get two links each: the tool itself and the WASM port that makes it run in a browser, since crediting only the port and not what it wraps (or the reverse) would each be half the story. All eight links in the pop-up were checked resolving before publishing. |
-| **v24.10 (Examples Taken Out of the Page)** | Every example but **`basic`** — 10 assembly, 10 C — is no longer inside `riscv_simulator.html`. Each now lives as a plain file under `examples/asm/` or `examples/c/`, fetched by `loadExample()` when picked from the menu, editable there with no rebuild step at all. `basic` stays embedded on purpose: it is the one example guaranteed to work with the page opened straight from disk, exactly as `file://` blocks `fetch()` for every other example and for C compilation — a constraint raised and shelved twice earlier in this project's history, revisited here because editing an example by hand-patching a JS template literal inside a 800 KB file, every time, was worse than accepting that trade. The error when a fetch fails names the cause and points at Basic, rather than leaving the editor showing stale content with no explanation. Byte-for-byte extraction: every file was produced by loading the *previous*, still-baked build in a real DOM and reading `editor.value` back after `loadExample()`, not by regex over the JS source — which is exactly the class of mistake v24.9 already found once (the `\r`/`\n` doubling a JS template literal needs). Test-side fallout was the larger part of this change: jsdom has no `fetch`, so every suite touching a non-`basic` example needed a new shim (`examples_fetch.js`, serving `examples/` from disk) alongside `await` on every now-async `loadExample()` call — 12 files, ~35 call sites. The Godbolt-response cache moved with it: keyed by example name against a `cExamples` object that no longer exists, it is now keyed by filename and matched by reading `examples/c/*.c` straight off disk. One real bug fell out of the churn: two tests loaded a C factorial example by a key, `c_fact`, that had never been a real one — `loadExample`'s old silent fallback to Basic Sum on a bad key hid it, and both assertions happened to pass anyway because Basic Sum's disassembly also has a `main:` label. Fixed to `factorial_c`. `npm test`: 18 suites, exit 0. |
-| **v24.9 (Two New C Examples: DIP to LED, Hello World)** | Added **`dip_led_c`** and **`hello_world_c`**, C translations of `DIP_to_LED.asm` and `HelloWorld.asm`, in the style of `circle_accel_c`/`image_display_c` — explicit `MMIO_BASE`-plus-offset `#define`s and a manual `asm volatile("li sp, ...")` stack-pointer init, rather than the plainer style of `peripherals_c`. `dip_led_c` mirrors the DIP switches onto the LEDs on a short polling delay; `hello_world_c` echoes every UART byte it receives (to UART, LEDs and the 7-segment display at once) and sends a greeting once it sees `A` followed by Enter, matching `HelloWorld.asm`'s three-stage `WAIT_A` / `WAIT_CRorLF` / `PRINT_S` protocol via `goto`-labelled stages rather than a literal transliteration of its word-packed byte loop. Two things caught in verification, not just eyeballing the diff: a **backslash-escaping bug** — `\r`, `\n` and `\0` need doubling (`\\r`) in the JS template literal so the *C source* still has one backslash left after the browser's own parsing, not zero — which silently truncated a string literal and only showed up as a Godbolt compile error, not an assembler one; and `hello_world_c`'s first draft (137 instructions, six local MMIO pointers, a five-argument helper) **exceeded the default 512-byte Code segment at -O0** by 32 bytes, silently dropping its last 8 instructions — exactly enough to break the goto that prints the greeting, without erroring at all. Replacing the local pointers with address macros and cutting the helper to one argument brought it to 107 instructions, comfortably inside the default. Both were verified compiling live against Godbolt and running to the expected result — LEDs mirroring an injected DIP pattern, and the UART transcript reading `A\r` then the full greeting — then again fully offline against the test cache, with no code-path difference between the two. Both are in `godbolt_cache.json` (10 C examples now), and every count in §9 updated to match (21 examples total, 10 in C). |
-| **v24.8 (Credits Pop-up, Trimmed Legend, Documented Wrapper Contract)** | The header's inline credit line — a link plus "Vibe coded by Rajesh Panicker" — is now an **ⓘ Credits pop-up**, reached from the same spot, which also names and links **RARS**, the RISC-V Assembler and Runtime Simulator: the MMIO layout and the `ecall` system call services follow its conventions. `Esc` now closes it and the Settings dialog, which it never did despite the shortcuts table claiming otherwise. The **Memory panel legend** dropped "label = symbol at row" and "highlighted bytes were written at runtime" — both stated what the panel already makes obvious; the colours themselves, and the rest of the legend, are unchanged. The **user guide is no longer CG3207-specific**: the course name, the deployment link, and a fixed lab file list are gone from it, and its troubleshooting table lost the eight rows that only restated an assembler message already printed in full with the fix in it. In their place, a **"Requirements your Verilog must meet"** section states the Wrapper contract the simulator actually enforces — one file declaring `module Wrapper`, a fixed port list connected positionally (never written down before; now in §5.3 of the reference manual, with the full 19-port table sourced from the generated testbench), an IROM and a DMEM the Wrapper owns and sizes itself while the simulator only writes their contents, and a 32-entry register array the Registers panel searches for but does not require. |
-| **v24.7 (Functional-only Build Retired)** | Deleted **`riscv_simulator_nohdl.html`**. It began as the same simulator minus the HDL engine, kept for anyone who wanted the smaller build, but it was a copy rather than the output of a build step, so it stopped tracking `riscv_simulator.html` — by the end it was missing the assembler-strictness diagnostics of v24.3, the message de-duplication of v24.4 and the Example-menu fix of v24.5. "No HDL" was no longer the difference between the two; "older, with known bugs" was. Keeping one file removes the risk of a fix landing in only half the project. There is one simulator: **`riscv_simulator.html`**. |
-| **v24.6 (Godbolt Cache Moved Out of the Page)** | The embedded **precompiled Godbolt cache** — `cPrecompiled`, a 379 KB JSON blob holding the compiler's output for all eight built-in C examples — is no longer part of `riscv_simulator.html`. It was **32% of the whole file** for a path a browser almost never takes: `compileAndAssembleC` tries the live Godbolt API first and only falls back to the cache, so in a browser it earned its size solely by letting the unmodified examples compile with no network. It was not dead weight everywhere, though: **jsdom provides no `fetch`**, so under the test harness the live path is skipped and the cache was the *only* way C mode compiled anything. It therefore moved rather than vanished — to `riscv_simulator_tests/godbolt_cache.json`, installed by `installGodboltCache(win)` through the page's existing `window.__mockGodboltResponse` hook, which now also accepts a function of the source so one window can compile several programs. The suites stay hermetic and offline; the page keeps one honest compilation path. **`riscv_simulator.html` went from 1.20 MB to 808 KB.** The trade is stated plainly: **C mode now requires the network**, and the message when Godbolt is unreachable says so and points at Assembly mode, which still compiles and runs entirely in the browser. |
-| **v24.5 (Instruction Semantics Suite & Example-menu Fix)** | Added **`test_instruction_semantics.js` (136 cases)**: every instruction is executed and its result checked against a value worked out from the RISC-V spec, which exercises encoder → machine code → decoder → execution rather than only asking whether a program assembles. The suite was **mutation-tested** against 12 seeded faults; two initially slipped through (`SLTI`'s `<` made `<=`, and `seqz`'s `sltiu rd, rs, 1` made `, 2`) because no case sat on the boundary, so boundary cases were added for every comparison — equal as well as less and greater, zero as well as positive and negative. Fixed the **Example menu reverting on a language round-trip**: the list was written out twice, once in the markup and once in `updateExampleSelectorOptions()`, so a label edited in one came back the old way after switching to C and back. There is now one `EXAMPLE_MENU` table, rendered at boot and on every switch. The starting-point entry reads **Basic (start here)**, and the C list marks **Basic Sum (start here)** the same way, which it never did. The **JS Simulation tab's hint lost its double negative** ("so nothing here silently does nothing"), and the **Statement Stepping description was cut to one sentence** on both tabs. |
-| **v24.4 (Message De-duplication & Test-suite Cleanup)** | With the PC and the instruction count now permanently on the metrics readout, the step messages stopped repeating them: `Back step: PC = 0x40000c` beside `… | Instr: 12 | PC: 0x0040000c` said the same thing twice, in two different formats. A step message now says what the step did — **`Stepped to line 16`**, `Stepped back to line 15`, `Statement step over line 7 — 3 instructions, now at line 8` — and the same for HDL mode. The three **segment-overflow warnings** were rewritten to one shape (what it is, how much over, what to change): each size is printed once instead of in both decimal and hex, and the status bar states the outcome while the console carries the fix, rather than both carrying it. **15 files were deleted from `riscv_simulator_tests/`**: the pre-CodeMirror bare-eval harnesses (`test_asm.js`, `test_all_instructions.js`, `test_run.js`, `tests_body.js`, `sim_harness.js`), the one-off exploratory scripts kept from developing the image and circle examples (`debug_circle.js`, `test_prep.js`, `test_circle_compile.js`, `test_img_compile.js`, `test_mode5_render.js`, `analyze_imagedisplay.js`, `inspect_img.js`, `render_ascii.js`), and the v2-experiment relics `generate_v2.js` and `build_v2.js` — the first of which wrote a `riscv_simulatorv2.html` that is not part of the repository, and the second of which read a bundle from a hardcoded path in another tool's scratch directory. All were broken or assertion-free. What remains is 17 real suites, every one of them wired into `npm test` — `test_hdl_mode.js` had never been in it. |
-| **v24.3 (Assembler Strictness, PC Readout & Vendored Engines)** | Operand forms that used to be accepted silently are now diagnosed. **A bare number is no longer a register**: `add t0, t0, 1` assembled as `add t0, t0, x1` and the disassembly still showed `1`, so nothing gave it away; it now reports `'1' is a number, not a register` and suggests `addi`. The same applies to the FP file. **A store to a symbol must name its scratch register** — `sw t0, var1` picked `x5` (or `x6`) and clobbered it without a word; the third operand is now required, as in GNU `as`, and the message shows the exact two-instruction expansion. **A load from a symbol clobbers nothing**: `lw s3, delay_val` now builds the address in `rd` itself (`lui x19` / `lw x19, …(x19)`) instead of borrowing a temporary; float loads, whose `rd` cannot hold an address, still need the register named. Those three were reported from use, so the assembler was then put through **51 deliberately-wrong programs — 28 assembled with no message at all**. Fixed from that audit: **missing operands were filled in with `x0`** and surplus ones dropped (operand counts now come from the instruction format and, for pseudo-instructions, from the highest `%N` in their own expansion template, so new ones are checked automatically); **`slli t0, t1, 32` was masked to a shift by zero**; **`lui t0, 0x100000` was truncated to 20 bits**; **a duplicate label silently redefined** and **a label named after a register was unreachable** (`j t0` read the register); **`.byte 256` stored 0** and the other data directives truncated the same way. Misaligned word and half accesses now warn — the Wrapper's memory is word-addressed. `parseReg`, `parseFReg` and `parseImm` tolerate a missing operand, so `sub t0` reports its arity instead of `Cannot read properties of undefined`. **`ecall` is flagged**: every built-in example that uses it says in a header comment that it is a simulator service the CG3207 hardware cannot provide, and the assembler repeats it once per assemble (assembly only — the CRT0 shim's exit `ecall` is not the student's). The **Native instruction column became a real disassembly**, naming registers `x0`–`x31` while ABI names stay in the source column beside it — and that renaming alone no longer marks a row as a pseudo-instruction expansion, so the expansion colour means only what it says. The **PC moved onto the always-visible metrics readout** (`Cycles: 3 est | Instr: 3 | PC: 0x0040000c`), which moved down to the status row: it was previously only in the transient status message, which the next message overwrites. The **optimisation level carries a note** about code size varying several-fold (`-O0` and `-O3` largest, `-Os` smallest) with a folded explanation of the `.text` / `IROM_DEPTH_BITS` limit, and **libgcc helper calls are reported at compile time** rather than as an unknown symbol during assembly, naming both ways out — enable M, or raise the optimisation level, since from `-O1` a multiply by a constant often becomes shifts and adds. The Example dropdown labels **Basic — start here**. All three external engines (CodeMirror, Icarus Verilog, Yosys — 78 MB) are now **vendored under `vendor/`** as a fallback for when the CDN is unreachable; the wasm ones need the page served over `http://`. Test suite gained sections [11] and [12] of the comprehensive suite. |
-| **v24.2 (Post-Synthesis Functional Simulation)** | Added **Post-synthesis functional simulation** (⚙ Settings → 🔌 HDL Simulation): every run is simulated twice, once as written and once as a gate-level netlist produced by **Yosys compiled to WebAssembly**, with the two traces diffed and the first divergence reported — which is what an inferred latch, an incomplete sensitivity list or a race between blocking assignments looks like. Only the core is synthesised; the Wrapper stays behavioural so its `$readmemh` keeps working and one synthesis serves every run. A generated parameter shim keeps the Wrapper's `RV #(.PC_INIT(…))` valid after synthesis resolves parameters away. `iverilog -S` was evaluated first and rejected: it refuses constructs every real tool accepts and gives identical errors for good and broken RTL, so a **synthesis lint** carrying file and line was written instead, tuned to stay quiet on the reference design. Yosys is ~13 MB over the wire, fetched only when the box is first ticked and then served from the browser's cache for a year. Also: the **M extension is now off by default**, and changing anything on the Compiler tab **clears the compiled program** so what is loaded always matches the settings on screen. |
-| **v24.1 (MMIO Timing, Resume & Breakpoints, Settings Reorganisation)** | Fixed MMIO being **one instruction late in both directions**. Inputs are nonblocking assignments, so a value stamped at cycle *C* was driven at the edge that *ends* C and only settled during *C+1* — the instruction of cycle *C* read the previous value; the testbench now drives at `cyc + 1`, so a timestamp means "in force during that cycle". On the way out, every peripheral signal the Wrapper exposes is an `output reg`, so it is now sampled on the **falling edge**, where it is readable but the trace still sits inside the causing step — previously correct only by Icarus's block ordering. **Run became Resume**: it continues to the next breakpoint, or to the end of the recording, and records another *Cycles* worth when it reaches the end; breakpoints are matched by mapping recorded PCs back to source lines. **`UART_RX_ack` is traced**, so the console's RX FIFO drains on the instruction that reads it and refills when you step back. Fixed **both engines running at once** — switching JS→HDL left the functional timer chain advancing the counters until it hit the JS run limit; it is now paused on the switch and the toggle is locked during an HDL run. **Statement Stepping now works in HDL mode**, seeking over a whole source line. **The HDL panel was retired**: everything it held is done once per session, so it moved to a new **🔌 HDL Simulation** settings tab, its output to the shared console tagged `[HDL]`, and its status to the status bar — returning the dock to four panels. The Simulator tab became **⏱ JS Simulation**, with Statement Stepping mirrored on both. Sources can be dropped **anywhere on the page** or opened with 📂 Open, a toolbar chip reports what is loaded, and switching to HDL with nothing loaded opens the tab that asks for it. The **console became resizable** (drag, double-click to reset, height remembered). Also: Apply & Close no longer reloads the program unless the memory layout changed, an input moved during a re-simulation is queued rather than dropped, the Registers panel explains itself when the register file cannot be reached, and `riscv_simulator.html` / `riscv_simulator_nohdl.html` were swapped so the two-engine build is the canonical one. Test suite grown to 120 HDL assertions. |
-| **v24.0 (HDL Simulation Mode — Your Verilog in the Browser)** | Added a **second execution engine**. A `JS | HDL` toolbar pill switches Run/Step/Back from the JavaScript functional model to **your own Verilog processor**, compiled and simulated in the browser by **Icarus Verilog built to WebAssembly** (`ivlpp` → `ivl` → `vvp`, loaded at runtime from a CDN with a local fallback). The simulator **generates a program-independent testbench** around your unmodified `Wrapper` — no assembled code, no switch settings, no input data in the Verilog; everything arrives at run time through plusargs (`+CYCLES`, `+TRACE`, `+DIP`, `+PB`, `+ACCEL`, `+VCD`) and through `stim.mem` / `uart_rx.mem`, so **one compile serves every run, every step and every input change**. The register file is located by **discovery** (a 32×32-bit array reachable under the Wrapper's core instance) and read by hierarchical reference, with writes detected by **shadow-comparing the array on the falling edge** so no write-port signal has to be named and a renamed port cannot break the trace. Because `vvp` cannot be paused, a run **records the whole simulation** and Step/Back navigate the recording — which makes stepping instant and, unlike any real Verilog simulator, makes **stepping backwards** possible. Unwritten registers render `xxxxxxxx`, not `0`. Optional **cross-check** replays the same program on the functional model and reports the first instruction where the two disagree. |
-| **v23.8 (Intra-Panel Column-Resize Separators, Unified Data-Panel Headers & No-Stretch Columns)** | Gave the three data panels — **Registers**, **Memory** (a new `.mem-col-header` label bar above the hex dump) and **Disassembly** — **one shared header design** (small uppercase labels) and an **always-visible hairline separator** (`.col-resizer`, 11px hit area) at every column boundary but the last, replacing three different header styles and a separator that was invisible until hovered. Column sizing moved into a single `PANEL_COLS` / `applyPanelColLayout()` model driving each table's `<colgroup>` (and Memory's `--mem-*-w` custom properties): `grow: 0` columns (`#`, `Name`, `Addr`, `Machine code`, `Content (Hex)`) hold their content-sized width and are never stretched when the panel widens, while the `grow`-weighted columns (the Value pair, `Native instruction` + `Original source`, `Content (ASCII)`) **share the surplus between them** — no single column is left to absorb it alone. A panel narrower than the sum of the minimums **scrolls horizontally** instead of crushing a column, and the text columns now wrap at word boundaries rather than `break-all` mid-mnemonic. **Dragging is spreadsheet-style**: the first movement pins every column at its rendered width, then only the dragged column changes, so everything to its right keeps its width and shifts along; double-click any separator to unpin the panel. A `ResizeObserver` re-runs the layout on panel resize. This replaced an earlier attempt whose `width: 1%` on the elastic columns **collapsed the last two columns while ballooning the first two** — in a fixed-layout table where every column has a specified width, surplus space is shared out *in proportion to those widths*. Memory's `Content (Hex)` | `Content (ASCII)` boundary is now clamped to the hex data's measured natural width so the separator can no longer be dragged back over the bytes. All three headers are **frozen** (`position: sticky`) so they stay put while their rows scroll, and Memory's columns are labelled **Addr / Content (Hex) / Content (ASCII)**. Widths persist per panel under `rvsim.panelColW.<panel>`; **Peripherals** is untouched. New regression assertions in `riscv_simulator_tests/test_panel_grid.js` (sections [16]–[18]). |
-| **v23.7 (Disassembly Binary Byte Grouping & Panel-Grid Layout Fixes)** | Binary machine code now keeps each **byte's 8 digits contiguous** — Byte mode renders space-separated bytes in memory order, Word mode renders one 32-bit word with its bytes **underscore-separated** (`xxxxxxxx_xxxxxxxx_xxxxxxxx_xxxxxxxx`). Added a cyan **LSB hint** beside the `[ Byte | Word ]` pill — *LSB to the left* in Byte mode, *LSB to the right* in Word mode — matching the Memory-view endianness legend. Dropped `word-break: break-all` from the machine-code cell so a byte's digits can no longer split across rows. Fixed the **3-panel grid leaving a blank 4th cell** (the lone second-row panel now stretches across the full row via `.panel-dock-row-single`), and fixed the **main-splitter drag shifting the panels area** (`updateDockWidthForGrid` no longer force-grows the dock to 50% on every relayout; `.right-panel` allows `min-width: 0`). New suite `test_disassembly_machine_code.js` plus 7 grid-layout assertions in `test_panel_grid.js`. |
-| **v23.6 (UART Hex-Mode & Mobile Keyboard Fixes)** | Fixed **Hex input parsing**: comma-separated hex bytes are now interpreted as hex (`0x41`, `41`, `69h` → `0x41`), not decimal, so `0x41, 0x0d` transmits the same bytes as `A\r`. Fixed the **terminal hex display** being overwritten back to ASCII: the peripheral refresh path now renders through the same hex-aware terminal renderer, so UART_TX bytes stay as `0xHH` in Hex mode across run batches, stepping, mode toggles and resets (and `uartTxBytes` is cleared on reset). Added **mobile keyboard fixes**: the transmit field uses `autocomplete="off"`, `autocapitalize="off"`, `spellcheck="false"` and `enterkeyhint="send"`, and the global F5/F8/F9/Ctrl+Enter/Ctrl+S shortcuts are suppressed while any form field is focused so the on-screen keyboard stays open. |
-| **v23.5 (Disassembly Machine-code Byte/Word Toggle & Word-as-Default + Accelerometer Tilt Start Direction)** | Added a **segmented `[ Byte | Word ]` pill to the Disassembly toolbar** (matching the Memory toolbar's toggle) that switches the **Machine-code** column between the classic separate bytes (`xx xx xx xx`) and one **whole 8-digit little-endian 32-bit hex word** per 4-byte chunk — **Word is the default** there and everywhere: the **Memory view now also opens in Word mode** (default `memViewMode = 'word'`, Word button pre-highlighted, word-mode legend shown on load). Both toggles stay in sync with their panel state and persist across re-assembles. Also flipped the **Accelerometer `Tilt X` / `Tilt Y` preset start direction**: the **first click now tilts to $-1g$** (`-64`/`0xC0`), and the second click flips to `+1g` (`+64`) — the tooltips now read "Toggle Tilt X/Y (-1g / +1g)". |
-| **v23.4 (Two-Row Memory Toolbar, Segmented Byte/Word Toggle & Row Symbol Labels)** | Restructured the Memory toolbar into **two clean rows**: Row 1 = `Addr` input, the `[ Code | Data | Stack | MMIO ]` region sub-tabs and the **↻ refresh** button; Row 2 = `Rows` input and a **segmented `[ Byte | Word ]` pill** replacing the old bare "Word" checkbox (the active mode is visually highlighted). The **legend moved to its own row** with syntax highlighting that mirrors the code editor: `label` in orange (`#fab387`), `highlighted bytes` in yellow (`#ffe08f`), `Data/Stack/MMIO: editable` in blue (`#89b4fa`) and the endianness hint in cyan (`#00ffff`). The **word-mode legend** now reads *"each row = two 32-bit words · Full word (LSB to the right)"* (deliberately not called "big endian"); byte mode keeps the *"little endian (LSB to the left)"* wording. Any **code or data label** whose address falls inside a row is now annotated **directly above the word it belongs to** in orange (`.mem-row-label-anchor` stacks `.mem-row-label` over the matching word cell / 4-byte group, so with two words per row it's always clear which word a label refers to); **non-word-aligned** labels additionally expose their exact byte address via a hover tooltip. Disassembly **label names turned orange** (`#fab387`, matching the Code window and Memory view) while **pseudoinstructions in the Original-source column switched to blue** (`#89b4fa`) — a simple colour swap that frees orange exclusively for labels. The **"All panels are hidden" empty state** was de-cluttered into a compact single line with a grid icon and emphasised panel names (`.panel-stack-empty-panels`). |
-| **v23.3 (Memory Byte/Word View Toggle, M-Extension Checkbox & Auto-Assemble on Load)** | Added a **Byte ↔ Word view switch** to the Memory toolbar: the classic byte view (separate editable bytes, single-click byte / double-click word edit) and a **whole-32-bit-word view** where each aligned 4-byte group renders as one 8-digit little-endian hex word with click-to-edit word cells (code segment stays read-only), ASCII column and symbol labels preserved, and a legend hint that adapts to the active mode. Added an **"Include M extension (RV32I + M — mul/div)"** checkbox to Settings → Compiler that automatically rewrites the Architecture & ABI flags between `-march=rv32im -mabi=ilp32` and `-march=rv32i -mabi=ilp32` (both reset paths restore it). Assembly programs now **auto-assemble on load** (examples, files, and the initial boot example) so **Run/Step are immediately active** and Assemble is disabled until the source is edited; editing re-enables Assemble and disables Run/Step. The **Memory view now refreshes immediately after Assemble/Compile** (previously only the Disassembly window updated) via new `updateMemoryView()`/`updateMemSubTabs()` calls in the assemble/compile success paths. |
-| **v23.2 (CDN-Loaded CodeMirror 6 & Natural Mobile Panel Scrolling)** | Replaced the ~800 KB duplicated inline CodeMirror 6 bundle with a **tiny bootstrap loader** that loads the **single self-contained CM6 bundle** (`riscv_simulator_tests/cm6_bundle.min.js`, one copy of every package so `EditorState`/`StreamLanguage`/`HighlightStyle` share consistent instances) from jsDelivr, with an **automatic local fallback** to the same file when the CDN is unreachable — the app still boots 100% offline. An earlier attempt assembled `window.CM6` from separate jsDelivr ESM packages (`@codemirror/state@6.5.2`, `view@6.36.5`, `language@6.11.3`, `commands@6.9.0`, `autocomplete@6.19.1`, `@lezer/highlight@1.2.3`), but that produced **duplicate `@lezer/common`/`@codemirror/view` instances** which broke extension validation ("Unrecognized extension value") and silently killed syntax highlighting; the single-bundle loader fixes this. `riscv_simulator.html` shrank from 1.8 MB → 1.0 MB (~45% smaller). The editor bootstrap (`initCodeMirrorEditor`) now runs only after `window.CM6` is available (polling `bootSimulator`), and CM6-derived extensions are built lazily in `buildEditorExtensions()`. On **mobile (≤ 800px)** the active tab is no longer compressed by the desktop docked flex-basis logic: the JS skips inline `flex`/`height` styling in mobile mode so the active panel expands to its full natural content height (`flex: 0 0 auto; height: auto; overflow: visible`) and the **page scrolls naturally** instead of trapping content in a small inner scrollbox. The automated jsdom suites now **pre-inject** the local bundle in `beforeParse` (jsdom cannot run the CDN script fetch), preserving offline test coverage. |
-| **v23.1 (Mobile Tabbed View, Splitter Clamp & Responsive 7-Segment)** | On **mobile (≤ 800px)** the panels return to a **classic tabbed view**: the chip strip becomes a mutually-exclusive tab bar showing exactly one panel at a time, with floating/grid/splitters disabled and the header ⧉/✕ controls hidden — while the mobile tab selection stays **ephemeral** so the persisted desktop dock/grid layout is never altered. If the persisted desktop layout has **all panels hidden**, the tabbed view still shows one tab (falling back to Registers) so the panel area is never empty. The **main editor/dock splitter** is now **clamped** so the code editor always keeps ≥360px (and is re-clamped on window resize), eliminating the blank space / starved-editor overflow when the dock is dragged wide or the window is shrunk. The **7-Segment display** now **scales responsively** to its panel width (SVG digits keep their 22:40 ratio via `aspect-ratio`; the `.periph-pair` wraps automatically so the display gets full width in narrow 2×2-grid cells) instead of staying a fixed 20px — no more horizontal scrolling in small fields. |
-| **v23.0 (2×2 Docking Grid & Draggable Column Splitters)** | When **more than two panels are docked**, the right-side inspector now arranges them in a **2×2 grid** (2 rows × 2 columns) instead of a 4×1 stack. The dock expands to **50% of the window width** (each panel ≈ ¼ screen) and returns to the previous width when ≤2 panels are shown. Added draggable **`.panel-hsplitter`** column separators (vertical, `col-resize`) alongside the existing `.panel-vsplitter` row separators; both drag to resize and double-click to even out. Per-row heights (`panelDock.rowHeights`) and per-panel column widths (`wbasis`) persist to `localStorage`. The 3-panel case renders as 2+1 (row 1 two columns, row 2 one panel). |
-| **v22.0 (Dockable & Detachable Inspector Panels)** | Replaced the mutually-exclusive right-side tab strip with **independently toggled panels**: Registers, Memory, Peripherals, and Disassembly can now be shown at the same time, **stacked vertically** in a resizable `.panel-stack` (drag the `.panel-vsplitter` between panels; double-click to even out), or **detached** into `position: fixed` floating windows that drag by their header bar and resize from any edge. Toolbar buttons became **toggle chips** with visible/floating status dots; each panel gained an injected header (`.panel-hdr`) with **⧉ float / ▣ dock** and **✕ hide** controls. Layout (shown set, order, docked heights, floating rects) persists to `localStorage` (`rvsim.panelDock.v1`); first-run layout is unchanged (Registers only). All panels refresh regardless of visibility; disassembly current-PC auto-scroll now fires in both docked and floating modes. Legacy `switchTab(name)` retained as an "ensure visible" alias. Detaching is disabled on `≤ 800px` viewports (inline accordion fallback). |
-| **v21.0 (Clang Stable Compiler Default & Dual Segment Boundary Overflow Warnings)** | Set **RISC-V Clang 20.1.0 (Stable)** (`rv32-cclang2010`) as the default C compiler across UI selection, settings resets, and compiler fallback resolution. Fixed C data segment byte sizing to accurately categorize `.data`, `.rodata`, `.bss`, `.sdata`, `.sbss`, `.tdata`, `.tbss` while strictly ignoring debug info sections (`.debug_*`, `.comment`, `.note*`). Fixed false-positive overflow warnings and premature stack adjustments on small C programs. Added **Code Segment Overflow Warning** in `assemble()` when assembled instructions exceed configured `codeSize` (`0x200` / 512 B), triggering for `Circle & Accel` and `Image Display & Accel` at `-O0`. Eliminated duplicate data section warnings in C mode. |
-| **v20.0 (Run Limit Fix, SPIM-Style Memory Layout & UART Console Polish)** | Fixed **Max Instructions Per Run** to correctly pause execution after the configured total instruction count (previously only controlled per-tick batch size); now uses a fixed internal `BATCH_SIZE=10,000` per JS event-loop tick for UI responsiveness. Default raised to **100,000,000**. Updated default memory layout to **SPIM-style** addresses: `.text` base `0x00400000`, `.data` base `0x10010000`, MMIO base `0xFFFF0000`; fixed a `pc >= memory.length` bounds check that immediately stopped execution at the new `.text` base — replaced with `pc >= mmioBase`. **UART Console**: simplified input-mode dropdown to **ASCII / Hex**; text input grows to fill remaining width; placeholder updates dynamically — ASCII shows `ASCII text incl. extended — \r, \n, …`, Hex shows `Comma-separated hex bytes — 0x48, 0x69, 0x0D, …`. Increased push-button gap from 4 px to 10 px. **Assembler**: confirmed no implicit alignment padding is inserted between byte-oriented directives (`.asciz`, `.byte`) and subsequent labels — addresses advance by exactly the directive's byte count, matching GAS/RARS behaviour. |
-| **v19.0 (OLED Auto-Advance Mode 5, Image Display Examples & Batch Instruction Throttling)** | Implemented **OLED Auto-Advance Mode 5 (`autoadvance_row`)** for high-throughput column-major bitmap image rendering. Added pre-loaded **Image Display & Accel** examples in both C (`ImageDisplay_autoadvance_accel.c`) and Assembly (`ImageDisplay_autoadvance_accel.asm`) rendering 96x64 8-bit color bitmap graphics with dynamic accelerometer tilt responsiveness and UART logging. Added configurable **Max Instructions (Batch Limit)** setting in the Simulator Settings tab (`simMaxInstrPerCycle`, default `100,000`), allowing fine-tuning of execution chunk size for high-speed simulation without browser freezing. Expanded automated test suite with full offline precompiled verification (`test_baked_examples_full.js`, `test_sim_max_instructions_setting.js`). |
-| **v18.0 (Disassembly Labels, Target Annotations, FPGA Hardware Warning & Statement Stepping)** | Added dedicated **Disassembly Label Header Rows** (`.disasm-label-row`) and **Jump/Branch Target Annotations** (`.disasm-target-label`) in both ASM and C modes. Added **FPGA Hardware Memory Notice** box in the Linker settings tab alerting users to real hardware RAM constraints and stack overflow risks. Implemented **Statement Stepping (Fast Mode)** executing all underlying machine instructions for a C statement or multi-instruction pseudo-op in a single step with 1-click step back. Relocated memory dump buttons to the simulation/config toolbar for cleaner layout balance. |
-| **v17.0 (C Compilation via Godbolt, Unified Settings & Advanced Memory View)** | Integrated full C language simulation via **Compiler Explorer (Godbolt) REST API** (RV32 GCC & Clang) with bidirectional line mapping, C source-level stepping, step back, and C breakpoints. Consolidated settings into a unified 3-tab modal (**Compiler**, **Linker**, **Simulator**) with settable segment sizes and user-customizable Stack Top ($\text{Data Base} + \text{Data Size}$). Added Disassembly view auto-scroll on stepping, tabbed Memory navigation (`[ Code | Data | Stack | MMIO ]`) with **downward decreasing address ordering for the Stack tab**, read-only code memory protection, and pre-loaded C examples including `Circle_delay_accel.c`. |
-| **v16.0 (Typography Contrast & 4-Row Mobile Toolbar)** | Upgraded UI typography stack to modern system UI (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) with enhanced font weights (`500`–`650`) and crisp contrast. Restructured desktop toolbar into 2 clean rows with CPI and Linker segments aligned with Stats on row 2. Restructured mobile toolbar into **4 dedicated rows** with larger touch targets (`32px` height) that never overflow when Run toggles to Resume. |
-| **v15.0 (CodeMirror 6 Engine Upgrade)** | **Major Architecture Overhaul**: Upgraded editor to **CodeMirror 6** with standalone offline bundle (`window.CM6`). Implemented custom RISC-V stream tokenizer & Catppuccin Mocha theme, **interactive breakpoint gutter with highlighted line numbers alone**, **smart breakpoint snapping to next valid executable instruction**, **live floating parameter signature helper (`signatureHelpField`)**, **interactive hover tooltips (`riscvHoverTooltip`)**, **active instruction format banner in operand autocompletions**, **precision in-line `\t` Tab key insertion**, native transaction undo/redo history, and complete backward compatibility proxy facade. |
-| **v12.0 – v14.0** | Intelligent UX button state lifecycle management, in-editor IntelliSense autocomplete, extended load/store pseudo-instructions, and 60 FPS visual rendering optimization. |
-| **v7.0 – v11.0** | 96x64 Pixel OLED Display MMIO peripheral, 3-Axis Accelerometer & Temperature Sensor `{temp, X, Y, Z}`, System Cycle Counter (`0xFFFF00A0`), RARS `ecall` syscall engine, and mobile viewport enhancements. |
-| **v1.0 – v6.0** | Basic RV32GC simulator core, two-pass assembler, non-blocking engine, Nexys 4 FPGA LEDs/DIP switches/buttons/7-segment, UART Serial Console, escape sequence parser, and double-height dual-rectangle 3D DIP switches. |
+HDL mode runs builds of **Icarus Verilog**, which are licensed under the **GPL**. The page does not contain them: it loads them at runtime from a CDN, falling back to the copy in `vendor/verisim/`. Check the GPL's terms before redistributing those binaries. The desktop app bundles native Icarus and Verilator as separate programs it runs, with Icarus's `COPYING` beside them in `resources/iverilog/`; the Icarus source is the pinned commit of <https://github.com/steveicarus/iverilog>.
 
----
-
-## Licensing note
-
-The Verilog engine used by HDL mode consists of builds of **Icarus Verilog**, which are
-derivative works under the **GPL**. They are *loaded at runtime from an external URL*,
-not bundled into `riscv_simulator.html`. If you plan to redistribute a copy with the
-binaries alongside it, check that this is compatible with your own licensing terms
-first. The desktop app does bundle them, as separate programs it runs, and ships
-Icarus's `COPYING` beside them in `resources/iverilog/`; its source is the pinned commit
-of <https://github.com/steveicarus/iverilog>.
-
-Your Verilog sources are never bundled with the page and are never uploaded anywhere —
-they are compiled on your computer and live only in that tab, or in the folder they
-were read from.
+Verilog sources are never uploaded. They are compiled on the user's computer and exist only in the browser tab, or in the folder they were read from.

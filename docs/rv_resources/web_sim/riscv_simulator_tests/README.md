@@ -1,4 +1,4 @@
-# RISC-V Simulator — Test Suites
+# RVEduSim: test suites
 
 This directory contains the automated test suites, bundling tools, and generator utilities for **[riscv_simulator.html](../riscv_simulator.html)** and **[riscv_simulator_specs.md](../riscv_simulator_specs.md)**.
 
@@ -196,7 +196,7 @@ is edited directly.
 ### 17. `test_hdl_mode.js` — HDL Simulation Mode, End to End (159 assertions)
 - **Purpose**: The only suite that drives real external tooling. It loads the page, assembles through the normal assembler, asks the page for the artefacts it would hand to Icarus (the generated testbench, the memory images, the stimulus files), then runs the **real** Icarus/WASM pipeline over the unmodified `RV/*.v` sources.
 - **Covers**: settings layout, engine toggle, register-file discovery (including after the module, instance and array are all renamed), synthesis lint, post-synthesis plumbing, compiler-setting invalidation, the program-independent testbench, the memory depths an example declares (a program too big for the loaded Wrapper is refused rather than half-loaded, and the Wrapper shipped with the prebuilt processor is sized to fit while an uploaded one is left alone), MMIO timing in both directions, breakpoints and Resume, `UART_RX_valid` behaviour, and Statement Stepping through the recording.
-- **Requires**: the `RV/` sources, which are gitignored — the engine-backed sections skip cleanly without them.
+- **Requires**: a processor's RTL, from the folder `RVSIM_CORE_DIR` names (see `core_dir.js`); without one the suite skips.
 - **Run Command**: `npm run test:hdl`
 
 ---
@@ -228,7 +228,7 @@ is edited directly.
 - **Purpose**: `MCycle.v` against the JS engine, and both against a reference computed here with BigInt. A generated straight-line program runs all eight M instructions over six awkward operand pairs — mixed signs, `-2**31 / -1`, a product that needs the full 64 bits, division by zero — storing every result to its own word of data memory. The three sets of stored words are then compared. Agreement between the two engines is what the processor must preserve; the BigInt reference is there so that both agreeing on something wrong still fails.
 - **Covers**: the M encodings coming out of the assembler; the program fitting the Wrapper's 128-word IROM (silent truncation of the IROM image is what a too-long program looks like from the hardware side, so it fails on the length instead); all 48 results on the JS engine, on `RV/*.v` through the real Icarus/WASM pipeline, and against the reference; the stall — no PC executed twice in a row, one write-back per M instruction rather than one per cycle, and a signed multiply taking 65 cycles; and section [5], `examples/hdl/RV_reference.v`, which is generated from those same sources and so goes stale silently if `RV/` changes and nobody reruns `examples/hdl/build_reference_core.sh` — it is checked for its stripped names, for `RegBank` surviving the flattening (`dut.RV1.RegFile1.RegBank`), and for running the same program to the same results.
 - **Note**: register writes are found by shadow-comparing the array, so a write of the value already in the register is invisible. The write count is compared against the results that actually change `x3`, not against all of them.
-- **Requires**: the `RV/` sources and the vendored engine, as `test_hdl_mode.js` does.
+- **Requires**: a processor's RTL, as `test_hdl_mode.js` does, and the vendored engine.
 - **Run Command**: `npm run test:m`
 
 ---

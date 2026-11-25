@@ -23,7 +23,7 @@ try { JSDOM = require('jsdom').JSDOM; }
 catch (e) { JSDOM = require(path.resolve(__dirname, 'node_modules/jsdom')).JSDOM; }
 
 const ROOT = path.resolve(__dirname, '..');
-const RV = path.join(ROOT, 'RV');
+const RV = require('./core_dir').coreDir('test_hdl_mode');
 // vendor/verisim/ is the repo's own vendored copy of the same engine the page
 // falls back to (see vendor/README.md) - a stray absolute scratchpad path
 // here previously meant this only worked inside one Claude Code session.
@@ -553,7 +553,7 @@ setTimeout(async () => {
     // different but equivalent expansion of a pseudo-instruction (absolute
     // lui+lw vs PC-relative auipc+lw for the same address). Section 7 proves
     // functional equivalence by actually running it.
-    const refIrom = fs.readFileSync(path.join(RV, 'AA_IROM_DIP_to_LED.mem'), 'utf8')
+    const refIrom = fs.readFileSync(path.join(__dirname, 'AA_IROM_DIP_to_LED.mem'), 'utf8')
       .trim().split('\n').map(l => l.trim().toLowerCase()).filter(Boolean);
     const gotIrom = iromLines.map(l => l.toLowerCase());
     check('Generated IROM has the same word count as the reference RARS dump',

@@ -1,4 +1,4 @@
-# RISC-V Simulator User Guide
+# RVEduSim User Guide
 
 <p align="center">
   <a href="../riscv_simulator.html" target="_blank" rel="noopener">

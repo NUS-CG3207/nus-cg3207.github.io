@@ -25,7 +25,7 @@ try { JSDOM = require('jsdom').JSDOM; }
 catch (e) { JSDOM = require(path.resolve(__dirname, 'node_modules/jsdom')).JSDOM; }
 
 const ROOT = path.resolve(__dirname, '..');
-const RV = path.join(ROOT, 'RV');
+const RV = require('./core_dir').coreDir('test_m_extension');
 const ENGINE = process.env.HDL_ENGINE_DIR || path.join(ROOT, 'vendor', 'verisim');
 
 const DESIGN = ['ALU.v', 'Decoder.v', 'Extend.v', 'MCycle.v', 'PC_Logic.v', 'ProgramCounter.v',

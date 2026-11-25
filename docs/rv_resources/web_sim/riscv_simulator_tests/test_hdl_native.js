@@ -24,7 +24,7 @@ try { JSDOM = require('jsdom').JSDOM; }
 catch (e) { JSDOM = require(path.resolve(__dirname, 'node_modules/jsdom')).JSDOM; }
 
 const ROOT = path.resolve(__dirname, '..');
-const RV = path.join(ROOT, 'RV');
+const RV = require('./core_dir').coreDir('test_hdl_native');
 const ENGINE = process.env.HDL_ENGINE_DIR || path.join(ROOT, 'vendor', 'verisim');
 const { createRunner, findBinDir, readFolder } = require(path.join(ROOT, 'electron', 'hdl_native.js'));
 const OS = { darwin: 'mac', win32: 'win' }[process.platform] || process.platform;

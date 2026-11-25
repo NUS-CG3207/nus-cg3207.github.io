@@ -12,7 +12,7 @@ const path = require('path');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.resolve(__dirname, '..');
-const RV = path.join(ROOT, 'RV');
+const RV = require('./core_dir').coreDir('test_hdl_folder_browser');
 let passed = 0, failed = 0;
 function check(label, cond) {
   if (cond) { passed++; console.log('  ✅ ' + label); }
@@ -107,7 +107,7 @@ const sources = fs.readdirSync(RV).filter(f => /\.v$/.test(f))
     const loaded2 = await page2.waitForFunction(() => getHdlFiles().length === 10, null, { timeout: 10000 })
       .then(() => true, () => false);
     check('A folder chosen through the file input loads the same ten files', loaded2);
-    check('…named after the folder', /10 loaded from RV/.test(await page2.textContent('#hdlSourcesNote')));
+    check('…named after the folder', new RegExp('10 loaded from ' + path.basename(RV)).test(await page2.textContent('#hdlSourcesNote')));
     await page.screenshot({ path: path.join(process.env.SHOT_DIR || require('os').tmpdir(), 'rvsim_folder_browser.png') });
   } catch (e) {
     console.error(e);

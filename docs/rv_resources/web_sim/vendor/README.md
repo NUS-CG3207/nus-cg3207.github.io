@@ -26,7 +26,7 @@ that works. CodeMirror is the exception: it loads through a `<script>` tag, whic
 
 Each engine tries its sources in order and takes the first that answers:
 
-- **CodeMirror** — `vendor/codemirror/` → `riscv_simulator_tests/` → jsDelivr (local first: jsDelivr can only serve this repository while it is public, and waiting for it to fail cost most of a second on every load)
+- **CodeMirror** — `vendor/codemirror/` → `riscv_simulator_tests/` → jsDelivr, serving `vendor/codemirror/` from the public repository (local first, since a CDN round trip costs a noticeable part of a second on every load)
 - **Icarus** — jsDelivr → `senolgulgonul.github.io/verisim/` → `vendor/verisim/` → `verisim/`
 - **Yosys** — jsDelivr → `vendor/yosys/`
 

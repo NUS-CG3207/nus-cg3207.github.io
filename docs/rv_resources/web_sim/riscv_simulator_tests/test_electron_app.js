@@ -6,7 +6,7 @@
  *
  * Needs: cd electron && npm install && npm run build:iverilog
  * RVSIM_APP_EXE runs a packaged app instead (electron/dist/linux-unpacked/
- * rvsimulator, say). Opens a window on the desktop for a few seconds.
+ * rvedusim, say). Opens a window on the desktop for a few seconds.
  */
 const fs = require('fs');
 const os = require('os');
@@ -15,6 +15,12 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const APP = path.join(ROOT, 'electron');
 const { _electron } = require('playwright-core');
+const { findCoreDir } = require('./core_dir');
+// A processor's RTL when there is one (see core_dir.js); otherwise the
+// prebuilt core in examples/hdl, a gate-level netlist and the Wrapper.
+const CORE = findCoreDir();
+const FOLDER = CORE || path.join(ROOT, 'examples', 'hdl');
+const NFILES = CORE ? 10 : fs.readdirSync(FOLDER).filter(f => /\.v$/.test(f)).length;
 const SHOT = process.env.SHOT_DIR || os.tmpdir();
 
 let passed = 0, failed = 0;
@@ -56,14 +62,14 @@ async function launch(userData) {
     console.log('\n[2] Picking a folder with the button');
     await app.evaluate(({ dialog }, dir) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
-    }, path.join(ROOT, 'RV'));
+    }, FOLDER);
     await page.evaluate(() => setSimEngineMode('hdl'));
     await page.waitForSelector('#hdlFolderBtn', { state: 'visible' });
     await page.click('#hdlFolderBtn');
-    await page.waitForFunction(() => getHdlFiles().length === 10, null, { timeout: 10000 });
-    check('The ten RV/ sources are loaded', true);
+    await page.waitForFunction(n => getHdlFiles().length === n, NFILES, { timeout: 10000 });
+    check('The ' + NFILES + ' sources in ' + path.basename(FOLDER) + '/ are loaded', true);
     check('The sources note names the folder',
-      /10 loaded from RV, Wrapper found/.test(await page.textContent('#hdlSourcesNote')));
+      new RegExp(NFILES + ' loaded from ' + path.basename(FOLDER) + ', Wrapper found').test(await page.textContent('#hdlSourcesNote')));
     await page.screenshot({ path: path.join(SHOT, 'rvsim_app_settings.png') });
     await page.evaluate(() => closeSettingsModal());
 
@@ -127,7 +133,7 @@ async function launch(userData) {
 
     console.log('\n[4] The folder is remembered');
     run = await launch(userData);
-    const back = await run.page.waitForFunction(() => getHdlFiles().length === 10, null, { timeout: 10000 }).then(() => true, () => false);
+    const back = await run.page.waitForFunction(n => getHdlFiles().length === n, NFILES, { timeout: 10000 }).then(() => true, () => false);
     check('A restart loads the same folder without asking', back);
     await run.page.evaluate(() => hdlClearFiles());
     await run.app.close();

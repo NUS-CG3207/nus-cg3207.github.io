@@ -6,7 +6,7 @@
   <!-- The editor's bundle, fetched while the page is still being parsed. -->
   <link rel="preload" href="vendor/codemirror/cm6_bundle.min.js" as="script">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NUS-CG3207 RISC-V Functional and HDL Simulator</title>
+  <title>RVEduSim: RISC-V Functional and HDL Simulator</title>
   <link rel="icon" type="image/svg+xml"
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='3.5' fill='%23181825' stroke='%2389b4fa' stroke-width='1.5'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='%23313244' stroke='%23cba6f7' stroke-width='1'/%3E%3Cpath d='M2 11h4M2 16h4M2 21h4 M26 11h4M26 16h4M26 21h4 M11 2v4M16 2v4M21 2v4 M11 26v4M16 26v4M21 26v4' stroke='%23f9e2af' stroke-width='1.5' stroke-linecap='round'/%3E%3Ctext x='16' y='18.5' font-family='monospace' font-size='6.5' font-weight='bold' fill='%2389b4fa' text-anchor='middle'%3ERV%3C/text%3E%3C/svg%3E">
   <style>
@@ -4387,7 +4387,7 @@
               <path d="M2 11h4M2 16h4M2 21h4 M26 11h4M26 16h4M26 21h4 M11 2v4M16 2v4M21 2v4 M11 26v4M16 26v4M21 26v4"
                 stroke="#f9e2af" stroke-width="1.5" stroke-linecap="round" /><text x="16" y="18.5"
                 font-family="monospace" font-size="6.5" font-weight="bold" fill="#89b4fa" text-anchor="middle">RV</text>
-            </svg>NUS-CG3207 RISC-V Functional and HDL Simulator</h1>
+            </svg>RVEduSim: RISC-V Functional and HDL Simulator</h1>
           <span class="header-info"><button type="button" class="header-info-link" onclick="openCreditsModal()">ⓘ
               Credits</button></span>
         </div>
@@ -4906,7 +4906,7 @@
       // See vendor/README.md.
       var SOURCES = ['vendor/codemirror/cm6_bundle.min.js',
                      'riscv_simulator_tests/cm6_bundle.min.js',
-                     'https://cdn.jsdelivr.net/gh/r-panicker/Visualisations@main/riscv_simulator_tests/cm6_bundle.min.js'];
+                     'https://cdn.jsdelivr.net/gh/r-panicker/RVEduSim@main/vendor/codemirror/cm6_bundle.min.js'];
 
       function load(i) {
         if (i >= SOURCES.length) {
@@ -16460,7 +16460,7 @@ ${ABI_NAMES.map((n, i) => `  wire [31:0] x${i}_${n} = ${rb}[${i}];`).join('\n')}
   // path explicitly under Settings > Simulation to enable it.`;
 
       const about = run
-        ? `// Testbench for one run - RISC-V Simulator (HDL mode)
+        ? `// Testbench for one run - RVEduSim (HDL mode)
 //
 // It replays the inputs of the run it was saved from: the switch, button
 // and accelerometer values at the start, every change made to them, and
@@ -16469,7 +16469,7 @@ ${ABI_NAMES.map((n, i) => `  wire [31:0] x${i}_${n} = ${rb}[${i}];`).join('\n')}
 // AA_DMEM.mem, which your Wrapper reads; save them from the same Download
 // menu, alongside this file. The plusargs below still override any
 // setting.`
-        : `// Generic testbench - RISC-V Simulator (HDL mode)
+        : `// Generic testbench - RVEduSim (HDL mode)
 //
 // This file is program-independent. It holds no assembled code, no
 // switch settings and no input data: every one of those is read at RUN

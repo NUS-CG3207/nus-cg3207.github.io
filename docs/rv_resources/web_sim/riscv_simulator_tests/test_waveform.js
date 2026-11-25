@@ -22,7 +22,7 @@ try { JSDOM = require('jsdom').JSDOM; }
 catch (e) { JSDOM = require(path.resolve(__dirname, 'node_modules/jsdom')).JSDOM; }
 
 const ROOT = path.resolve(__dirname, '..');
-const RV = path.join(ROOT, 'RV');
+const RV = require('./core_dir').coreDir('test_waveform');
 const ENGINE = process.env.HDL_ENGINE_DIR || path.join(ROOT, 'vendor', 'verisim');
 
 const html = fs.readFileSync(path.join(ROOT, 'riscv_simulator.html'), 'utf8');

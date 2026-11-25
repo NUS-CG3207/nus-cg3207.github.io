@@ -1,5 +1,5 @@
 /**
- * Comprehensive Test Suite for C Code Support via Godbolt Compiler Explorer in RISC-V Simulator
+ * Comprehensive Test Suite for C Code Support via Godbolt Compiler Explorer in RVEduSim
  */
 
 const fs = require('fs');

@@ -815,11 +815,11 @@ setTimeout(async () => {
       }
     }
     // The shipped DIP_to_LED image was built by RARS; ours has to match it word for word.
-    const rarsImage = fs.readFileSync(path.resolve(__dirname, '../RV/AA_IROM_DIP_to_LED.mem'), 'utf8')
+    const rarsImage = fs.readFileSync(path.resolve(__dirname, 'AA_IROM_DIP_to_LED.mem'), 'utf8')
       .split('\n').map(l => l.trim()).filter(Boolean).map(l => parseInt(l, 16));
     const ours = words(win.eval('BAKED_ASM_EXAMPLE'));
     if (JSON.stringify(ours) !== JSON.stringify(rarsImage)) {
-      throw new Error('DIP_to_LED no longer assembles to the RARS image in RV/AA_IROM_DIP_to_LED.mem');
+      throw new Error('DIP_to_LED does not assemble to the RARS image in AA_IROM_DIP_to_LED.mem');
     }
     // call's jalr carried no offset, so a callee that was not 4 KB-aligned from
     // the call site was missed.
