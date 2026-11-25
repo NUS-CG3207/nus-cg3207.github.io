@@ -59,9 +59,9 @@ Finally, dump the instruction and data memories. Click the "Dump Memory" button 
 Simulate a 'Hello World' Program.
 There are 2 versions provided -
 
-* [HelloWorld](../../rv_resources/web_sim/examples/asm/HelloWorld.asm) that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
+* [HelloWorld](https://github.com/r-panicker/RVEduSim/blob/main/examples/asm/HelloWorld.asm) that doesn't use subroutines and can be done using instructions implemented in Assignment 2,<br>
 and
-* [HelloWorld_jal_jalr](../../rv_resources/web_sim/examples/asm/HelloWorld_jal_jalr.asm) that uses subroutines and requires full `jal` and `jalr` support.
+* [HelloWorld_jal_jalr](https://github.com/r-panicker/RVEduSim/blob/main/examples/asm/HelloWorld_jal_jalr.asm) that uses subroutines and requires full `jal` and `jalr` support.
 
 Since we are using a simulator now and isn't worried about processor capabilities, you can simulate either or both.
 Read the UART peripheral details to understand the 4 registers involved.
