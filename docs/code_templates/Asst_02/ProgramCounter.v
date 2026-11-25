@@ -40,12 +40,8 @@ module ProgramCounter #(
     input RESET,
     input WE_PC,    // write enable, for multi-cycle operations and pipelining
     input [31:0] PC_IN,
-    output reg [31:0] PC  
+    output reg [31:0] PC = PC_INIT
     );
-    
-    initial begin 
-        PC <= PC_INIT;
-    end
     
     always@( posedge CLK )
     begin

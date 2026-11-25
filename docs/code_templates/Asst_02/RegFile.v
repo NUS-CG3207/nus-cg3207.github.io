@@ -52,8 +52,8 @@ module RegFile(
     // read
     always@(*)	// change to @posedge CLK only if using synch read. In that case, the output is RD1E, RD2E directly
     begin
-    	RD1 <= (rs1 == 5'b00000) ? 32'd0 : RegBank[rs1] ; 
-    	RD2 <= (rs2 == 5'b00000) ? 32'd0 : RegBank[rs2] ;  
+    	RD1 = (rs1 == 5'b00000) ? 32'd0 : RegBank[rs1] ; 
+    	RD2 = (rs2 == 5'b00000) ? 32'd0 : RegBank[rs2] ;  
     end 
     
     // write
