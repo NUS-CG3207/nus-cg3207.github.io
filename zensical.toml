@@ -1,0 +1,85 @@
+[project]
+site_name = "NUS CG3207 Labs"
+site_url = "https://nus-cg3207.github.io"
+copyright = '''<p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://nus-cg3207.github.io">NUS CG3207 Labs</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/nus-CG3207">NUS CG3207 Team</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC-SA 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1" alt=""></a></p>'''
+
+extra_css = [
+  "stylesheets/extra.css",
+  "stylesheets/isa-tutorial.css",
+]
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting Started" = [
+    { "How to use this website" = "getting_started/howto.md" },
+    { "Lab Prerequisites" = "getting_started/prereq.md" },
+    { "Getting to know your Nexys 4" = "getting_started/nexys4.md" },
+    { "Installation Guide for Vivado" = "getting_started/vivado_install_guide.md" },
+  ] },
+  { "Assignment manuals" = [
+    { "Assignment 1 [Weeks 4-5]" = "asst_manuals/Asst_01/Asst_01.md" },
+    { "Assignment 2 [Weeks 5-7]" = "asst_manuals/Asst_02/Asst_02.md" },
+    { "Assignment 3 [Weeks 7-9]" = "asst_manuals/Asst_03/Asst_03.md" },
+    { "Assignment 4 [Weeks 9-12]" = "asst_manuals/Asst_04/Asst_04.md" },
+  ] },
+  { "Resources for RISC-V" = [
+    { "Memory Map" = "rv_resources/rv_memmap.md" },
+    { "Peripheral Guides" = "rv_resources/peripherals.md" },
+    { "Programming Guide" = "rv_resources/rv_programming.md" },
+    { "RISC-V Simulator (RVEduSim)" = "https://r-panicker.github.io/RVEduSim/" },
+    { "RISC-V ISA Tutorial" = [
+      { "Getting Started" = "rv_resources/isa_tutorial/getting-started.md" },
+      { "Background" = "rv_resources/isa_tutorial/background.md" },
+      { "Registers" = "rv_resources/isa_tutorial/registers.md" },
+      { "Instruction Formats" = "rv_resources/isa_tutorial/formats.md" },
+      { "Data Processing Instructions" = "rv_resources/isa_tutorial/dp-instructions.md" },
+      { "Memory Instructions" = "rv_resources/isa_tutorial/memory-instructions.md" },
+      { "Control Instructions" = "rv_resources/isa_tutorial/control-instructions.md" },
+      { "RISC-V Assembly Examples" = "rv_resources/isa_tutorial/assembly.md" },
+      { "ISA Designer's Dilemma" = "rv_resources/isa_tutorial/isa-design.md" },
+    ] },
+  ] },
+  { "Miscellaneous" = [
+    { "Memory Access & Acceleration Examples" = "miscellaneous/SamplePrograms.md" },
+    { "Interactive Visualisations" = "miscellaneous/Visualisations.md" },
+  ] },
+]
+
+[project.theme]
+# "classic" keeps the Material for MkDocs look; "modern" is Zensical's own.
+variant = "classic"
+custom_dir = "overrides"
+features = [
+  "content.tooltips",
+  "navigation.indexes",
+]
+
+[project.theme.palette]
+scheme = "nus"
+
+[project.theme.font]
+text = "Merriweather"
+
+[project.theme.icon]
+annotation = "material/information-variant-circle-outline"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/nus-cg3207"
+
+[[project.extra.social]]
+icon = "fontawesome/solid/envelope"
+link = "mailto:neil@nus.edu.sg"
+
+# Setting markdown_extensions replaces Zensical's defaults, so only these load
+# (the same set the site used under MkDocs).
+[project.markdown_extensions]
+admonition = {}
+footnotes = {}
+pymdownx.details = {}
+pymdownx.blocks.caption = {}
+attr_list = {}
+md_in_html = {}
+pymdownx.superfences = {}
+pymdownx.tabbed.alternate_style = true
+toc.toc_depth = 3

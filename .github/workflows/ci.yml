@@ -1,8 +1,8 @@
-name: ci 
+name: ci
 on:
   push:
     branches:
-      - master 
+      - master
       - main
 permissions:
   contents: write
@@ -18,12 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
-      - uses: actions/cache@v4
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
-      - run: pip install mkdocs-material 
-      - run: mkdocs gh-deploy --force
+      - run: pip install -r requirements.txt ghp-import
+      - run: zensical build --clean --strict
+      # Zensical has no gh-deploy, so push the built site to the gh-pages
+      # branch ourselves (the branch GitHub Pages already serves from).
+      - run: ghp-import --no-jekyll --push --force --message "Deployed ${GITHUB_SHA::7} with Zensical" site

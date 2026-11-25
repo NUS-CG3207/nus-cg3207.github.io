@@ -24,21 +24,23 @@ You may choose to use [uv](https://docs.astral.sh/uv/), [Anaconda](https://www.a
 
 Clone the repository to your machine to get started. The instructions below will assume you have a terminal opened, and the current working directory is the cloned repository. 
 
+The site is built with [Zensical](https://zensical.org). Its configuration is in `zensical.toml`.
+
 ### Using uv (recommended)
 
 Simply run `uv sync`. This will read `pyproject.toml` and install all the required dependencies. 
 
-To run the development server, run `uv run -- mkdocs serve`.
+To run the development server, run `uv run -- zensical serve`.
 
 ### Using conda
 
-Create a new conda environment to run mkdocs, let's say by running `conda create -n mkdocs-env`.
+Create a new conda environment, let's say by running `conda create -n zensical-env python=3.12 pip`.
 
-Switch to the new conda environment by running `conda activate mkdocs-env`. 
+Switch to the new conda environment by running `conda activate zensical-env`. 
 
-Install mkdocs by running `conda install mkdocs-material`.
+Install Zensical by running `pip install -r requirements.txt`.
 
-To run the development server, run `mkdocs serve`. 
+To run the development server, run `zensical serve`. 
 
 ### Using pip
 
@@ -48,7 +50,11 @@ Activate the new virtual environment using `source .venv/bin/activate`. Use `act
 
 Install the requirements by running `pip install -r requirements.txt`. 
 
-To run the development server, run `mkdocs serve`. 
+To run the development server, run `zensical serve`. 
+
+### Building and deploying
+
+Run `zensical build` to build the site into `site/`. Pushing to `main` builds the site in GitHub Actions and publishes it to the `gh-pages` branch.
 
 ## License 
 

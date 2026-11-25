@@ -2,3 +2,5 @@
 *.log
 *.json
 *.ys
+site/
+.cache/
