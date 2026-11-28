@@ -40,7 +40,7 @@ nav = [
     ] },
   ] },
   { "Miscellaneous" = [
-    { "Memory Access & Acceleration Examples" = "miscellaneous/SamplePrograms.md" },
+    { "Demonstrations" = "miscellaneous/Demonstrations.md" },
     { "Interactive Visualisations" = "miscellaneous/Visualisations.md" },
   ] },
 ]
