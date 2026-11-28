@@ -158,16 +158,27 @@ Two 8-bit registers (`reg_a`, `reg_b`) share the same clock, synchronous reset, 
 `stat -width` prints cell width as a `_8` suffix, so *cells × width = flip-flops*. In Yosys 0.33 the `(* keep *)` must be on the `always` block; on the `reg` declaration alone it is not enough.
 
 ```bash
-yosys -s dff_infer.ys       # reports all five stages (script not in this folder)
+yosys -s dff_infer.ys       # reports all five stages
 # or manually:
 yosys -p "read_verilog dff_infer.v; synth -top dff_infer; stat -width"
 yosys -p "read_verilog dff_infer_keep.v; synth -top dff_infer; stat -width"
 ```
 
-### `number_multiplier.v`: constant multiplication folds to a shift
-`result = data_ext * (12'd13 + 12'd3)`. The constants fold to 16, so synthesis replaces the multiplier with a fixed left shift by 4 (no `$mul` cell survives).
+### `multiplication_optimisation.v`: constant multiplication folds to a shift
+`result = data_ext * (12'd13 + 12'd3)`. The constants fold to 16 during elaboration, so synthesis replaces the multiplier with a fixed left shift by 4: no `$mul` cell survives, and the output is just wiring. Writing the same arithmetic as two terms, `(data_ext * 12'd13) + (data_ext * 12'd3)`, is *not* folded by Yosys, and the hardware cost jumps:
+
+| Stage | `data_ext * (13 + 3)` | `(data_ext * 13) + (data_ext * 3)` |
+|---|---|---|
+| coarse `synth -run coarse` (RTL cells) | 0 cells | 1 × `$macc` |
+| generic `synth` (gate level) | 0 cells | ~170 gates (exact count varies with Yosys version) |
+| `synth_xilinx -family xc7` | I/O buffers only, 0 DSP48E1, 0 LUTs | 2 × DSP48E1 |
+
+`multiplication_optimisation.ys` runs all three stages on the current RTL; edit the `assign` line to try the two-term form.
+
 ```bash
-yosys -p "read_verilog number_multiplier.v; synth -top transfer; stat"
+yosys -s multiplication_optimisation.ys
+# or manually:
+yosys -p "read_verilog multiplication_optimisation.v; synth -top transfer; stat"
 ```
 
 ---
@@ -202,7 +213,7 @@ gcc -o number_formats number_formats.c
 | `matmul_comparison.c` | C | Transpose, blocking, OpenMP, NUMA/SMT | `gcc -O2 -fopenmp` |
 | `gpu_demo.c` | C | GPU compute-bound vs memory-bound | `-lOpenCL` + runtime |
 | `number_formats.c` | C | Float encoding, fixed-point error/overflow, non-associativity | `gcc` |
-| `dff_infer.v`, `dff_infer_keep.v` | Verilog | FF inference, merging, `(* keep *)` | Yosys |
-| `number_multiplier.v` | Verilog | Constant multiply → shift | Yosys |
+| `dff_infer.v`, `dff_infer_keep.v` (+ `dff_infer.ys`) | Verilog | FF inference, merging, `(* keep *)` | Yosys |
+| `multiplication_optimisation.v` (+ `.ys`) | Verilog | Constant folding: multiply → shift vs DSP blocks | Yosys |
 
 `col_row_maj_cache.txt` is a standalone cheat-sheet for that example; the compiled binaries in this folder are build artifacts and can be regenerated with the commands above.
