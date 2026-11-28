@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 260" width="470" height="260" role="img" aria-label="Register file with three 5-bit address ports, one 32-bit write data port, a write enable and two 32-bit read data ports">
+<title>Register file with three 5-bit address ports, one 32-bit write data port, a write enable and two 32-bit read data ports</title>
+<rect x="0" y="0" width="470" height="260" rx="6" fill="#ffffff" stroke="#d3dae1"/>
+<rect x="170" y="60" width="150" height="160" rx="4" fill="#dbe9f7" stroke="#43505c" stroke-width="1.6"/>
+<text x="245.0" y="140.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1c1c1c" text-anchor="middle"><tspan x="245.0" dy="-6">Register</tspan><tspan x="245.0" dy="18">File</tspan></text>
+<line x1="70" y1="90" x2="170" y2="90" stroke="#43505c" stroke-width="1.4"/>
+<line x1="115.0" y1="96" x2="125.0" y2="84" stroke="#43505c" stroke-width="1.2"/>
+<text x="122.0" y="81.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">5</text>
+<text x="176.0" y="94.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="start" font-weight="600" font-style="normal">rs1</text>
+<line x1="70" y1="125" x2="170" y2="125" stroke="#43505c" stroke-width="1.4"/>
+<line x1="115.0" y1="131" x2="125.0" y2="119" stroke="#43505c" stroke-width="1.2"/>
+<text x="122.0" y="116.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">5</text>
+<text x="176.0" y="129.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="start" font-weight="600" font-style="normal">rs2</text>
+<line x1="70" y1="165" x2="170" y2="165" stroke="#43505c" stroke-width="1.4"/>
+<line x1="115.0" y1="171" x2="125.0" y2="159" stroke="#43505c" stroke-width="1.2"/>
+<text x="122.0" y="156.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">5</text>
+<text x="176.0" y="169.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="start" font-weight="600" font-style="normal">rd</text>
+<line x1="70" y1="195" x2="170" y2="195" stroke="#43505c" stroke-width="1.4"/>
+<line x1="115.0" y1="201" x2="125.0" y2="189" stroke="#43505c" stroke-width="1.2"/>
+<text x="122.0" y="186.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">32</text>
+<text x="176.0" y="199.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="start" font-weight="600" font-style="normal">WD</text>
+<line x1="320" y1="100" x2="400" y2="100" stroke="#43505c" stroke-width="1.4"/>
+<line x1="355.0" y1="106" x2="365.0" y2="94" stroke="#43505c" stroke-width="1.2"/>
+<text x="362.0" y="91.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">32</text>
+<text x="314.0" y="104.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="end" font-weight="600" font-style="normal">RD1</text>
+<line x1="320" y1="165" x2="400" y2="165" stroke="#43505c" stroke-width="1.4"/>
+<line x1="355.0" y1="171" x2="365.0" y2="159" stroke="#43505c" stroke-width="1.2"/>
+<text x="362.0" y="156.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="600" font-style="normal">32</text>
+<text x="314.0" y="169.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#1c1c1c" text-anchor="end" font-weight="600" font-style="normal">RD2</text>
+<line x1="270" y1="30" x2="270" y2="60" stroke="#43505c" stroke-width="1.4"/>
+<line x1="265" y1="48" x2="275" y2="38" stroke="#43505c" stroke-width="1.2"/>
+<text x="280.0" y="42.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="9.5" fill="#5b6570" text-anchor="start" font-weight="normal" font-style="normal">1</text>
+<text x="270.0" y="24.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="normal" font-style="normal">WE</text>
+<line x1="210" y1="30" x2="210" y2="60" stroke="#43505c" stroke-width="1.4"/>
+<polygon points="203,60 217,60 210,72" fill="none" stroke="#43505c" stroke-width="1.4"/>
+<text x="210.0" y="24.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#1c1c1c" text-anchor="middle" font-weight="normal" font-style="normal">CLK</text>
+<text x="235.0" y="246.0" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" fill="#5b6570" text-anchor="middle" font-weight="normal" font-style="normal">32 x 32-bit integer registers  —  x0 is hardwired to 0</text>
+</svg>

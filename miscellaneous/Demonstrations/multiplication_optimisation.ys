@@ -1,0 +1,92 @@
+# =============================================================================
+# multiplication_optimisation.ys
+#
+# Design : multiplication_optimisation.v   (top module = transfer)
+#          assign result = data_ext * (12'd13 + 12'd3);   -> data_ext * 16
+# Run    : yosys -s multiplication_optimisation.ys
+#
+# Three synthesis possibilities are run on the same RTL:
+#
+#   1. Generic "coarse" synthesis  -> RTL cells      ($add / $mul / $macc)
+#   2. Generic full synthesis      -> gate level     (techmap + ABC: $_AND_, ...)
+#   3. Xilinx 7-series synthesis   -> primitives     (DSP48E1 / LUT / IBUF / OBUF)
+#
+# Expected result for the CURRENT RTL (13+3 folds to 16 at elaboration):
+#   coarse = 0 cells | full = 0 cells | xc7 = IOB only, 0 DSP48E1, 0 LUT, 0 LC
+#
+# For reference, the two-term form
+#   assign result = (data_ext * 12'd13) + (data_ext * 12'd3);
+# is NOT folded by Yosys and gives:
+#   coarse = 1 x $macc | full = 176 gates | xc7 = 2 x DSP48E1
+# =============================================================================
+
+
+# =============================================================================
+# 1. GENERIC COARSE SYNTHESIS  (behavioural Verilog -> RTL cells)
+#    stage: proc -> opt_expr -> opt -> fsm -> opt -> wreduce -> peepopt ->
+#           opt_clean -> alumacc -> share -> opt -> memory -nomap -> opt_clean
+# =============================================================================
+log
+log =============================================================================
+log SECTION 1 : GENERIC COARSE SYNTHESIS  (behavioural Verilog - RTL cells)
+log =============================================================================
+
+read_verilog multiplication_optimisation.v
+hierarchy -check -top transfer
+
+synth -top transfer -run coarse
+stat -width
+
+# stat with a type filter, e.g. only arithmetic operators:
+# stat -width t:$add t:$mul t:$alu t:$macc
+# keep $mul + $add instead of letting alumacc build a $macc:
+# synth -top transfer -noalumacc -run coarse
+# stat -width
+
+
+# =============================================================================
+# 2. GENERIC FULL SYNTHESIS  (adds the "fine" stage: techmap + ABC)
+#    -> technology-independent gate netlist ($_AND_, $_OR_, $_XOR_, $dff, ...)
+# =============================================================================
+log
+log =============================================================================
+log SECTION 2 : GENERIC FULL SYNTHESIS  (techmap + ABC - gate level)
+log =============================================================================
+
+design -reset
+read_verilog multiplication_optimisation.v
+hierarchy -check -top transfer
+
+synth -top transfer
+stat -width
+check
+
+# re-map to a fixed gate set if wanted:
+# abc -g AND,OR,XOR,NAND,NOR,XNOR,ANDNOT,ORNOT
+# stat -width
+# write_verilog -noattr multiplication_optimisation_gates.v
+
+
+# =============================================================================
+# 3. XILINX 7-SERIES SYNTHESIS  (DSP48E1 / LUT / IO inference)
+#    map_dsp: techmap -map +/mul2dsp.v -map +/xilinx/xc7_dsp_map.v
+#             (multipliers by constants such as 13 and 3 become DSP48E1 blocks)
+# =============================================================================
+log
+log =============================================================================
+log SECTION 3 : XILINX 7-SERIES SYNTHESIS  (DSP48E1 / LUT / IO inference)
+log =============================================================================
+
+design -reset
+read_verilog multiplication_optimisation.v
+hierarchy -check -top transfer
+
+synth_xilinx -top transfer -family xc7
+stat -width
+
+# force LUTs instead of hard multipliers:
+# synth_xilinx -top transfer -family xc7 -nodsp
+# stat -width
+# write_verilog -noattr multiplication_optimisation_xc7.v
+
+## run it with yosys -s multiplication_optimisation.ys

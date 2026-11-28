@@ -1,0 +1,555 @@
+
+<!-- saved from url=(0067)https://nus-cs2100de.github.io/animations/vectored_nonvectored.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISC-V Interrupt Simulator</title>
+<script>
+// ALL GLOBAL FUNCTIONS FIRST BEFORE ANYTHING ELSE
+function nextStep() {
+    saveState();
+    switch (state.currentState) {
+        case 'MAIN_RUNNING': handleMainRunning(); break;
+        case 'INTERRUPT_PENDING': handleInterruptPending(); break;
+        case 'CONTEXT_SWITCH': handleContextSwitch(); break;
+        case 'ISR_RUNNING': handleISRRunning(); break;
+        case 'INTERRUPT_RETURN': handleInterruptReturn(); break;
+    }
+    render();
+}
+function stepBack() {
+    if (history.length === 0) return;
+    state = JSON.parse(history.pop());
+    render();
+}
+function resetSimulation() {
+    state = {
+        pc: 0x0000,
+        epc: null,
+        interruptId: null,
+        interruptActive: false,
+        mode: state.mode,
+        currentState: 'MAIN_RUNNING',
+        pollingStatus: { 1: 'none', 2: 'none' }
+    };
+    history = [];
+    render();
+}
+function triggerInterrupt(id) {
+    if (state.currentState !== 'MAIN_RUNNING') return;
+    state.interruptId = id;
+    state.interruptActive = true;
+    state.currentState = 'INTERRUPT_PENDING';
+    if (state.mode === 'nonvectored') state.pollingStatus[id] = 'active';
+    render();
+}
+function setMode(mode) {
+    document.querySelectorAll('.mode-btn').forEach(b => {
+        b.classList.remove('active','with-vectored');
+        if(b.id === `mode-${mode}`) {
+            b.classList.add('active');
+            if(mode === 'vectored') b.classList.add('with-vectored');
+        }
+    });
+    state.mode = mode;
+    resetSimulation();
+}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:#0a0e27;color:#e0e0e0;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+}
+.header{
+  text-align:center;padding:12px 16px 6px;
+  background:linear-gradient(135deg,#0a0e27,#1a1e47);
+  border-bottom:2px solid #2a2e57;flex-shrink:0;
+}
+.header h1{
+  font-size:clamp(1rem,3.2vw,1.6rem);
+  background:linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;margin-bottom:3px;
+}
+.header p{color:#8888aa;font-size:clamp(0.65rem,1.8vw,0.82rem)}
+.mode-selector{
+  display:flex;justify-content:center;gap:8px;
+  padding:8px 12px;background:#0d1130;
+  border-bottom:1px solid #2a2e57;flex-shrink:0;flex-wrap:wrap;
+}
+.mode-btn{
+  padding:7px 14px;border:2px solid #3a3e67;border-radius:30px;
+  background:transparent;color:#aaa;font-size:clamp(0.68rem,1.8vw,0.82rem);
+  cursor:pointer;transition:all .3s;font-weight:600;white-space:nowrap;
+}
+.mode-btn:hover{border-color:#60a5fa;color:#60a5fa;background:rgba(96,165,250,.08)}
+.mode-btn.active{border-color:#f87171;background:rgba(248,113,113,.13);color:#f87171;box-shadow:0 0 15px rgba(248,113,113,.1)}
+.mode-btn.active.with-vectored{border-color:#34d399;background:rgba(52,211,153,.13);color:#34d399;box-shadow:0 0 15px rgba(52,211,153,.1)}
+
+.main-container{
+  display:flex;flex:1;overflow:hidden;
+  max-width:1500px;width:100%;margin:0 auto;
+  padding:10px;gap:10px;
+  justify-content:center;
+}
+.viz-panel{flex:0 1 560px;min-width:0;display:flex;flex-direction:column}
+.info-panel{
+  width:380px;flex-shrink:0;display:flex;flex-direction:column;
+  gap:8px;overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:thin;scrollbar-color:#2a2e57 transparent;
+}
+.info-panel::-webkit-scrollbar{width:5px}
+.info-panel::-webkit-scrollbar-thumb{background:#2a2e57;border-radius:4px}
+
+.controls{
+  display:flex;justify-content:center;align-items:center;gap:10px;
+  padding:8px 12px;background:#0d1130;border-radius:10px;
+  border:1px solid #2a2e57;margin-top:8px;flex-shrink:0;
+  max-width:560px;align-self:center;width:100%;
+}
+.ctrl-btn{
+  width:40px;height:40px;border-radius:50%;border:2px solid #3a3e67;
+  background:rgba(255,255,255,.03);color:#ccc;font-size:1rem;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;
+}
+.ctrl-btn:hover:not(:disabled){border-color:#60a5fa;color:#60a5fa;background:rgba(96,165,250,.1);transform:scale(1.05)}
+.ctrl-btn:disabled{opacity:.3;cursor:not-allowed}
+.ctrl-btn.primary{width:48px;height:48px;border-color:#60a5fa;color:#60a5fa;font-size:1.2rem}
+.step-indicator{font-size:.82rem;color:#8888aa;min-width:68px;text-align:center;font-weight:600}
+.kbd-hint{text-align:center;margin-top:5px;font-size:.67rem;color:#444;flex-shrink:0;line-height:1.5}
+.kbd{display:inline-block;padding:1px 5px;background:#1a1e47;border:1px solid #3a3e67;border-radius:3px;font-family:monospace;font-size:.67rem;color:#777}
+
+.card{background:linear-gradient(145deg,#0d1130,#111540);border:1px solid #2a2e57;border-radius:10px;padding:10px}
+.card h3{font-size:.73rem;text-transform:uppercase;letter-spacing:.7px;color:#60a5fa;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.card h3 .icon{font-size:.95rem}
+
+#state-display{
+  text-align:center;font-weight:bold;
+  background:rgba(96,165,250,.08);
+  padding:8px 18px;
+  border-radius:20px;
+  margin:8px auto;
+  border:1px solid #60a5fa;
+  color:#93c5fd;
+}
+
+/* Registers & Peripherals */
+.reg-peri-card{
+  max-width:560px;
+  align-self:center;
+  width:100%;
+}
+#registers{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+  margin-bottom:12px;
+}
+.reg-box{
+  background:rgba(0,0,0,0.2);
+  padding:8px 5px;
+  border-radius:6px;
+  text-align:center;
+  border:1px solid #2a2e57;
+}
+.reg-label{font-size:.7em;display:block;opacity:0.7;color:#8888aa}
+.reg-val{color:#fbbf24;font-weight:bold;font-size:1.1em;font-family:'Fira Code','Cascadia Code',monospace}
+
+#interrupt-controller{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.peripheral{
+  width:150px;
+  padding:10px 12px;
+  background:#111540;
+  border:2px solid #2a2e57;
+  border-radius:8px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  cursor:pointer;
+  user-select:none;
+  font-size:.85em;
+  transition:all .2s;
+}
+.peripheral:hover{border-color:#4a4e87}
+.peripheral.asserted-trigger{
+  border-color:#f87171;
+  box-shadow:0 0 12px rgba(248,113,113,.5);
+}
+.peripheral-irq{
+  width:14px;
+  height:14px;
+  border-radius:3px;
+  background:#1a1e47;
+  transition:all .2s;
+}
+.peripheral-irq.asserted{
+  background:#f87171;
+  box-shadow:0 0 8px #f87171;
+}
+
+/* Code Display */
+.code-block{
+  background:#11112b;
+  padding:8px 10px;
+  border-radius:6px;
+  font-family:'Fira Code','Cascadia Code','JetBrains Mono',monospace;
+  font-size:clamp(0.62rem,1.5vw,0.76rem);
+  max-height:160px;
+  overflow-y:auto;
+  margin-bottom:10px;
+  scroll-behavior:smooth;
+  scrollbar-width:thin;
+  scrollbar-color:#2a2e57 transparent;
+}
+.code-block::-webkit-scrollbar{height:3px;width:4px}
+.code-block::-webkit-scrollbar-thumb{background:#2a2e57;border-radius:2px}
+
+.instruction{
+  display:flex;
+  padding:3px 6px;
+  border-radius:3px;
+  white-space:pre;
+  border-left:2px solid transparent;
+}
+.instruction.highlight{
+  background:rgba(96,165,250,.12);
+  border-left-color:#60a5fa;
+  color:#93c5fd;
+}
+.instruction.active-vector{
+  background:rgba(251,191,36,.15);
+  border-left-color:#fbbf24;
+  color:#fcd34d;
+}
+.addr{color:#585b70;margin-right:12px;min-width:56px;display:inline-block}
+
+/* Vector Table */
+#vector-table-display{
+  margin-top:12px;
+  border-top:1px solid #2a2e57;
+  padding-top:8px;
+}
+.vector-entry{padding:3px 6px;font-family:'Fira Code',monospace;font-size:.8em}
+.vector-entry.active-vector{background:rgba(251,191,36,.12);color:#fcd34d;border-radius:4px}
+
+/* Polling Indicators */
+.polling-group{display:flex;gap:16px;margin:8px 0;justify-content:center}
+.polling-indicator{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:#2a2e57;
+  transition:all .3s;
+}
+.polling-indicator.active{background:#f87171;box-shadow:0 0 8px #f87171}
+.polling-indicator.handled{background:#34d399;box-shadow:0 0 6px #34d399}
+
+/* Responsive */
+@media(max-width:1024px){
+  body{min-height:0}
+  .main-container{flex-direction:column;overflow:visible;flex:0 0 auto;padding:8px}
+  .viz-panel{flex:0 0 auto;width:100%}
+  .info-panel{width:100%;overflow:visible;flex-shrink:0}
+  .kbd-hint{display:none}
+  .reg-peri-card{max-width:none}
+  .controls{max-width:none}
+}
+@media(max-width:600px){
+  .mode-btn{padding:5px 10px;font-size:.68rem}
+  .controls{gap:6px;padding:6px}
+  .ctrl-btn{width:36px;height:36px;font-size:.95rem}
+  .ctrl-btn.primary{width:42px;height:42px;font-size:1.1rem}
+  .step-indicator{font-size:.74rem;min-width:58px}
+  .card{padding:8px}
+  .code-block{font-size:.62rem}
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🧠 RISC-V Interrupt Simulator</h1>
+  <p>Vectored vs Non-Vectored Interrupt Handling - Interactive Visualizer</p>
+</div>
+
+<div class="mode-selector">
+  <button class="mode-btn active with-vectored" id="mode-vectored" onclick="setMode('vectored')">✅ Vectored Mode</button>
+  <button class="mode-btn" id="mode-nonvectored" onclick="setMode('nonvectored')">⏳ Non-Vectored Mode</button>
+</div>
+
+<div id="state-display">State: MAIN_RUNNING (Vectored)</div>
+
+<div class="main-container">
+  <div class="viz-panel">
+    <div class="card reg-peri-card">
+      <h3><span class="icon">📟</span> CPU Registers</h3>
+      <div id="registers">
+        <div class="reg-box"><span class="reg-label">PC</span><span id="reg-pc" class="reg-val">0x0000</span></div>
+        <div class="reg-box"><span class="reg-label">EPC</span><span id="reg-epc" class="reg-val">N/A</span></div>
+        <div class="reg-box"><span class="reg-label">IRQ ID</span><span id="reg-irq" class="reg-val">N/A</span></div>
+      </div>
+
+      <h3><span class="icon">🔌</span> Peripherals (Click to trigger IRQ)</h3>
+      <div id="interrupt-controller">
+        <div class="peripheral" id="peri-1" onclick="triggerInterrupt(1)">
+          <span>🖨️ Peripheral 1</span>
+          <div class="peripheral-irq" id="irq-1"></div>
+        </div>
+        <div class="peripheral" id="peri-2" onclick="triggerInterrupt(2)">
+          <span>💾 Peripheral 2</span>
+          <div class="peripheral-irq" id="irq-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="btn-reset" title="Reset (R)" onclick="resetSimulation()">⟲</button>
+      <button class="ctrl-btn" id="btn-back" title="Previous (←)" onclick="stepBack()" disabled="">◀</button>
+      <span class="step-indicator">Step</span>
+      <button class="ctrl-btn primary" id="btn-step" title="Next Step (→/Space)" onclick="nextStep()">▶</button>
+    </div>
+
+    <div class="kbd-hint">
+      <span class="kbd">←</span> Prev <span class="kbd">→</span><span class="kbd">Space</span> Next <span class="kbd">R</span> Reset
+    </div>
+  </div>
+
+  <div class="info-panel">
+    <div class="card">
+      <h3><span class="icon">📝</span> Main Program</h3>
+      <div id="main-program" class="code-block"><div class="instruction highlight"><span class="addr">0x0000:</span><span class="text">lw t0, 0(s0)</span></div><div class="instruction"><span class="addr">0x0004:</span><span class="text">addi t0, t0, 1</span></div><div class="instruction"><span class="addr">0x0008:</span><span class="text">sw t0, 0(s0)</span></div><div class="instruction"><span class="addr">0x000C:</span><span class="text">bne t3, t4, 0x0000</span></div></div>
+    </div>
+
+    <div id="isr-vectored-container" style="display: block;">
+      <div class="card">
+        <h3><span class="icon">⚡</span> Vectored ISRs</h3>
+        <div id="isr-a" class="code-block"><div class="instruction"><span class="addr">0x8000:</span><span class="text">ack_int_1</span></div><div class="instruction"><span class="addr">0x8004:</span><span class="text">addi t1, t1, 10</span></div><div class="instruction"><span class="addr">0x8008:</span><span class="text">eret</span></div></div>
+        <div id="isr-b" class="code-block"><div class="instruction"><span class="addr">0x8800:</span><span class="text">ack_int_2</span></div><div class="instruction"><span class="addr">0x8804:</span><span class="text">addi t2, t2, 20</span></div><div class="instruction"><span class="addr">0x8808:</span><span class="text">eret</span></div></div>
+      </div>
+    </div>
+
+    <div id="isr-nonvectored-container" style="display: none;">
+      <div class="card">
+        <h3><span class="icon">🔍</span> Non-Vectored ISR</h3>
+        <div id="isr-nv" class="code-block"></div>
+        <div class="polling-group">
+          <div class="polling-indicator" id="poll-1"></div>
+          <span style="font-size:.75em">Polling sequence</span>
+          <div class="polling-indicator" id="poll-2"></div>
+        </div>
+        <h3><span class="icon">📋</span> Handlers</h3>
+        <div id="handle-1" class="code-block"></div>
+        <div id="handle-2" class="code-block"></div>
+      </div>
+    </div>
+
+    <div id="vector-table-display" style="display: block;">
+      <div class="card">
+        <h3><span class="icon">📖</span> Vector Table</h3>
+        <div id="v-table-content"><div class="vector-entry">IRQ 1 → 0x8000</div><div class="vector-entry">IRQ 2 → 0x8800</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/** --- DATA STRUCTURES --- **/
+const MEMORY = {
+    "0x0000": "lw t0, 0(s0)",
+    "0x0004": "addi t0, t0, 1",
+    "0x0008": "sw t0, 0(s0)",
+    "0x000C": "bne t3, t4, 0x0000",
+    "0x8000": "ack_int_1",
+    "0x8004": "addi t1, t1, 10",
+    "0x8008": "eret",
+    "0x8800": "ack_int_2",
+    "0x8804": "addi t2, t2, 20",
+    "0x8808": "eret",
+    "0x9000": "lw t3, INT_STATUS",
+    "0x9004": "bne t3, ID_1, 0x900C",
+    "0x9008": "jal ra, 0x9100",
+    "0x900C": "bne t3, ID_2, 0x9014",
+    "0x9010": "jal ra, 0x9200",
+    "0x9014": "eret",
+    "0x9100": "ack_int_1",
+    "0x9104": "addi t1, t1, 10",
+    "0x9108": "ret",
+    "0x9200": "ack_int_2",
+    "0x9204": "addi t2, t2, 20",
+    "0x9208": "ret"
+};
+
+const VECTOR_TABLE = [
+    { id: 1, addr: "0x8000", label: "IRQ 1" },
+    { id: 2, addr: "0x8800", label: "IRQ 2" }
+];
+
+let state = {
+    pc: 0x0000,
+    epc: null,
+    interruptId: null,
+    interruptActive: false,
+    mode: 'vectored',
+    currentState: 'MAIN_RUNNING',
+    pollingStatus: { 1: 'none', 2: 'none' }
+};
+
+let history = [];
+
+function saveState() {
+    history.push(JSON.stringify(state));
+    if (history.length > 50) history.shift();
+}
+
+function handleMainRunning() {
+    state.pc += 4;
+    if (state.pc > 0x000C) state.pc = 0x0000;
+}
+
+function handleInterruptPending() {
+    if (state.mode === 'vectored') {
+        state.currentState = 'CONTEXT_SWITCH';
+    } else {
+        state.epc = state.pc;
+        state.pc = 0x9000;
+        state.currentState = 'ISR_RUNNING';
+    }
+}
+
+function handleContextSwitch() {
+    state.epc = state.pc;
+    const vector = VECTOR_TABLE.find(v => v.id === state.interruptId);
+    state.pc = parseInt(vector.addr, 16);
+    state.currentState = 'ISR_RUNNING';
+}
+
+function handleISRRunning() {
+    const currentPCStr = "0x" + state.pc.toString(16).toUpperCase().padStart(4, '0');
+    const instr = MEMORY[currentPCStr];
+
+    if (instr && instr.startsWith('ack_int')) {
+        state.interruptActive = false; 
+    }
+
+    if (state.mode === 'nonvectored') {
+        if (state.pc === 0x9004) {
+            if (state.interruptId === 1) state.pc = 0x9008;
+            else state.pc = 0x900C;
+        } 
+        else if (state.pc === 0x9008) state.pc = 0x9100;
+        else if (state.pc === 0x900C) {
+            if (state.interruptId === 2) state.pc = 0x9010;
+            else state.pc = 0x9014;
+        }
+        else if (state.pc === 0x9010) state.pc = 0x9200;
+        else if (state.pc === 0x9108 || state.pc === 0x9208) {
+            state.pc = (state.pc === 0x9108) ? 0x900C : 0x9014;
+        }
+        else if (state.pc === 0x9014) state.currentState = 'INTERRUPT_RETURN';
+        else state.pc += 4;
+    } else {
+        if (instr === 'eret') state.currentState = 'INTERRUPT_RETURN';
+        else state.pc += 4;
+    }
+}
+
+function handleInterruptReturn() {
+    state.pc = state.epc;
+    state.epc = null;
+    state.interruptId = null;
+    state.interruptActive = false;
+    state.currentState = 'MAIN_RUNNING';
+    state.pollingStatus = { 1: 'none', 2: 'none' };
+}
+
+function render() {
+    document.getElementById('state-display').innerText = `State: ${state.currentState} ${state.mode === 'vectored' ? '(Vectored)' : '(Non-Vectored)'}`;
+    document.getElementById('reg-pc').innerText = '0x' + state.pc.toString(16).toUpperCase().padStart(4, '0');
+    document.getElementById('reg-epc').innerText = state.epc !== null ? '0x' + state.epc.toString(16).toUpperCase().padStart(4, '0') : 'N/A';
+    document.getElementById('reg-irq').innerText = state.interruptId !== null ? state.interruptId : 'N/A';
+
+    [1, 2].forEach(id => {
+        const peri = document.getElementById(`peri-${id}`);
+        const irq = document.getElementById(`irq-${id}`);
+        peri.classList.toggle('asserted-trigger', state.interruptActive && state.interruptId === id);
+        irq.classList.toggle('asserted', state.interruptActive && state.interruptId === id);
+    });
+
+    document.getElementById('btn-back').disabled = history.length === 0;
+    renderCode('main-program', 0x0000, 0x000C);
+    
+    const isVectored = state.mode === 'vectored';
+    document.getElementById('isr-vectored-container').style.display = isVectored ? 'block' : 'none';
+    document.getElementById('isr-nonvectored-container').style.display = isVectored ? 'none' : 'block';
+    document.getElementById('vector-table-display').style.display = isVectored ? 'block' : 'none';
+
+    if (isVectored) {
+        renderCode('isr-a', 0x8000, 0x8008);
+        renderCode('isr-b', 0x8800, 0x8808);
+    } else {
+        renderCode('isr-nv', 0x9000, 0x9014);
+        renderCode('handle-1', 0x9100, 0x9108);
+        renderCode('handle-2', 0x9200, 0x9208);
+        document.getElementById('poll-1').className = 'polling-indicator ' + state.pollingStatus[1];
+        document.getElementById('poll-2').className = 'polling-indicator ' + state.pollingStatus[2];
+    }
+
+    const vTableContent = document.getElementById('v-table-content');
+    vTableContent.innerHTML = '';
+    VECTOR_TABLE.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'vector-entry';
+        if (state.currentState === 'CONTEXT_SWITCH' && state.interruptId === v.id) div.classList.add('active-vector');
+        div.innerHTML = `${v.label} &rarr; ${v.addr}`;
+        vTableContent.appendChild(div);
+    });
+
+    document.querySelectorAll('.code-block').forEach(block => {
+        const highlighted = block.querySelector('.instruction.highlight');
+        if (highlighted) {
+            highlighted.scrollIntoView({ block: 'nearest', inline: 'start' });
+        }
+    });
+}
+
+function renderCode(containerId, startAddr, endAddr) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    for (let addr = startAddr; addr <= endAddr; addr += 4) {
+        const addrStr = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+        const instr = MEMORY[addrStr] || 'nop';
+        const div = document.createElement('div');
+        div.className = 'instruction';
+        if (state.pc === addr) div.classList.add('highlight');
+        if (state.currentState === 'CONTEXT_SWITCH' && state.mode === 'vectored') {
+            const vector = VECTOR_TABLE.find(v => v.id === state.interruptId);
+            if (vector && addr === parseInt(vector.addr, 16)) div.classList.add('active-vector');
+        }
+        div.innerHTML = `<span class="addr">${addrStr}:</span><span class="text">${instr}</span>`;
+        container.appendChild(div);
+    }
+}
+
+
+
+document.addEventListener('keydown', e => {
+    if(e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+    else if(e.key === 'ArrowLeft') { e.preventDefault(); stepBack(); }
+    else if(e.key === 'r' || e.key === 'R') resetSimulation();
+});
+
+document.querySelector('.main-container').addEventListener('click', e => { if(!e.target.closest('button')) nextStep(); });
+
+resetSimulation();
+
+</script>
+
+</body>
+</html>

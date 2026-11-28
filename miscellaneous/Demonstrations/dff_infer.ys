@@ -1,0 +1,145 @@
+# =============================================================================
+# dff_infer.ys
+#
+# Design : dff_infer.v        (top module = dff_infer)
+#          always @(posedge clk)
+#              if (reset)       reg_a <= 0;       reg_b <= 0;
+#              else if (enable) reg_a <= data_in; reg_b <= data_in;
+#          assign out_a = reg_a;  assign out_b = reg_b;
+#          pure Verilog-2001: reg + always @(posedge clk), read without -sv
+#
+# QUESTION: how many flip-flops does this code infer?
+#
+#   RTL structure, i.e. what the code implies : 2 x 8-bit = 16 flip-flops
+#   Yosys netlist after optimization          : 8 flip-flops
+#
+#   Yosys is not wrong: reg_a and reg_b are *always* loaded with the same
+#   value (reset -> 8'h00, enable -> data_in, else hold), so they are the
+#   same register.  proc creates two $dff cells (16 FFs, SECTION 1), then
+#   opt_dff folds reset/enable into $sdffe cells and opt_merge merges the
+#   two identical $sdffe_8 cells into one, which then drives both out_a and
+#   out_b (SECTION 2).  SECTION 5 synthesizes the same RTL with (* keep *) on
+#   the always block, which blocks the merge and leaves all 16 FFs.
+#
+# Run: yosys -s dff_infer.ys
+#
+# Flip-flop count per section (stat -width prints the cell width as an "_8"
+# suffix, so cells x width = flip-flops):
+#
+#   SECTION 1  proc only            -> $dff_8        x 2  = 16 FFs
+#   SECTION 2  proc + opt           -> $sdffe_8      x 1  =  8 FFs
+#   SECTION 3  generic full synth   -> $_SDFFE_PP0P_ x 8  =  8 FFs
+#   SECTION 4  Xilinx 7-series      -> FDRE          x 8  =  8 FFs
+#   SECTION 5  (* keep *) variant   -> $_SDFFE_PP0P_ x 16 = 16 FFs
+# =============================================================================
+
+
+# =============================================================================
+# SECTION 1 : RTL INFERENCE  (proc only - one $dff per registered signal)
+#             reg_a -> one $dff cell of width 8, reg_b -> one $dff of width 8
+# =============================================================================
+log
+log =============================================================================
+log SECTION 1 : RTL INFERENCE  (proc - RTL cells)  -> 16 flip-flops
+log =============================================================================
+
+read_verilog dff_infer.v
+hierarchy -check -top dff_infer
+
+proc
+
+# stat -width: "2 cells of $dff_8" = 2 x 8 bits = 16 FFs
+# (the 4 $mux_8 come from the reset/enable if-else chain)
+stat -width
+
+# same thing as a plain count of the flip-flop cells (2 objects = 2 FF cells)
+select -count t:$dff* t:$sdff* t:$adff* t:$aldff*
+
+# show that there really are TWO separate registers (Q = \reg_a and \reg_b)
+dump t:$dff
+
+
+# =============================================================================
+# SECTION 2 : AFTER OPTIMIZATION  (opt - opt_dff + opt_merge)
+#             reset/enable are folded into a single $sdffe cell (SRST + EN)
+#             and the two identical cells are merged -> 8 flip-flops
+# =============================================================================
+log
+log =============================================================================
+log SECTION 2 : AFTER OPT  -> 8 flip-flops  (identical registers merged)
+log =============================================================================
+
+design -reset
+read_verilog dff_infer.v
+hierarchy -check -top dff_infer
+
+proc
+opt
+
+# stat -width: "1 cell of $sdffe_8" = 8 FFs
+#   $dff     -> $sdffe : reset becomes the SRST input, enable the EN input
+#   $sdffe 2 -> $sdffe 1 : opt_merge shares the two identical registers
+stat -width
+select -count t:$dff* t:$sdff* t:$adff* t:$aldff*
+
+
+# =============================================================================
+# SECTION 3 : GENERIC FULL SYNTHESIS  (techmap + ABC - gate level)
+#             $_SDFFE_PP0P_ = posedge FF, synchronous reset to 0, clock enable
+# =============================================================================
+log
+log =============================================================================
+log SECTION 3 : GENERIC FULL SYNTHESIS  -> 8 flip-flops
+log =============================================================================
+
+design -reset
+read_verilog dff_infer.v
+hierarchy -check -top dff_infer
+
+synth -top dff_infer
+stat -width
+select -count t:$_DFF* t:$_SDFF*
+check
+
+# inspect the merged netlist (there out_a and out_b are both driven by reg_b):
+# write_verilog -noattr dff_infer_gates.v
+
+
+# =============================================================================
+# SECTION 4 : XILINX 7-SERIES SYNTHESIS  (primitive inference)
+#             sync reset -> R pin, enable -> CE pin, so no LUT is needed
+# =============================================================================
+log
+log =============================================================================
+log SECTION 4 : XILINX 7-SERIES SYNTHESIS  -> 8 flip-flops (FDRE)
+log =============================================================================
+
+design -reset
+read_verilog dff_infer.v
+hierarchy -check -top dff_infer
+
+synth_xilinx -top dff_infer -family xc7
+stat -width
+select -count t:FDRE t:FDCE t:FDSE t:FDPE
+
+
+# =============================================================================
+# SECTION 5 : THE SAME RTL WITH (* keep *) ON THE always block
+#             the "keep" attribute protects the registers from opt_merge, so
+#             the netlist keeps BOTH registers -> 16 flip-flops
+#             (a (* keep *) on the reg_b declaration is NOT enough in 0.33)
+# =============================================================================
+log
+log =============================================================================
+log SECTION 5 : (* keep *) VARIANT  -> 16 flip-flops
+log =============================================================================
+
+design -reset
+read_verilog dff_infer_keep.v
+hierarchy -check -top dff_infer
+
+synth -top dff_infer
+stat -width
+select -count t:$_DFF* t:$_SDFF*
+
+## run it with yosys -s dff_infer.ys
