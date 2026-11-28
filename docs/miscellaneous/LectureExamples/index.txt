@@ -1,0 +1,15 @@
+# Example Index
+
+The **Example:** dropdown, in row order, filtered by `Lang`. Add a program by
+adding a row and dropping the file in `asm/` or `c/`.
+
+`IROM` and `DMEM` are the `IROM_DEPTH_BITS` / `DMEM_DEPTH_BITS` the program
+needs, so its memory is `2**bits` bytes. Selecting an example sets the Linker
+segment sizes from them, and HDL mode refuses a program that does not fit the
+loaded `Wrapper.v`.
+
+| Key | Lang | Label | File | IROM | DMEM | Description |
+|-----|------|-------|------|------|------|--------------|
+| week6sample | asm | Week 6 Sample | Week6Sample.asm | 9 | 9 | Week 6 Example — load a word from data memory |
+| week6quiz | asm | Week 6 Quiz | Week6Quiz.asm | 9 | 9 | Week 6 Quiz — load, add and store loop over four words |
+| week11sample | asm | Week 11 Sample | Week11Sample.asm | 9 | 9 | Week 11 Branch Prediction Example |
